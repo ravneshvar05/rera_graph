@@ -12,7 +12,7 @@ Example:
 
 import json
 import re
-from typing import Optional
+from typing import Optional, Union, List
 from groq import Groq
 from pydantic import BaseModel, Field
 from loguru import logger
@@ -32,17 +32,17 @@ class QueryIntent(BaseModel):
         "SPECIFIC",
         description="SPECIFIC (user wants particular units) or GLOBAL (user wants overview/all projects)",
     )
-    bhk: Optional[int] = Field(None, description="Number of BHK rooms requested (1, 2, 3, 4, 5)")
-    property_type: Optional[str] = Field(
-        None, description="APARTMENT, VILLA, TENEMENT, BUNGALOW, or None"
+    bhk: Optional[Union[int, List[int]]] = Field(None, description="Number of BHK rooms requested (1, 2, 3, 4, 5) or list of numbers")
+    property_type: Optional[Union[str, List[str]]] = Field(
+        None, description="APARTMENT, VILLA, TENEMENT, BUNGALOW, or None or list of types"
     )
-    city: Optional[str] = Field(None, description="City name, e.g. Ahmedabad, Surat")
-    neighbourhood: Optional[str] = Field(
-        None, description="Locality/neighbourhood, e.g. Vinzol, Bopal, Nikol"
+    city: Optional[Union[str, List[str]]] = Field(None, description="City name or list of cities, e.g. Ahmedabad, Surat")
+    neighbourhood: Optional[Union[str, List[str]]] = Field(
+        None, description="Locality/neighbourhood or list of localities, e.g. Vinzol, Bopal, Nikol"
     )
-    zone: Optional[str] = Field(
+    zone: Optional[Union[str, List[str]]] = Field(
         None,
-        description="Zone, e.g. 'West Ahmedabad', 'East Ahmedabad', 'South Ahmedabad'",
+        description="Zone or list of zones, e.g. 'West Ahmedabad', 'East Ahmedabad', 'South Ahmedabad'",
     )
     amenities: list[str] = Field(
         default_factory=list,
@@ -81,11 +81,11 @@ Return ONLY a valid JSON object matching this schema — no explanation, no mark
 Schema:
 {
   "query_type": "SPECIFIC" or "GLOBAL",
-  "bhk": <integer or null>,
-  "property_type": "APARTMENT" | "VILLA" | "TENEMENT" | "BUNGALOW" | null,
-  "city": <string or null>,
-  "neighbourhood": <string or null>,
-  "zone": <string or null — e.g. "West Ahmedabad">,
+  "bhk": <integer, list of integers, or null>,
+  "property_type": <"APARTMENT" | "VILLA" | "TENEMENT" | "BUNGALOW" | list of types | null>,
+  "city": <string, list of strings, or null>,
+  "neighbourhood": <string, list of strings, or null>,
+  "zone": <string, list of strings, or null, e.g. "West Ahmedabad">,
   "amenities": [<list of amenity strings>],
   "landmark_types": [<from: EDUCATION, HEALTHCARE, COMMERCIAL, TRANSPORT, RELIGIOUS, RECREATION>],
   "specific_landmarks": [<list of specific place names>],

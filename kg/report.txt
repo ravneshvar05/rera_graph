@@ -1,0 +1,69 @@
+=================================================================
+FULL NEO4J DATA AUDIT
+=================================================================
+
+[JSON SOURCE SUMMARY]
+  Total projects:   20
+  Total landmarks:  228
+  Total units:      71
+  Total rooms:      893
+  Room types found: ['BALCONY', 'BATHROOM', 'BEDROOM', 'COURTYARD', 'DINING', 'DRAWING_ROOM', 'DRESSING_ROOM', 'FOYER', 'KITCHEN', 'LOBBY', 'OTHER', 'PASSAGE', 'POOJA_ROOM', 'SERVANT_ROOM', 'STORE_ROOM', 'STUDY_ROOM', 'TERRACE', 'TOILET', 'UTILITY_ROOM', 'WASH_AREA', 'WC']
+
+[NEO4J GRAPH COUNTS]
+  Projects:       20  (JSON has 20) OK
+  Neighbourhoods: 19
+  Cities:         2
+  Landmark nodes: 224
+  NEAR rels:      228  (JSON total lm count = 228) OK
+  Units:          71  (JSON has 71) OK
+  Rooms:          893  (JSON has 893) OK
+
+[ROOM TYPE DISTRIBUTION IN NEO4J]
+  BEDROOM               188  OK
+  TOILET                147  OK
+  DRAWING_ROOM           72  OK
+  KITCHEN                71  OK
+  WASH_AREA              66  OK
+  BALCONY                66  OK
+  OTHER                  43  OK
+  STORE_ROOM             40  OK
+  DINING                 32  OK
+  DRESSING_ROOM          24  OK
+  WC                     22  OK
+  TERRACE                22  OK
+  POOJA_ROOM             21  OK
+  BATHROOM               20  OK
+  LOBBY                  18  OK
+  FOYER                  17  OK
+  COURTYARD               7  OK
+  SERVANT_ROOM            6  OK
+  UTILITY_ROOM            4  OK
+  PASSAGE                 4  OK
+  STUDY_ROOM              3  OK
+
+[PROJECTS WITH NO LANDMARK NODES IN GRAPH] (2)
+  - Neelkanth Status
+  - Palak Elina
+
+[PROJECTS WITH NO ADDRESS IN GRAPH] (3)
+  - NIVAAN GREENS
+  - Neelkanth Status
+  - Sky Avenue
+
+[PROJECTS WITH NO UNITS IN GRAPH] (0)
+
+[PROJECTS WHERE UNITS HAVE NO ROOMS] (0)
+
+[PROJECTS WITH NO NEIGHBOURHOOD LINK] (0)
+
+[LANDMARK TYPE DISTRIBUTION IN GRAPH]
+  OTHER           126
+  TRANSPORT       29
+  RELIGIOUS       21
+  EDUCATION       21
+  RECREATION      18
+  COMMERCIAL      6
+  HEALTHCARE      3
+
+=================================================================
+AUDIT COMPLETE

@@ -559,6 +559,32 @@ def ingest_one(
     amenities_raw: list[str] = [
         a for a in (data.get("amenities") or []) if _str(a)
     ]
+
+    # ── Synthesise amenity strings from society_layout boolean flags ──────────
+    # Some projects have has_clubhouse=true (etc.) but the amenities[] list
+    # does not contain the matching text.  Without this step those projects
+    # would have no HAS_AMENITY node for the feature, so amenity-based Cypher
+    # filters would silently miss them.  We inject a canonical name only when
+    # the list does not already contain the concept.
+    _SOCIETY_FLAG_AMENITY: list[tuple[str, str]] = [
+        ("has_clubhouse",            "Clubhouse"),
+        ("has_swimming_pool",        "Swimming Pool"),
+        ("has_park_or_garden",       "Garden / Park"),
+        ("has_sports_courts",        "Sports Courts"),
+        ("has_parking_area",         "Parking"),
+        ("commercial_shops_included","Commercial Shops"),
+    ]
+    _amenities_lower = " ".join(amenities_raw).lower()
+    for flag_key, canonical_name in _SOCIETY_FLAG_AMENITY:
+        if society.get(flag_key):
+            # Only add if no similar text is already in the list
+            if canonical_name.lower().split("/")[0].strip() not in _amenities_lower:
+                amenities_raw.append(canonical_name)
+                logger.debug(
+                    f"  ↪ Synthesised amenity '{canonical_name}' from flag "
+                    f"'{flag_key}' for {data.get('project_name', '?')}"
+                )
+
     landmarks_raw: list[str] = [
         lm for lm in (loc.get("nearby_landmarks") or []) if _str(lm)
     ]
@@ -713,6 +739,8 @@ def ingest_one(
                 "bhk":           _int(unit.get("bhk")) or 0,
                 "property_type": (_str(unit.get("property_type")) or "").upper(),
                 "area_sqft":     float(_float(unit.get("super_built_up_area_sqft")) or 0),
+                "developer":     _str(data.get("developer_name")),
+                "amenities":     ", ".join(amenities_raw)[:800],
             })
 
         # ── 6. ChromaDB batch upsert ──────────────────────────────────────────

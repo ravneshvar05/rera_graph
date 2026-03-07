@@ -197,28 +197,61 @@ class GraphRetriever:
 
         # Location filtering
         if intent.neighbourhood:
-            where_clauses.append(
-                "(toLower(n.name) CONTAINS toLower($neighbourhood) "
-                "OR EXISTS { MATCH (n)-[:ALIAS_OF*1..2]->(canonical) WHERE toLower(canonical.name) CONTAINS toLower($neighbourhood) })"
-            )
-            params["neighbourhood"] = intent.neighbourhood
+            if isinstance(intent.neighbourhood, list):
+                # Multiple neighbourhoods
+                conds = []
+                for i, nbh in enumerate(intent.neighbourhood):
+                    key = f"nbh_{i}"
+                    conds.append(f"(toLower(n.name) CONTAINS toLower(${key}) OR EXISTS {{ MATCH (n)-[:ALIAS_OF*1..2]->(canonical) WHERE toLower(canonical.name) CONTAINS toLower(${key}) }})")
+                    params[key] = nbh
+                where_clauses.append(f"({' OR '.join(conds)})")
+            else:
+                where_clauses.append(
+                    "(toLower(n.name) CONTAINS toLower($neighbourhood) "
+                    "OR EXISTS { MATCH (n)-[:ALIAS_OF*1..2]->(canonical) WHERE toLower(canonical.name) CONTAINS toLower($neighbourhood) })"
+                )
+                params["neighbourhood"] = intent.neighbourhood
 
         if intent.city and not intent.neighbourhood:
-            where_clauses.append("toLower(c.name) = toLower($city)")
-            params["city"] = intent.city
+            if isinstance(intent.city, list):
+                # We need case-insensitive exact match against a list of cities
+                # e.g., toLower(c.name) IN [toLower($c1), toLower($c2)]
+                city_conds = []
+                for i, cty in enumerate(intent.city):
+                    key = f"city_{i}"
+                    city_conds.append(f"toLower(c.name) = toLower(${key})")
+                    params[key] = cty
+                where_clauses.append(f"({' OR '.join(city_conds)})")
+            else:
+                where_clauses.append("toLower(c.name) = toLower($city)")
+                params["city"] = intent.city
 
         if intent.zone:
-            where_clauses.append(
-                "EXISTS { MATCH (n)-[:PART_OF]->(z:Zone) WHERE toLower(z.name) CONTAINS toLower($zone) }"
-            )
-            params["zone"] = intent.zone
+            if isinstance(intent.zone, list):
+                conds = []
+                for i, z in enumerate(intent.zone):
+                    key = f"zone_{i}"
+                    conds.append(f"EXISTS {{ MATCH (n)-[:PART_OF]->(z:Zone) WHERE toLower(z.name) CONTAINS toLower(${key}) }}")
+                    params[key] = z
+                where_clauses.append(f"({' OR '.join(conds)})")
+            else:
+                where_clauses.append(
+                    "EXISTS { MATCH (n)-[:PART_OF]->(z:Zone) WHERE toLower(z.name) CONTAINS toLower($zone) }"
+                )
+                params["zone"] = intent.zone
 
         # BHK filtering
         if intent.bhk is not None:
-            where_clauses.append(
-                "ANY(u IN units WHERE u.bhk = $bhk)"
-            )
-            params["bhk"] = intent.bhk
+            if isinstance(intent.bhk, list):
+                where_clauses.append(
+                    "ANY(u IN units WHERE u.bhk IN $bhk)"
+                )
+                params["bhk"] = intent.bhk
+            else:
+                where_clauses.append(
+                    "ANY(u IN units WHERE u.bhk = $bhk)"
+                )
+                params["bhk"] = intent.bhk
 
         # Amenity filtering — check HAS_AMENITY nodes AND project-level boolean flags
         if intent.amenities:
@@ -359,14 +392,26 @@ class VectorRetriever:
         """
         # Build a rich query text from intent components
         query_parts = []
-        if intent.bhk:
-            query_parts.append(f"{intent.bhk} BHK")
+        if intent.bhk is not None:
+            if isinstance(intent.bhk, list):
+                query_parts.extend([f"{b} BHK" for b in intent.bhk])
+            else:
+                query_parts.append(f"{intent.bhk} BHK")
         if intent.property_type:
-            query_parts.append(intent.property_type.lower())
+            if isinstance(intent.property_type, list):
+                query_parts.extend([pt.lower() for pt in intent.property_type])
+            else:
+                query_parts.append(intent.property_type.lower())
         if intent.neighbourhood:
-            query_parts.append(intent.neighbourhood)
+            if isinstance(intent.neighbourhood, list):
+                query_parts.extend(intent.neighbourhood)
+            else:
+                query_parts.append(intent.neighbourhood)
         if intent.city:
-            query_parts.append(intent.city)
+            if isinstance(intent.city, list):
+                query_parts.extend(intent.city)
+            else:
+                query_parts.append(intent.city)
         if intent.amenities:
             query_parts.extend(intent.amenities)
         if intent.semantic_keywords:
@@ -380,9 +425,15 @@ class VectorRetriever:
         where_filter = None
         conditions = []
         if intent.bhk is not None:
-            conditions.append({"bhk": {"$eq": intent.bhk}})
+            if isinstance(intent.bhk, list):
+                conditions.append({"bhk": {"$in": intent.bhk}})
+            else:
+                conditions.append({"bhk": {"$eq": intent.bhk}})
         if intent.city:
-            conditions.append({"city": {"$eq": intent.city}})
+            if isinstance(intent.city, list):
+                conditions.append({"city": {"$in": intent.city}})
+            else:
+                conditions.append({"city": {"$eq": intent.city}})
         if len(conditions) == 1:
             where_filter = conditions[0]
         elif len(conditions) > 1:

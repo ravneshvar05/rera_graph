@@ -1,0 +1,160 @@
+--- Brochure 10.json ---
+Project: SATYAMEV ELYSIUM
+Location: Science City Road, Ahmedabad
+Address: Nr. Shukan Palace Bunglows, Opp. Ugati Lake View, Science City Road, Ahmedabad.
+Landmarks: Shukan Palace Bunglows, Ugati Lake View, Science City Circle, Science City Park, McDonald's, Avirat Circle, Shyam Paradise Flats, Auda Lake View, Sardar Patel Ring Road
+Amenities: GYM AND MINI THEATRE, WI-FI SPOTS, KIDS PLAY AREA, SENIOR CITIZEN SITOUTS, INDOOR GAMES, PICK AND DROP ZONE, ELEGANT LANDSCAPE, 2 LEVEL BASEMENT PARKING, 5 AC PER UNIT
+Units: 4 BHK APARTMENT (None sqft), 5 BHK PENTHOUSE (None sqft)
+
+--- Brochure 11.json ---
+Project: Sunflower Enclave
+Location: Sarkhej, Ahmedabad
+Address: Near Emaad, T.P. 85, 100 Feet Road, Opp Amber Tower, Sarkhej, Ahmedabad-380055.
+Landmarks: Amber Tower
+Amenities: CHILDREN PLAY AREA, 24 HOURS WATER SUPPLY, SENIOR CITIZEN SITOUT, SECURITY CABIN, LANDSCAPE GARDEN, CCTV CAMERA, MADRASA OR OFFICE, AUTOMATIC LIFT
+Units: 2 BHK APARTMENT (None sqft), 3 BHK APARTMENT (None sqft)
+
+--- Brochure 12.json ---
+Project: Palak Elina
+Location: Iscon-Ambli Road, Ahmedabad
+Address: Iscon-Ambli Road, Ahmedabad-380058
+Landmarks: None
+Amenities: Gymnasium, Mini Theater, Reception Area, Entrance Foyer, Children Play Area, Common Plot, Swimming Pool
+Units: 5 BHK APARTMENT (None sqft)
+
+--- Brochure 13.json ---
+Project: DWARKESH GREENS
+Location: Thaltej, Ahmedabad
+Address: Nr. Anand Niketan School, Opp. Venetian Villa Thaltej-Shilaj Road, Thaltej, Ahmedabad
+Landmarks: Anand Niketan School, Venetian Villa, ISCON MEGA MALE, SHIVALIK VILLA, MURLI RESTAURANT, NEELKANTH GREENS VILLAS, ANAND NIKATEN SCHOOL, OMAPLE COUNTY, AARYAN CORPORATE PARK, NANDIGRAM PARTY PLOT, COPPER STONE, SATYA VIKAS SCHOOL, SILVER SOLUTION, DEV VIHAR PARTY PLOT, DEV ARCADE PARTY PLOT, HERITAGE HOMES, AUDA GARDEN, THALTEJ VILLAGE, THALTEJ LAKE, HOME TOWN, GURUDWARA ACROPOLIS, HONEST GRAND BHAGWATI, BODAKDEV, UDAGAM SCHOOL
+Amenities: Children Play Area, Senior Citizen Sitting, Decorative Main Entry, Video Door Phone, Security Cabin, 24 Hour Water Supply, Wooden Flooring in Master Bed, Landscaped Garden, Multi Apartment Security System, Central Satellite Dish, Elevators, Allotted Parking Spaces, Designated Waiting Area for Staff, Backup Generator for Lift and Water Pumps
+Units: 3 BHK APARTMENT (None sqft)
+
+--- Brochure 14.json ---
+Project: Gandhi Galaxy
+Location: Paldi, Ahmedabad
+Address: 1A / 2A Faiz Mohammad Co. Op. Housing Society Ltd., Opp Faizul Hall, Shaikh Adam Abuvala Road, Narayan Nagar Road, Paldi, Ahmedabad
+Landmarks: Faizul Hall, Shaikh Adam Abuvala Road, Narayan Nagar Road, Petrol Pump
+Amenities: Parking Area, CCTV Security, Intercom Facility, Automatic Lifts, 24 Hour Water Supply, Underground Water Tank, Overhead Water Tank
+Units: 2 BHK APARTMENT (None sqft), 3 BHK APARTMENT (None sqft)
+
+--- Brochure 15.json ---
+Project: Elysium at Shantigram
+Location: Shantigram, Ahmedabad
+Address: CBD, Shantigram, Near Vaishnodevi Circle, SG Highway, Ahmadabad 882 421, Gujarat, India
+Landmarks: Thaltej Cross Roads, S. G. Highway, Nirma University, Vaishno Devi Temple, Sardar Patel Ring Road, Narmada Canal
+Amenities: Clubhouse, Swimming Pool, Dedicated Car Parking, Kids' Play Area, Jogging Track, Senior Citizens' Area, Gym, Indoor Sports Facilities, Outdoor Badminton Court, Landscaped Gardens, Treated Water Supply, Piped Gas Facility, Perimeter Security, Smart Card Access For Residents, Communication Facility Connecting Each Flat With Entrance Lobby, CCTV in Basement and Main Entrance Lobby, Power Backup for Lifts, Staircase, Corridors, Water and Fire Pumps
+Units: 2 BHK APARTMENT (660.15 sqft), 2 BHK APARTMENT (833.34 sqft)
+
+--- Brochure 16.json ---
+Project: Sudama Homes
+Location: Chiloda-Kotarpur, Ahmedabad
+Address: Nr. Kotarpur Water Works, Nr. Nandigram Society, Airport Chiloda Road, Nana Chiloda, Ahmedabad.
+Landmarks: Kotarpur Water Works, Nandigram Society, Airport Chiloda Road
+Amenities: Well-Planned professionally designed centrally located beautiful garden, R.C.C. finished internal road and adequate streetlight with paved footpath, Decorative main gate with security cabin, Bore-Well for water supply, Under ground and overhead 500 ltr. pvc Water tank in every block
+Units: 3 BHK VILLA (None sqft), 4 BHK VILLA (None sqft)
+
+--- Brochure 17.json ---
+Project: Satyash Residency
+Location: Shantipura Cross Roads, Ahmedabad
+Address: Shantipura Cross Roads, Sardar Patel Ring Road, Ahmedabad - 380058
+Landmarks: YMCA, Iscon Mandir, Marriott, Rajpath Club Road, Sindhu Bhavan Road, Gokuldham, Surbhit Vatika, Shanti Palace, Bopal, SG Highway, SP Ring Road
+Amenities: Security, Parking Area, Garden, Lifts, Party Area, Children's Play Area, Internal Roads, Street Lights, 24/7 Water Supply, 24/7 Power Backup, Compound Wall
+Units: 0 BHK APARTMENT (None sqft), 1 BHK APARTMENT (None sqft)
+
+--- Brochure 18.json ---
+Project: NIVAAN GREENS
+Location: Isanpur, Isanpur
+Address: None
+Landmarks: Smruti Mandir, Partheshwar Mahadev, Umiya Dham, BRTS, Maninagar Railway Station, Health Center, School, Playground, Municipal Garden, PD Pandya College, Muralidhar Society, Aalok Pushpak Bungalows, Hanumanji & Shital Bapa Sitaram Mandir, Saurabh School, Sitebag Tenament, Gebanshah Bus Stop, Shriji Corner, Partheshwar Residency, Pushpak Heights, Pushpak Complex, Mahakali Complex, Jethabhal's Vav, Dharmabhumi Shopping Center
+Amenities: Peaceful and safe area, Proximity to religious places, Proximity to hospitals, Proximity to schools, Proximity to restaurants, BRTS access, Maninagar Railway Station access, Reserved Health Center plot, Reserved School plot, Reserved Playground plot, Reserved Municipal Garden plot, Two main gates with security cabin, TP road entry, All roads at least 25 feet wide, Independent parking for each unit, RCC roads, Two large common plots, Auto timer street lights, Children's park, Senior citizen seating area, Jogging track, Independent water borewell, Overhead water tank for each bungalow, Municipal corporation water supply, High road level to prevent water logging, Earthquake-proof construction, Pile foundation, Tie-beam construction, NA, NOC, plan passed land, Land deed in favor of the association, Joyful living environment, Luxurious common areas, Life necessities and safety planning, Earthquake-proof structure design, Double coat sand-face plaster on exterior, Single coat mala plaster with wall putty on interior, Premium vitrified tiles flooring in all rooms, Black granite kitchen platform, Stainless steel sink in kitchen, Stainless steel finish bath fittings, Glazed tiles up to lintel level in bathrooms, Decorative main door, Waterproof flush doors with granite frames for other doors, Aluminum section sliding windows, Safety grill on windows, High quality I.S.I. three-phase concealed wiring
+Units: 4 BHK VILLA (None sqft)
+
+--- Brochure 19.json ---
+Project: Devnandan Sankalp City
+Location: Hanspura Road, None
+Address: Opp. 108 Institute. Hanspura Road, Nr. 200 FT. Ring Road
+Landmarks: 108 Institute, 200 FT. Ring Road, Express Highway
+Amenities: Club House, Garden, Swimming Pool, Gym, Children Play Area, Senior Citizen Sitout, Gated Community, 24x7 Security, CCTV Camera, Intercom Facility, Power Backup, Fire Fighting System, Borewell, Underground Drainage, Street Lights, RCC Roads
+Units: 2 BHK APARTMENT (None sqft), 0 BHK APARTMENT (None sqft), 1 BHK APARTMENT (None sqft)
+
+--- Brochure 7.json ---
+Project: SURYA KUTIR
+Location: NARANPURA, AHMEDABAD
+Address: NR. BHOOMI PARTY PLOT, OPP. TORRENT OFFICE, NARANPURA, AHMEDABAD.
+Landmarks: Bhoomi Party Plot, Torrent Office, Naranpura Cross Road, AEC Circle, May Flower Hospital, St Kabir School, Vijaynagar Cricket Ground
+Amenities: 24 hours water supply, High speed automatic two elevators, Parking area, Park or Garden
+Units: 3 BHK APARTMENT (1197.25 sqft), 3 BHK APARTMENT (1170.9 sqft), 3 BHK APARTMENT (1188.65 sqft)
+
+--- Brochure 8.json ---
+Project: સીતારામ સીટી
+Location: વસ્ત્રાલ રોડ, અમદાવાદ
+Address: હરિઓમ ડુપ્લેક્ષ સામે, દેવી કૃપા સોસાયટીની સામે, ગોપી ડેરી ચાર રસ્તા, મહાદેવનગર ટેકરા, વસ્ત્રાલ રોડ, અમદાવાદ.
+Landmarks: રબારી કોલોની ચાર રસ્તા, પોલીસ ચોકી, સહજાનંદ, હરિઓમ ડુપ્લેક્ષ, દેવીકૃપા સોસાયટી, સ્વામિનારાયણ મંદિર (વઢવાણ), ઘનશ્યામ કોમ્પલેક્ષ, મોધી ડેહી, ગોપી બંગ્લોઝ, સામ્રાજ્ય સોસાયટી, નીરાંત ચોકડી, કંકુબાગ પાર્ટી પ્લોટ, ૨૦૦' સરદાર પટેલ રીંગ રોડ, વસ્ત્રાલ ગામ
+Amenities: પાર્કિંગ, ક્લબ હાઉસ, ચિલ્ડ્રન પાર્ક, જોગીંગ ટ્રેક, હેલ્થ કલબ, ગાર્ડન, ૨૪ કલાક પાણી, સીક્યુરીટી
+Units: 2 BHK APARTMENT (None sqft), 1 BHK APARTMENT (None sqft)
+
+--- Brochure 9.json ---
+Project: Swastik Harmony
+Location: New Nikol - Naroda Road, Ahmedabad
+Address: Opp. Galaxy Banglow, B/h. A.M.C. Water Works, Nr. Haridarsan Cross Road, New Nikol - Naroda Road, Ahmedabad.
+Landmarks: Galaxy Banglow, A.M.C. Water Works, Haridarsan Cross Road, Swaminarayan Park, Club House/Gym, Sardar Patel Ring Road
+Amenities: Senior Citizen Area, Children Play Area, Swimming Pool, Club House, Gym, Jogging Track, Party Lawn
+Units: 3 BHK APARTMENT (None sqft), 4 BHK APARTMENT (None sqft)
+
+--- Brochure1.json ---
+Project: Svasaar Pravesh
+Location: Gamdi Gaam, Ahmedabad
+Address: Gamdi Gaam, Vatva - Chosar Road, Ringroad Paase Ahmedabad
+Landmarks: Jetpur School and College, Gayatri Vidyalaya - Narol, Rajaram Vidyalaya, Saraswati Vidyalaya Nava Vatva Ma.Shala, Riddhi Gujarati School, Rajshree English School - Vatva, Kutir Vidyalaya, Municipal Gujarati School, Bank of Maharashtra, Moni Hotel, Bank of India, Gokul Petrol Pump, Turning Krishna Mandir, Vatva Police Chowki, Vatva Gram Panchayat, Ranchoji Mandir, Devimata Mandir, Nava Vatva Gram Panchayat, Khodiyar Mata Mandir, General Hospital, Someshwar Mahadev Mandir, Pauranik Swaminarayan Mandir Gamdi and Jetpur, Pauranik Baliyadev Mandir - Lambha, Devimata Mandir, Ranchoji Mandir, Rangila Hanuman Mandir - Vatva, Jain Derasar - Vatva, G.I.D.C. Road, Gayatri Mandir - Vatva, Bala Hanuman Mandir - Vatva, AMTS Bus Stop (14/1), Vatva Gaam Bus Stop, Isanpur Chowkdi Bus Stop, Aslali Ring Road Bus Stop, Narol Chowkdi Bus Stop
+Amenities: Public Transport Access, Educational Institutions, Religious Sites, Healthcare Facilities, Banking Services
+Units: 2 BHK APARTMENT (None sqft), 1 BHK APARTMENT (None sqft)
+
+--- Brochure2.json ---
+Project: Neelkanth Status
+Location: Kubernagar, Ahmedabad
+Address: null
+Landmarks: None
+Amenities: 24 Hours water supply from borewell, Pavers in parking, Common garden, R.C.C paved road, 24 Hours security with security cabin
+Units: 3 BHK APARTMENT (None sqft)
+
+--- Brochure3.json ---
+Project: RATNAAKAR 6 Beaumonde
+Location: Jodhpur, Satellite, Ahmedabad
+Address: Pernatirth Derasar Road, Jodhpur, Satellite, Ahmedabad
+Landmarks: KARNAVATI CLUB, BIG BAZAAR, ISCON TEMPLE, ISCON FLY OVER BRIDGE, WIDE ANGLE, DEV ARC MALL, GULMOHAR PARK, SATELLITE POLICE STATION, RAMDEV NAGAR, MARRIOT, ISRO, STAR BAZAAR, 10C PETROL PUMP, ARJUN TOWER, REGENCY PLAZA, RAHUL TOWER, SACHIN TOWER, DHANAJAYO TOWER, SHYAMAL, JAIN DERASAR
+Amenities: None
+Units: 4 BHK APARTMENT (None sqft), 5 BHK APARTMENT (None sqft)
+
+--- Brochure4.json ---
+Project: OUM ORBIT
+Location: Vinzol, Ahmedabad
+Address: Towards 200 ft. S.P.Ring Road, Opp. Karnavati APMC Market, Behind MADHAV school, Ropda Cross Road, Vinzol, Ahmedabad.
+Landmarks: Karnavati APMC Market, MADHAV school, Ropda Cross Road, Hathijin Circle, Railway Over Bridge, Sardar Patel Ring Road, Gamdi Cross Road, Aslali Circle, Narol Circle, Jasoda Cross Road, Vinzol Village, Vatva Village, Ropda Village, Vishala
+Amenities: GYM, LIBRARY, JOGGING TRACK, SENIOR CITIZEN PARK, GARDEN & FOUNTAIN, CHILDREN PLAY AREA, CHESS, CAROM BOARD, CARD TABLE, CLUB HOUSE, COMMON PLOT
+Units: 2 BHK APARTMENT (None sqft)
+
+--- Brochure5.json ---
+Project: Sky Avenue
+Location: None, Ahmedabad
+Address: None
+Landmarks: ANIK HOMES, SONA PALACE, APEX APARTMENT, BEST RESIDENCY, KADARI PLOT, AKEERA HEIGHTS, LOKHANDWALA PARK, JENAB RESIDENCY, ASHIYANA GREENS, AL-ARSH APARTMENT, HAYAT RESIDENCY, Bushra Height, AJVAD APARTMENT, KOH-E-TOOR RESIDENCY, MEEM RESIDENI, Tabah, AJBA RESIDENC, LAXURIYA APAR
+Amenities: Attractive main entrance gate with security, Kid's play area, Internal paved road, Street lights, Elevators, 24 house water supply, Common bore well with submersible pumps, Under ground & overhead water tanks, Earthquake Resistant R.C.C. frame structure, Garden
+Units: 2 BHK APARTMENT (None sqft)
+
+--- Brochure6.json ---
+Project: AMBER
+Location: Sarkhej, Ahmedabad
+Address: Opp. Amber Tower, B/h. Kadri Party Plot, TP 85-FP7, Subplot 2, Sarkhej Highway Road, Ahmedabad-55.
+Landmarks: Kadri Party Plot, Fatehwadi Canal, Juhapura-Sarkhej Road, 100 Feet Ring Road, Gulzar Park, Arshad Park
+Amenities: Park, Garden, Play Area, Parking Area, Watchman Cabin
+Units: 2 BHK APARTMENT (90.93 sqft), 2 BHK APARTMENT (100.79 sqft), 2 BHK APARTMENT (99.93 sqft), 2 BHK APARTMENT (97.6 sqft), 2 BHK APARTMENT (93.94 sqft), 2 BHK APARTMENT (96.27 sqft), 2 BHK APARTMENT (96.38 sqft), 2 BHK APARTMENT (98.0 sqft)
+
+--- KP_Villa Bochure.json ---
+Project: KP Villas
+Location: Gokuldham, Ahmedabad
+Address: Near Sarkhej Gandhinagar Highway
+Landmarks: DEHRASER COMPLEX, SUN CITY, SAMPRAT RESIDENCY, SARAL PARIGAR, SAFAL PARISAR, BOPAL, SHILAJ, THALTE CROSSROADS, SAON TEMPLE, GATTELITE, BIG BAZZAR, FUN REPUBLIC, KARNAVATI CLUB, PRAHLADNAGAR CROSSROADS, SATELITE, SAFAL PROFITARE, NPRIMA PARK, SWET AMBYENM, BUNEALITW, SAHAJA, SAFAL KAMPAKIBU, ESLAVA SCHOOL, SAKET, SAFAL PRELUDE, SAFAL PARVESH, SAFFL PEGASUS
+Amenities: Exclusively gated community with hi-tech security system, Well planned site layout with prominent location of the COP, All internal roads of RCC and Paver Blocks with adequate & attractive street lighting, Abundant greenery all over the site with the highlight being the huge COP right at the entrance, A Celebration lounge spilling over the COP lawns, Indoor Sports Room, Gymnasium and Health Club, A netted sports zone for outdoor sports like volleyball, cricket and basket ball avoiding nuisance to the residents, A well-equipped children play zone, Jogging track amidst the exclusively landscaped COP, Power backup facility for all common amenities, A Grand Dehraser Complex with Upashray & Bhojanshala
+Units: 5 BHK VILLA (None sqft), 4 BHK VILLA (None sqft)
+
