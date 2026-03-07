@@ -1,0 +1,26 @@
+# GraphRAG — Python dependencies
+# Install inside a dedicated venv:
+#   python -m venv venv
+#   venv\Scripts\activate
+#   pip install -r requirements.txt
+
+# Core LLM + AI
+google-generativeai>=0.8.0
+groq>=0.11.0
+
+# Neo4j driver
+neo4j>=5.18.0
+
+# Vector store (same version as kg/)
+chromadb>=0.5.0
+sentence-transformers>=3.0.0
+
+# Data validation
+pydantic>=2.7.0
+pydantic-settings>=2.3.0
+
+# Web UI
+streamlit>=1.40.0
+
+# Logging
+loguru>=0.7.2
