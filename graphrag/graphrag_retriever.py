@@ -99,10 +99,52 @@ class ProjectResult:
         return "\n".join(lines)
 
 
+# ── Amenity keyword → Project boolean flag mapping ────────────────────────────
+# When a user asks for an amenity that maps to a direct boolean property on the
+# Project node, we can also check that flag in Cypher (in addition to the
+# HAS_AMENITY relationship).  This means a project is retrieved even if its
+# amenity *text* doesn't mention the feature but the structured field does.
+_AMENITY_TO_FLAG: dict[str, str] = {
+    "clubhouse":       "p.has_clubhouse",
+    "club house":      "p.has_clubhouse",
+    "club":            "p.has_clubhouse",
+    "pool":            "p.has_pool",
+    "swimming pool":   "p.has_pool",
+    "swimming":        "p.has_pool",
+    "park":            "p.has_park",
+    "garden":          "p.has_park",
+    "lawn":            "p.has_park",
+    "sports":          "p.has_sports_courts",
+    "sports court":    "p.has_sports_courts",
+    "badminton":       "p.has_sports_courts",
+    "tennis":          "p.has_sports_courts",
+    "volleyball":      "p.has_sports_courts",
+    "parking":         "p.has_parking",
+    "car park":        "p.has_parking",
+    "commercial":      "p.has_commercial_shops",
+    "shop":            "p.has_commercial_shops",
+}
+
+
+def _amenity_flag(amenity_text: str) -> str | None:
+    """Return the Neo4j Project property name that corresponds to this amenity
+    keyword, or None if no direct mapping exists."""
+    lower = amenity_text.lower().strip()
+    # Exact match first
+    if lower in _AMENITY_TO_FLAG:
+        return _AMENITY_TO_FLAG[lower]
+    # Substring match (e.g. 'swimming pool facility' → 'swimming pool')
+    for keyword, flag in _AMENITY_TO_FLAG.items():
+        if keyword in lower:
+            return flag
+    return None
+
+
 # ── Neo4j / Graph Retriever ────────────────────────────────────────────────────
 
 class GraphRetriever:
     """Retrieves projects from Neo4j using dynamic Cypher queries."""
+
 
     def __init__(self):
         self._driver = GraphDatabase.driver(
@@ -178,13 +220,21 @@ class GraphRetriever:
             )
             params["bhk"] = intent.bhk
 
-        # Amenity filtering
+        # Amenity filtering — check HAS_AMENITY nodes AND project-level boolean flags
         if intent.amenities:
             for i, am in enumerate(intent.amenities):
                 key = f"amenity_{i}"
-                where_clauses.append(
-                    f"ANY(am IN amenities WHERE toLower(am) CONTAINS toLower(${key}))"
-                )
+                # Try to find a matching project boolean flag for well-known amenities
+                flag_col = _amenity_flag(am)
+                if flag_col:
+                    where_clauses.append(
+                        f"(ANY(am IN amenities WHERE toLower(am) CONTAINS toLower(${key})) "
+                        f"OR {flag_col} = 1)"
+                    )
+                else:
+                    where_clauses.append(
+                        f"ANY(am IN amenities WHERE toLower(am) CONTAINS toLower(${key}))"
+                    )
                 params[key] = am
 
         # Has balcony
@@ -365,16 +415,34 @@ class VectorRetriever:
         for meta, dist, doc in zip(metadatas, distances, documents):
             pid = meta.get("project_id", "")
             if pid not in project_map:
+                amenities_str = meta.get("amenities", "")
+                amenities_list = [a.strip() for a in amenities_str.split(",") if a.strip()] if amenities_str else []
                 project_map[pid] = ProjectResult(
                     project_id=pid,
                     project_name=meta.get("project_name", "Unknown"),
                     city=meta.get("city", ""),
                     neighbourhood=meta.get("neighbourhood", ""),
-                    developer="",
+                    developer=meta.get("developer", ""),
                     units=[],
                     score=dist,
                     source="vector",
+                    amenities=amenities_list
                 )
+            
+            # Reconstruct dummy unit layout from vector metadata for UI presentation
+            bhk = meta.get("bhk", 0)
+            ptype = meta.get("property_type", "")
+            area = meta.get("area_sqft", 0.0)
+            if bhk > 0 or ptype:
+                utyp = f"{bhk} BHK" if bhk > 0 else "Unit"
+                udict = {"unit_type": utyp, "property_type": ptype}
+                if area > 0.0:
+                    udict["super_builtup_sqft"] = area
+                
+                # Deduplicate units for rendering
+                if udict not in project_map[pid].units:
+                    project_map[pid].units.append(udict)
+
             # Keep updating with best score
             if dist < project_map[pid].score:
                 project_map[pid].score = dist
