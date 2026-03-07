@@ -44,15 +44,15 @@ class QueryIntent(BaseModel):
         None,
         description="Zone or list of zones, e.g. 'West Ahmedabad', 'East Ahmedabad', 'South Ahmedabad'",
     )
-    amenities: list[str] = Field(
+    amenities: Optional[List[str]] = Field(
         default_factory=list,
         description="List of amenity names user wants, e.g. ['swimming pool', 'gym', 'clubhouse']",
     )
-    landmark_types: list[str] = Field(
+    landmark_types: Optional[List[str]] = Field(
         default_factory=list,
         description="Types of landmarks user wants nearby: EDUCATION, HEALTHCARE, COMMERCIAL, TRANSPORT, RELIGIOUS, RECREATION",
     )
-    specific_landmarks: list[str] = Field(
+    specific_landmarks: Optional[List[str]] = Field(
         default_factory=list,
         description="Specific landmark names user mentioned, e.g. ['Karnavati Club', 'Airport']",
     )
@@ -64,7 +64,7 @@ class QueryIntent(BaseModel):
     has_parking: Optional[bool] = Field(None, description="User wants parking")
     entrance_facing: Optional[str] = Field(None, description="Facing direction: East, West, North, South")
     developer: Optional[str] = Field(None, description="Developer name if user specified one")
-    semantic_keywords: list[str] = Field(
+    semantic_keywords: Optional[List[str]] = Field(
         default_factory=list,
         description="Subjective/fuzzy keywords for vector search: spacious, luxury, family-friendly, affordable, etc.",
     )
@@ -86,9 +86,9 @@ Schema:
   "city": <string, list of strings, or null>,
   "neighbourhood": <string, list of strings, or null>,
   "zone": <string, list of strings, or null, e.g. "West Ahmedabad">,
-  "amenities": [<list of amenity strings>],
-  "landmark_types": [<from: EDUCATION, HEALTHCARE, COMMERCIAL, TRANSPORT, RELIGIOUS, RECREATION>],
-  "specific_landmarks": [<list of specific place names>],
+  "amenities": [<list of amenity strings> or null],
+  "landmark_types": [<from: EDUCATION, HEALTHCARE, COMMERCIAL, TRANSPORT, RELIGIOUS, RECREATION> or null],
+  "specific_landmarks": [<list of specific place names> or null],
   "min_sqft": <number or null>,
   "max_sqft": <number or null>,
   "min_price_lakhs": <number or null>,
@@ -97,7 +97,7 @@ Schema:
   "has_parking": <true/false/null>,
   "entrance_facing": <"East"|"West"|"North"|"South"|null>,
   "developer": <string or null>,
-  "semantic_keywords": [<subjective keywords like "spacious", "luxury", "affordable">]
+  "semantic_keywords": [<subjective keywords like "spacious", "luxury", "affordable"> or null]
 }
 
 Rules:
