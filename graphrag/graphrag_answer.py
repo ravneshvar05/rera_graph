@@ -8,6 +8,7 @@ The LLM acts as the "synthesis" layer of GraphRAG:
   graph context + vector context → structured LLM prompt → human answer
 """
 
+import json
 from groq import Groq
 from loguru import logger
 
@@ -30,21 +31,33 @@ You will be given:
 
 Your task:
 - Recommend the most suitable projects based on the user's stated requirements
-- Explain clearly WHY each recommended project fits the user's needs
-- Mention key details: location, unit types, area (sqft), amenities, nearby landmarks
-- If multiple projects match, list them in order of relevance
-- If a project only partially matches, mention what it does and doesn't have
-- If no projects match well, say so honestly and suggest what's available nearby
-- Keep your tone friendly, professional, and concise
-- Use bullet points for project details for easy reading
-- Format numbers clearly: "850 sqft", "₹45–60 Lakhs", "2 BHK"
+- If multiple projects match, detail them in order of relevance
+
+You MUST respond in strict JSON format. Do not use Markdown backticks for the JSON block, just raw JSON.
+The JSON must have the following exact structure:
+{
+  "general_summary": "A friendly introductory sentence or two.",
+  "projects": [
+    {
+      "project_name": "Exact Name of the project from context",
+      "reasoning": "Brief Markdown explanation (MAX 2 bullet points) of why this project is recommended and key details. IMPORTANT: You MUST use dashes (-) for bullet points, and separate each bullet point with a newline character (\\n) so that the entire reasoning is returned as a single valid JSON string. Do NOT use asterisks (*). IF THERE ARE MORE THAN 10 PROJECTS TOTAL, LEAVE THIS STRING EMPTY \"\"."
+    }
+  ],
+  "conclusion": "A brief summary or next steps suggestion."
+}
 
 Important rules:
+- IF THERE ARE MORE THAN 10 PROJECTS TO RECOMMEND, DO NOT WRITE ANY REASONING. JUST PROVIDE THE PROJECT NAMES AND A GOOD GENERAL SUMMARY.
 - ONLY use information from the provided context — do not invent data
-- If price information is not in the context, do not guess prices
-- If area is not in the context, say area information is not available
+- If price/area is not in the context, do not guess it
 - Always ground your recommendations in the actual retrieved data
-- End with a brief summary or next steps suggestion
+- The project_name MUST perfectly match the name provided in the context.
+- CRITICAL: You MUST filter out and omit any projects from the context that do not meaningfully match the user's specific requirements (e.g. if they asked for a 1 BHK, do not list a 3 BHK).
+- STRICT LOGIC: Pay very close attention to AND vs OR conditions in the user's query. 
+  - If a user asks for "Location A OR Location B AND Amenity C", a project is ONLY a perfect match if it actually HAS Amenity C AND is in either Location A OR Location B.
+  - PERFECT MATCHES: Only projects that satisfy ALL strict mandatory criteria should be included in the 'projects' array (these will be rendered as detailed UI cards).
+  - PARTIAL MATCHES: If a project only meets some conditions but fails others (e.g. it is in the right location but lacks the requested amenity), DO NOT include it in the 'projects' array. Instead, briefly mention these partial matches in the 'conclusion' string as plain text (e.g. "Note: Project X is in Location A but lacks Amenity C...").
+- If no projects match perfectly, leave the 'projects' array empty and explain the partial matches in the 'general_summary' or 'conclusion'.
 """
 
 
@@ -54,9 +67,9 @@ def generate_answer(
     user_query: str,
     context_text: str,
     project_results: list[ProjectResult],
-) -> str:
+) -> dict:
     """
-    Generate a natural language recommendation answer using Gemini.
+    Generate a JSON-structured recommendation answer using Gemini.
 
     Args:
         user_query: The original user query string.
@@ -64,14 +77,14 @@ def generate_answer(
         project_results: Structured project results (for fallback display).
 
     Returns:
-        A formatted string answer suitable for display in the chat UI.
+        A formatted dictionary answer suitable for display in the chat UI.
     """
     if not project_results:
-        return (
-            "I couldn't find any projects matching your criteria in our current database. "
-            "Try broadening your search — for example, remove a specific filter like the "
-            "area range or amenity requirement."
-        )
+        return {
+            "general_summary": "I couldn't find any projects matching your criteria in our current database. Try broadening your search.",
+            "projects": [],
+            "conclusion": ""
+        }
 
     prompt = f"""{_ANSWER_SYSTEM_PROMPT}
 
@@ -93,11 +106,17 @@ User Query: {user_query}
                 {"role": "system", "content": _ANSWER_SYSTEM_PROMPT},
                 {"role": "user", "content": f"{context_text}\n\nBased on the above retrieved project data, please provide a clear, helpful recommendation to the user.\n\nUser Query: {user_query}"},
             ],
-            temperature=0.7,
+            temperature=0.3,
+            response_format={"type": "json_object"}
         )
-        answer = response.choices[0].message.content.strip()
-        logger.success(f"Answer generated ({len(answer)} chars)")
-        return answer
+        answer_text = response.choices[0].message.content.strip()
+        logger.success(f"Answer generated ({len(answer_text)} chars)")
+        
+        try:
+            return json.loads(answer_text)
+        except json.JSONDecodeError:
+            logger.error("Failed to parse LLM JSON output. Falling back.")
+            return _fallback_answer(user_query, project_results)
 
     except Exception as e:
         logger.error(f"Answer generation failed: {e}")
@@ -105,19 +124,30 @@ User Query: {user_query}
         return _fallback_answer(user_query, project_results)
 
 
-def _fallback_answer(user_query: str, results: list[ProjectResult]) -> str:
+def _fallback_answer(user_query: str, results: list[ProjectResult]) -> dict:
     """Simple structured answer if LLM call fails."""
-    lines = [
-        f"Here are the residential projects matching your query: **{user_query}**\n"
-    ]
-    for i, proj in enumerate(results, 1):
-        lines.append(f"**{i}. {proj.project_name}**")
-        lines.append(f"   - Location: {proj.neighbourhood}, {proj.city}")
-        lines.append(f"   - Developer: {proj.developer}")
+    projects = []
+    for proj in results:
+        reasoning_lines = []
+        
+        address = proj.extra_props.get("address")
+        location_str = address if address else f"{proj.neighbourhood}, {proj.city}"
+        reasoning_lines.append(f"- Location: {location_str}")
+        
+        reasoning_lines.append(f"- Developer: {proj.developer}")
         if proj.units:
             unit_types = list({u.get("unit_type", "?") for u in proj.units})
-            lines.append(f"   - Units: {', '.join(unit_types)}")
+            reasoning_lines.append(f"- Units: {', '.join(unit_types)}")
         if proj.amenities:
-            lines.append(f"   - Amenities: {', '.join(proj.amenities[:5])}")
-        lines.append("")
-    return "\n".join(lines)
+            reasoning_lines.append(f"- Amenities: {', '.join(proj.amenities[:5])}")
+            
+        projects.append({
+            "project_name": proj.project_name,
+            "reasoning": "\n".join(reasoning_lines)
+        })
+
+    return {
+        "general_summary": f"Here are the residential projects matching your query: **{user_query}**\n",
+        "projects": projects,
+        "conclusion": "Hope this helps!"
+    }
