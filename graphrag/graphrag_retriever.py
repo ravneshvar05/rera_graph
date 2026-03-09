@@ -35,6 +35,7 @@ class ProjectResult:
     neighbourhood: str
     developer:     str
     units:         list[dict]      = field(default_factory=list)
+    floor_layouts: list[dict]      = field(default_factory=list)
     amenities:     list[str]       = field(default_factory=list)
     landmarks:     list[str]       = field(default_factory=list)
     extra_props:   dict            = field(default_factory=dict)
@@ -86,6 +87,15 @@ class ProjectResult:
                 if u.get("description"):
                     u_line += f"\n      Description: {u['description']}"
                 lines.append(u_line)
+
+        # Floor Layouts
+        if getattr(self, "floor_layouts", None):
+            lines.append("  Floor Layouts:")
+            for f in self.floor_layouts:
+                f_line = f"    - {f.get('layout_name', 'Unnamed Layout')}: {f.get('total_units_on_floor', 'Unknown')} units per floor"
+                if f.get("has_lifts") == 1:
+                    f_line += ", Lifts available"
+                lines.append(f_line)
 
         # Amenities
         if self.amenities:
@@ -280,10 +290,27 @@ class GraphRetriever:
         if intent.has_parking:
             where_clauses.append("p.has_parking = 1")
 
+        # Specific project names
+        if intent.project_names:
+            proj_conds = []
+            for i, p_name in enumerate(intent.project_names):
+                key = f"p_name_{i}"
+                proj_conds.append(f"toLower(p.project_name) CONTAINS toLower(${key})")
+                params[key] = p_name
+            where_clauses.append(f"({' OR '.join(proj_conds)})")
+
         # Developer
         if intent.developer:
-            where_clauses.append("toLower(dev.name) CONTAINS toLower($developer)")
-            params["developer"] = intent.developer
+            if isinstance(intent.developer, list):
+                dev_conds = []
+                for i, dev in enumerate(intent.developer):
+                    key = f"dev_{i}"
+                    dev_conds.append(f"toLower(dev.name) CONTAINS toLower(${key})")
+                    params[key] = dev
+                where_clauses.append(f"({' OR '.join(dev_conds)})")
+            else:
+                where_clauses.append("toLower(dev.name) CONTAINS toLower($developer)")
+                params["developer"] = intent.developer
 
         # Area range
         if intent.min_sqft is not None:
@@ -298,6 +325,19 @@ class GraphRetriever:
                 "AND (u.carpet_sqft IS NULL OR u.carpet_sqft <= $max_sqft))"
             )
             params["max_sqft"] = intent.max_sqft
+
+        # Units per floor filtering
+        if intent.min_units_per_floor is not None:
+            where_clauses.append(
+                "ANY(f IN floor_layouts WHERE f.total_units_on_floor >= $min_units_per_floor)"
+            )
+            params["min_units_per_floor"] = intent.min_units_per_floor
+
+        if intent.max_units_per_floor is not None:
+            where_clauses.append(
+                "ANY(f IN floor_layouts WHERE f.total_units_on_floor <= $max_units_per_floor)"
+            )
+            params["max_units_per_floor"] = intent.max_units_per_floor
 
         # Landmark type filtering
         landmark_match = ""
@@ -319,6 +359,7 @@ class GraphRetriever:
         MATCH (p:Project)-[:LOCATED_IN]->(n:Neighbourhood)-[:IN_CITY]->(c:City)
         OPTIONAL MATCH (p)-[:BUILT_BY]->(dev:Developer)
         OPTIONAL MATCH (p)-[:HAS_UNIT]->(u:Unit)
+        OPTIONAL MATCH (p)-[:HAS_FLOOR_LAYOUT]->(f:FloorLayout)
         OPTIONAL MATCH (p)-[:HAS_AMENITY]->(am:Amenity)
         OPTIONAL MATCH (p)-[:NEAR]->(lm:Landmark)
             {f"WHERE lm.landmark_type IN {json.dumps(intent.landmark_types)}" if intent.landmark_types else ""}
@@ -326,11 +367,12 @@ class GraphRetriever:
             p, n, c,
             dev,
             collect(DISTINCT properties(u)) AS units,
+            collect(DISTINCT properties(f)) AS floor_layouts,
             collect(DISTINCT am.name) AS amenities,
             collect(DISTINCT lm.name) AS landmarks
         {"WHERE " + " AND ".join(where_clauses) if where_clauses else ""}
         RETURN p, n.name AS neighbourhood, c.name AS city, dev.name AS developer,
-               units, amenities, landmarks
+               units, floor_layouts, amenities, landmarks
         LIMIT $limit
         """
         params["limit"] = settings.GRAPH_MAX_RESULTS
@@ -348,6 +390,8 @@ class GraphRetriever:
         p = dict(record["p"])
         units_raw = record.get("units") or []
         units = [dict(u) for u in units_raw if u]
+        floor_layouts_raw = record.get("floor_layouts") or []
+        floor_layouts = [dict(f) for f in floor_layouts_raw if f]
         amenities = [a for a in (record.get("amenities") or []) if a]
         landmarks = [lm for lm in (record.get("landmarks") or []) if lm]
         developer = record.get("developer") or p.get("developer_name", "Unknown")
@@ -361,6 +405,7 @@ class GraphRetriever:
             neighbourhood=neighbourhood,
             developer=developer,
             units=units,
+            floor_layouts=floor_layouts,
             amenities=amenities,
             landmarks=landmarks,
             extra_props={k: v for k, v in p.items()
@@ -418,6 +463,8 @@ class VectorRetriever:
             query_parts.extend(intent.semantic_keywords)
         if intent.specific_landmarks:
             query_parts.extend(intent.specific_landmarks)
+        if intent.project_names:
+            query_parts.extend(intent.project_names)
 
         query_text = " ".join(query_parts) if query_parts else "residential apartment"
 
@@ -549,12 +596,30 @@ class DualRetriever:
                 # Blend score (lower is better for vector)
                 merged[r.project_id].score = r.score
 
-        # 4. Sort: projects found in both sources first, then by score
+        # 4. Sort and filter
         def sort_key(r: ProjectResult):
             source_prio = 0 if r.source == "both" else (1 if r.source == "graph" else 2)
             return (source_prio, r.score)
 
-        final = sorted(merged.values(), key=sort_key)[: settings.FINAL_TOP_N]
+        final_candidates = sorted(merged.values(), key=sort_key)
+        
+        # If user asked for specific projects by name, heavily filter down to just those
+        if intent.project_names:
+            filtered_final = []
+            for candidate in final_candidates:
+                candidate_name = candidate.project_name.lower()
+                for requested_name in intent.project_names:
+                    if requested_name.lower() in candidate_name or candidate_name in requested_name.lower():
+                        filtered_final.append(candidate)
+                        break
+            final = filtered_final[: settings.FINAL_TOP_N]
+            
+            # If our strict name filter wiped everything out (which shouldn't happen if the graph found it, but just in case),
+            # fallback to the standard list to avoid an empty answer
+            if not final:
+                final = final_candidates[: settings.FINAL_TOP_N]
+        else:
+            final = final_candidates[: settings.FINAL_TOP_N]
 
         # 5. Assemble context text
         context_blocks = []

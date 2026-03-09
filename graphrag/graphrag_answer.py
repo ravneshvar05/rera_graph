@@ -40,7 +40,7 @@ The JSON must have the following exact structure:
   "projects": [
     {
       "project_name": "Exact Name of the project from context",
-      "reasoning": "Brief Markdown explanation (MAX 2 bullet points) of why this project is recommended and key details. IMPORTANT: You MUST use dashes (-) for bullet points, and separate each bullet point with a newline character (\\n) so that the entire reasoning is returned as a single valid JSON string. Do NOT use asterisks (*). IF THERE ARE MORE THAN 10 PROJECTS TOTAL, LEAVE THIS STRING EMPTY \"\"."
+      "reasoning": "Brief Markdown explanation (MAX 2 bullet points) of why this project is recommended and key details. IMPORTANT: If the user asks about floor layouts or units per floor, you MUST explicitly state the 'units per floor' in this reasoning block based on the provided context. You MUST use dashes (-) for bullet points, and separate each bullet point with a newline character (\\n) so that the entire reasoning is returned as a single valid JSON string. Do NOT use asterisks (*). IF THERE ARE MORE THAN 10 PROJECTS TOTAL, LEAVE THIS STRING EMPTY \"\"."
     }
   ],
   "conclusion": "A brief summary or next steps suggestion."
@@ -138,7 +138,13 @@ def _fallback_answer(user_query: str, results: list[ProjectResult]) -> dict:
         if proj.units:
             unit_types = list({u.get("unit_type", "?") for u in proj.units})
             reasoning_lines.append(f"- Units: {', '.join(unit_types)}")
-        if proj.amenities:
+        if getattr(proj, "floor_layouts", None):
+            layout_details = []
+            for f in proj.floor_layouts:
+                name = f.get('layout_name', 'Unnamed')
+                units = f.get('total_units_on_floor', '?')
+                layout_details.append(f"{name} ({units} units/floor)")
+            reasoning_lines.append(f"- Floor Layouts: {', '.join(layout_details)}")
             reasoning_lines.append(f"- Amenities: {', '.join(proj.amenities[:5])}")
             
         projects.append({

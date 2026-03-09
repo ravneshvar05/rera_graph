@@ -63,10 +63,20 @@ class QueryIntent(BaseModel):
     has_balcony: Optional[bool] = Field(None, description="User wants balcony")
     has_parking: Optional[bool] = Field(None, description="User wants parking")
     entrance_facing: Optional[str] = Field(None, description="Facing direction: East, West, North, South")
-    developer: Optional[str] = Field(None, description="Developer name if user specified one")
+    developer: Optional[Union[str, List[str]]] = Field(None, description="Developer name(s) if user specified one or more")
+    project_names: Optional[List[str]] = Field(
+        default_factory=list,
+        description="Specific project names the user mentioned (e.g., ['Oum Orbit', 'Svasar Pravesh'])",
+    )
     semantic_keywords: Optional[List[str]] = Field(
         default_factory=list,
         description="Subjective/fuzzy keywords for vector search: spacious, luxury, family-friendly, affordable, etc.",
+    )
+    min_units_per_floor: Optional[int] = Field(
+        None, description="Minimum number of units per floor requested"
+    )
+    max_units_per_floor: Optional[int] = Field(
+        None, description="Maximum number of units per floor requested"
     )
 
 
@@ -96,7 +106,10 @@ Schema:
   "has_balcony": <true/false/null>,
   "has_parking": <true/false/null>,
   "entrance_facing": <"East"|"West"|"North"|"South"|null>,
-  "developer": <string or null>,
+  "developer": <string, list of strings, or null>,
+  "project_names": [<list of specific project names> or null],
+  "min_units_per_floor": <integer or null>,
+  "max_units_per_floor": <integer or null>,
   "semantic_keywords": [<subjective keywords like "spacious", "luxury", "affordable"> or null]
 }
 
