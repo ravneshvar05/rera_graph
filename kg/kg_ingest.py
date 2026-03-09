@@ -444,12 +444,24 @@ SET p.project_name         = $project_name,
     p.society_description  = $society_description,
     p.building_names       = $building_names,
     p.road_widths          = $road_widths,
-    p.floor_layouts        = $floor_layouts,
     p.source_file          = $source_file,
     p.ingested_at          = $ingested_at
 
 MERGE (p)-[:LOCATED_IN]->(hood)
 MERGE (p)-[:IN_CITY]->(city)
+"""
+
+# Floor Layout
+_CYPHER_FLOOR_LAYOUT = """
+MERGE (f:FloorLayout {layout_id: $layout_id})
+SET f.layout_name          = $layout_name,
+    f.total_units_on_floor = $total_units_on_floor,
+    f.has_lifts            = $has_lifts,
+    f.has_staircases       = $has_staircases,
+    f.corridor_width       = $corridor_width,
+    f.has_refuge_area      = $has_refuge_area
+MERGE (p:Project {project_id: $project_id})
+MERGE (p)-[:HAS_FLOOR_LAYOUT]->(f)
 """
 
 # Developer
@@ -608,13 +620,9 @@ def ingest_one(
     neighbourhood = _str(loc.get("neighbourhood")) or city or "Unknown"
     city          = city or neighbourhood
 
-    floor_layouts_json = json.dumps(data.get("floor_layouts") or [])
-    building_names_str = "|".join(
-        b for b in (society.get("building_names") or []) if b
-    )
-    road_widths_str = " | ".join(
-        r for r in (society.get("road_width_details") or []) if r
-    )
+    floor_layouts_json = data.get("floor_layouts") or []
+    building_names_raw = [b for b in (society.get("building_names") or []) if b]
+    road_widths_raw = [r for r in (society.get("road_width_details") or []) if r]
     ingested_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
     with driver.session() as session:
@@ -639,12 +647,26 @@ def ingest_one(
             "total_buildings":     _int(society.get("total_apartment_blocks")),
             "total_villas":        _int(society.get("total_independent_villas_or_tenements")),
             "society_description": _str(society.get("description")),
-            "building_names":      building_names_str,
-            "road_widths":         road_widths_str,
-            "floor_layouts":       floor_layouts_json,   # stored as JSON string
+            "building_names":      building_names_raw,  # Pass directly as array
+            "road_widths":         road_widths_raw,     # Pass directly as array
             "source_file":         json_file.name,
             "ingested_at":         ingested_at,
         })
+        
+        # ── 1.5 Floor Layouts ───────────────────────────────────────────────
+        for idx, fl in enumerate(floor_layouts_json):
+            fl_name = _str(fl.get("layout_name")) or f"Layout {idx}"
+            layout_id = f"{project_id}_fl_{idx}"
+            session.run(_CYPHER_FLOOR_LAYOUT, {
+                "project_id":           project_id,
+                "layout_id":            layout_id,
+                "layout_name":          fl_name,
+                "total_units_on_floor": _int(fl.get("total_units_on_floor")),
+                "has_lifts":            _bool_int(fl.get("has_lifts")),
+                "has_staircases":       _bool_int(fl.get("has_staircases")),
+                "corridor_width":       _str(fl.get("corridor_width")),
+                "has_refuge_area":      _bool_int(fl.get("has_refuge_area")),
+            })
 
         # ── 2. Developer ─────────────────────────────────────────────────────
         session.run(_CYPHER_DEVELOPER, {
@@ -681,10 +703,11 @@ def ingest_one(
             unit_id = f"{project_id}__{idx}"
             # Safely handle key inconsistency: entrance_Facing vs entrance_facing
             facing = _str(unit.get("entrance_Facing") or unit.get("entrance_facing"))
+            
+            # Safely handle key inconsistency: description vs unit_description
+            desc = _str(unit.get("description") or unit.get("unit_description"))
 
-            appl = "|".join(
-                b for b in (unit.get("applicable_buildings") or []) if b
-            )
+            appl = [b for b in (unit.get("applicable_buildings") or []) if b]
 
             # On force re-ingest, delete existing rooms for this unit first
             if force:
@@ -697,13 +720,13 @@ def ingest_one(
                 "property_type":     _str(unit.get("property_type")),
                 "bhk":               _int(unit.get("bhk")),
                 "entrance_facing":   facing,
-                "description":       _str(unit.get("description")),
+                "description":       desc,
                 "carpet_sqft":       _float(unit.get("carpet_area_sqft")),
                 "super_builtup_sqft":_float(unit.get("super_built_up_area_sqft")
                                            or unit.get("super_builtup_sqft")),
                 "balcony_sqft":      _float(unit.get("balcony_area_sqft")),
                 "wash_sqft":         _float(unit.get("wash_area_sqft")),
-                "applicable_buildings": appl,
+                "applicable_buildings": appl,  # Pass directly as array
             })
 
             # Rooms — CREATE (not MERGE)

@@ -1,0 +1,486 @@
+Extracted Entities from JSONs
+=============================
+
+--- Projects ---
+* AMBER
+* DWARKESH GREENS
+* Devnandan Sankalp City
+* Elysium at Shantigram
+* Gandhi Galaxy
+* KP Villas
+* NIVAAN GREENS
+* Neelkanth Status
+* OUM ORBIT
+* Palak Elina
+* RATNAAKAR 6 Beaumonde
+* SATYAMEV ELYSIUM
+* SURYA KUTIR
+* Satyash Residency
+* Sky Avenue
+* Sudama Homes
+* Sunflower Enclave
+* Svasaar Pravesh
+* Swastik Harmony
+* સીતારામ સીટી
+
+--- Developers ---
+* Adani Realty
+* Applewoods & Sandesh Group
+* CRYSTAL REALINFRA Pvt. Ltd.
+* Dharmnandan DEVELOPERS
+* GHOGHARI Developers pvt. ltd.
+* KP SANGHVI
+* Neelkanth
+* Nishant Construction Pvt. Ltd.
+* Reliable Developers
+* SHREE SIDDHIVINAYAK ASSETS
+* SHRINATH CORPORATION
+* Satyamev DEVELOPERS
+* Shanti Infrastructure
+* Shree Developers
+* Sky High ORGANISER Pvt. Ltd.
+* Svasaar Value Builders
+* Swastik
+* તુલસીધામ ડેવલોપર
+
+--- Cities ---
+* AHMEDABAD
+* Ahmedabad
+* Isanpur
+* અમદાવાદ
+
+--- Neighbourhoods ---
+* Chiloda-Kotarpur
+* Gamdi Gaam
+* Gokuldham
+* Hanspura Road
+* Isanpur
+* Iscon-Ambli Road
+* Jodhpur, Satellite
+* Kubernagar
+* NARANPURA
+* New Nikol - Naroda Road
+* Paldi
+* Sarkhej
+* Science City Road
+* Shantigram
+* Shantipura Cross Roads
+* Thaltej
+* Vinzol
+* વસ્ત્રાલ રોડ
+
+--- Landmarks ---
+* 100 Feet Ring Road
+* 108 Institute
+* 10C PETROL PUMP
+* 200 FT. Ring Road
+* A.M.C. Water Works
+* AARYAN CORPORATE PARK
+* AEC Circle
+* AJBA RESIDENC
+* AJVAD APARTMENT
+* AKEERA HEIGHTS
+* AL-ARSH APARTMENT
+* AMTS Bus Stop (14/1)
+* ANAND NIKATEN SCHOOL
+* ANIK HOMES
+* APEX APARTMENT
+* ARJUN TOWER
+* ASHIYANA GREENS
+* AUDA GARDEN
+* Aalok Pushpak Bungalows
+* Airport Chiloda Road
+* Amber Tower
+* Anand Niketan School
+* Arshad Park
+* Aslali Circle
+* Aslali Ring Road Bus Stop
+* Auda Lake View
+* Avirat Circle
+* BEST RESIDENCY
+* BIG BAZAAR
+* BIG BAZZAR
+* BODAKDEV
+* BOPAL
+* BRTS
+* BUNEALITW
+* Bala Hanuman Mandir - Vatva
+* Bank of India
+* Bank of Maharashtra
+* Bhoomi Party Plot
+* Bopal
+* Bushra Height
+* COPPER STONE
+* Club House/Gym
+* DEHRASER COMPLEX
+* DEV ARC MALL
+* DEV ARCADE PARTY PLOT
+* DEV VIHAR PARTY PLOT
+* DHANAJAYO TOWER
+* Devimata Mandir
+* Devimata Mandir, Ranchoji Mandir
+* Dharmabhumi Shopping Center
+* ESLAVA SCHOOL
+* Express Highway
+* FUN REPUBLIC
+* Faizul Hall
+* Fatehwadi Canal
+* GATTELITE
+* GULMOHAR PARK
+* GURUDWARA ACROPOLIS
+* Galaxy Banglow
+* Gamdi Cross Road
+* Gayatri Mandir - Vatva
+* Gayatri Vidyalaya - Narol
+* Gebanshah Bus Stop
+* General Hospital
+* Gokul Petrol Pump
+* Gokuldham
+* Gulzar Park
+* HAYAT RESIDENCY
+* HERITAGE HOMES
+* HOME TOWN
+* HONEST GRAND BHAGWATI
+* Hanumanji & Shital Bapa Sitaram Mandir
+* Haridarsan Cross Road
+* Hathijin Circle
+* Health Center
+* ISCON FLY OVER BRIDGE
+* ISCON MEGA MALE
+* ISCON TEMPLE
+* ISRO
+* Isanpur Chowkdi Bus Stop
+* Iscon Mandir
+* JAIN DERASAR
+* JENAB RESIDENCY
+* Jain Derasar - Vatva, G.I.D.C. Road
+* Jasoda Cross Road
+* Jethabhal's Vav
+* Jetpur School and College
+* Juhapura-Sarkhej Road
+* KADARI PLOT
+* KARNAVATI CLUB
+* KOH-E-TOOR RESIDENCY
+* Kadri Party Plot
+* Karnavati APMC Market
+* Khodiyar Mata Mandir
+* Kotarpur Water Works
+* Kutir Vidyalaya
+* LAXURIYA APAR
+* LOKHANDWALA PARK
+* MADHAV school
+* MARRIOT
+* MEEM RESIDENI
+* MURLI RESTAURANT
+* Mahakali Complex
+* Maninagar Railway Station
+* Marriott
+* May Flower Hospital
+* McDonald's
+* Moni Hotel
+* Municipal Garden
+* Municipal Gujarati School
+* Muralidhar Society
+* NANDIGRAM PARTY PLOT
+* NEELKANTH GREENS VILLAS
+* NPRIMA PARK
+* Nandigram Society
+* Naranpura Cross Road
+* Narayan Nagar Road
+* Narmada Canal
+* Narol Chowkdi Bus Stop
+* Narol Circle
+* Nava Vatva Gram Panchayat
+* Nirma University
+* OMAPLE COUNTY
+* PD Pandya College
+* PRAHLADNAGAR CROSSROADS
+* Partheshwar Mahadev
+* Partheshwar Residency
+* Pauranik Baliyadev Mandir - Lambha
+* Pauranik Swaminarayan Mandir Gamdi and Jetpur
+* Petrol Pump
+* Playground
+* Pushpak Complex
+* Pushpak Heights
+* RAHUL TOWER
+* RAMDEV NAGAR
+* REGENCY PLAZA
+* Railway Over Bridge
+* Rajaram Vidyalaya
+* Rajpath Club Road
+* Rajshree English School - Vatva
+* Ranchoji Mandir
+* Rangila Hanuman Mandir - Vatva
+* Riddhi Gujarati School
+* Ropda Cross Road
+* Ropda Village
+* S. G. Highway
+* SACHIN TOWER
+* SAFAL KAMPAKIBU
+* SAFAL PARISAR
+* SAFAL PARVESH
+* SAFAL PRELUDE
+* SAFAL PROFITARE
+* SAFFL PEGASUS
+* SAHAJA
+* SAKET
+* SAMPRAT RESIDENCY
+* SAON TEMPLE
+* SARAL PARIGAR
+* SATELITE
+* SATELLITE POLICE STATION
+* SATYA VIKAS SCHOOL
+* SG Highway
+* SHILAJ
+* SHIVALIK VILLA
+* SHYAMAL
+* SILVER SOLUTION
+* SONA PALACE
+* SP Ring Road
+* STAR BAZAAR
+* SUN CITY
+* SWET AMBYENM
+* Saraswati Vidyalaya Nava Vatva Ma.Shala
+* Sardar Patel Ring Road
+* Saurabh School
+* School
+* Science City Circle
+* Science City Park
+* Shaikh Adam Abuvala Road
+* Shanti Palace
+* Shriji Corner
+* Shukan Palace Bunglows
+* Shyam Paradise Flats
+* Sindhu Bhavan Road
+* Sitebag Tenament
+* Smruti Mandir
+* Someshwar Mahadev Mandir
+* St Kabir School
+* Surbhit Vatika
+* Swaminarayan Park
+* THALTE CROSSROADS
+* THALTEJ LAKE
+* THALTEJ VILLAGE
+* Tabah
+* Thaltej Cross Roads
+* Torrent Office
+* Turning Krishna Mandir
+* UDAGAM SCHOOL
+* Ugati Lake View
+* Umiya Dham
+* Vaishno Devi Temple
+* Vatva Gaam Bus Stop
+* Vatva Gram Panchayat
+* Vatva Police Chowki
+* Vatva Village
+* Venetian Villa
+* Vijaynagar Cricket Ground
+* Vinzol Village
+* Vishala
+* WIDE ANGLE
+* YMCA
+* કંકુબાગ પાર્ટી પ્લોટ
+* ગોપી બંગ્લોઝ
+* ઘનશ્યામ કોમ્પલેક્ષ
+* દેવીકૃપા સોસાયટી
+* નીરાંત ચોકડી
+* પોલીસ ચોકી
+* મોધી ડેહી
+* રબારી કોલોની ચાર રસ્તા
+* વસ્ત્રાલ ગામ
+* સહજાનંદ
+* સામ્રાજ્ય સોસાયટી
+* સ્વામિનારાયણ મંદિર (વઢવાણ)
+* હરિઓમ ડુપ્લેક્ષ
+* ૨૦૦' સરદાર પટેલ રીંગ રોડ
+
+--- Amenities ---
+* 2 LEVEL BASEMENT PARKING
+* 24 HOURS WATER SUPPLY
+* 24 Hour Water Supply
+* 24 Hours security with security cabin
+* 24 Hours water supply from borewell
+* 24 hours water supply
+* 24 house water supply
+* 24/7 Power Backup
+* 24/7 Water Supply
+* 24x7 Security
+* 5 AC PER UNIT
+* A Celebration lounge spilling over the COP lawns
+* A Grand Dehraser Complex with Upashray & Bhojanshala
+* A netted sports zone for outdoor sports like volleyball, cricket and basket ball avoiding nuisance to the residents
+* A well-equipped children play zone
+* AUTOMATIC LIFT
+* Abundant greenery all over the site with the highlight being the huge COP right at the entrance
+* All internal roads of RCC and Paver Blocks with adequate & attractive street lighting
+* All roads at least 25 feet wide
+* Allotted Parking Spaces
+* Aluminum section sliding windows
+* Attractive main entrance gate with security
+* Auto timer street lights
+* Automatic Lifts
+* BRTS access
+* Backup Generator for Lift and Water Pumps
+* Banking Services
+* Black granite kitchen platform
+* Bore-Well for water supply
+* Borewell
+* CARD TABLE
+* CAROM BOARD
+* CCTV CAMERA
+* CCTV Camera
+* CCTV Security
+* CCTV in Basement and Main Entrance Lobby
+* CHESS
+* CHILDREN PLAY AREA
+* CLUB HOUSE
+* COMMON PLOT
+* Central Satellite Dish
+* Children Play Area
+* Children's Play Area
+* Children's park
+* Club House
+* Clubhouse
+* Common Plot
+* Common bore well with submersible pumps
+* Common garden
+* Communication Facility Connecting Each Flat With Entrance Lobby
+* Compound Wall
+* Decorative Main Entry
+* Decorative main door
+* Decorative main gate with security cabin
+* Dedicated Car Parking
+* Designated Waiting Area for Staff
+* Double coat sand-face plaster on exterior
+* ELEGANT LANDSCAPE
+* Earthquake Resistant R.C.C. frame structure
+* Earthquake-proof construction
+* Earthquake-proof structure design
+* Educational Institutions
+* Elevators
+* Entrance Foyer
+* Exclusively gated community with hi-tech security system
+* Fire Fighting System
+* GARDEN & FOUNTAIN
+* GYM
+* GYM AND MINI THEATRE
+* Garden
+* Gated Community
+* Glazed tiles up to lintel level in bathrooms
+* Gym
+* Gymnasium
+* Gymnasium and Health Club
+* Healthcare Facilities
+* High quality I.S.I. three-phase concealed wiring
+* High road level to prevent water logging
+* High speed automatic two elevators
+* INDOOR GAMES
+* Independent parking for each unit
+* Independent water borewell
+* Indoor Sports Facilities
+* Indoor Sports Room
+* Intercom Facility
+* Internal Roads
+* Internal paved road
+* JOGGING TRACK
+* Jogging Track
+* Jogging track
+* Jogging track amidst the exclusively landscaped COP
+* Joyful living environment
+* KIDS PLAY AREA
+* Kid's play area
+* Kids' Play Area
+* LANDSCAPE GARDEN
+* LIBRARY
+* Land deed in favor of the association
+* Landscaped Garden
+* Landscaped Gardens
+* Life necessities and safety planning
+* Lifts
+* Luxurious common areas
+* MADRASA OR OFFICE
+* Maninagar Railway Station access
+* Mini Theater
+* Multi Apartment Security System
+* Municipal corporation water supply
+* NA, NOC, plan passed land
+* Outdoor Badminton Court
+* Overhead Water Tank
+* Overhead water tank for each bungalow
+* PICK AND DROP ZONE
+* Park
+* Park or Garden
+* Parking Area
+* Parking area
+* Party Area
+* Party Lawn
+* Pavers in parking
+* Peaceful and safe area
+* Perimeter Security
+* Pile foundation
+* Piped Gas Facility
+* Play Area
+* Power Backup
+* Power Backup for Lifts, Staircase, Corridors, Water and Fire Pumps
+* Power backup facility for all common amenities
+* Premium vitrified tiles flooring in all rooms
+* Proximity to hospitals
+* Proximity to religious places
+* Proximity to restaurants
+* Proximity to schools
+* Public Transport Access
+* R.C.C paved road
+* R.C.C. finished internal road and adequate streetlight with paved footpath
+* RCC Roads
+* RCC roads
+* Reception Area
+* Religious Sites
+* Reserved Health Center plot
+* Reserved Municipal Garden plot
+* Reserved Playground plot
+* Reserved School plot
+* SECURITY CABIN
+* SENIOR CITIZEN PARK
+* SENIOR CITIZEN SITOUT
+* SENIOR CITIZEN SITOUTS
+* Safety grill on windows
+* Security
+* Security Cabin
+* Senior Citizen Area
+* Senior Citizen Sitout
+* Senior Citizen Sitting
+* Senior Citizens' Area
+* Senior citizen seating area
+* Single coat mala plaster with wall putty on interior
+* Smart Card Access For Residents
+* Stainless steel finish bath fittings
+* Stainless steel sink in kitchen
+* Street Lights
+* Street lights
+* Swimming Pool
+* TP road entry
+* Tie-beam construction
+* Treated Water Supply
+* Two large common plots
+* Two main gates with security cabin
+* Under ground & overhead water tanks
+* Under ground and overhead 500 ltr. pvc Water tank in every block
+* Underground Drainage
+* Underground Water Tank
+* Video Door Phone
+* WI-FI SPOTS
+* Watchman Cabin
+* Waterproof flush doors with granite frames for other doors
+* Well planned site layout with prominent location of the COP
+* Well-Planned professionally designed centrally located beautiful garden
+* Wooden Flooring in Master Bed
+* ક્લબ હાઉસ
+* ગાર્ડન
+* ચિલ્ડ્રન પાર્ક
+* જોગીંગ ટ્રેક
+* પાર્કિંગ
+* સીક્યુરીટી
+* હેલ્થ કલબ
+* ૨૪ કલાક પાણી
+

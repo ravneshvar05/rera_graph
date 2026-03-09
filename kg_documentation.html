@@ -793,76 +793,82 @@
     <div class="page-break"></div>
     <h1 id="pipeline"><span class="section-num">4</span> The Search Pipeline</h1>
 
-    <p>Every user query goes through three stages. The first two run in parallel — graph traversal and semantic vector
-        search — and their results are combined into a single ranked list.</p>
+    <p>The pipeline processes a user query through five distinct stages, combining structured graph retrieval with semantic vector search to produce a ranked set of project recommendations, which are then turned into a natural‑language answer by an LLM.</p>
 
     <div class="pipeline">
         <div class="pstep">
             <div class="num">Stage 1</div>
-            <div class="title">Query Planner</div>
-            <div class="tech">LLM extracts structure from natural language</div>
+            <div class="title">Intent Planner</div>
+            <div class="tech">LLM parses the natural‑language query into a structured <code>QueryIntent</code> (e.g., property type, BHK, required amenities, location).</div>
         </div>
         <div class="pstep">
             <div class="num">Stage 2A</div>
             <div class="title">Graph Traversal</div>
-            <div class="tech">Neo4j Cypher — structured facts</div>
+            <div class="tech">Neo4j Cypher queries are generated from the <code>QueryIntent</code>, retrieving exact matches such as projects in the specified zone with required amenities and rooms.</div>
         </div>
         <div class="pstep">
             <div class="num">Stage 2B</div>
             <div class="title">Vector Search</div>
-            <div class="tech">ChromaDB — semantic similarity</div>
+            <div class="tech">ChromaDB performs semantic similarity search on unit embeddings, retrieving projects that match the query in a fuzzy manner (e.g., based on keywords like “spacious”, “near park”).</div>
         </div>
         <div class="pstep">
             <div class="num">Stage 3</div>
             <div class="title">Merge & Rank</div>
-            <div class="tech">Weighted scoring, top-K projects</div>
+            <div class="tech">The results from Neo4j and ChromaDB are merged, de‑duplicated, and scored (graph matches receive higher weight). The top‑K projects are selected for answer generation.</div>
         </div>
-        <div class="pstep">
-            <div class="num">Stage 4</div>
-            <div class="title">Answer Generator</div>
-            <div class="tech">LLM composes the response</div>
+            <div class="pstep">
+                <div class="num">Stage 4</div>
+                <div class="title">Answer Generator</div>
+                <div class="tech">The selected context is fed to the LLM (Groq/Gemini) which generates a JSON‑structured answer containing recommendations, reasoning, and a summary for the UI.</div>
+            </div>
         </div>
-    </div>
 
-    <h2>Stage 1 — Query Planning</h2>
+        <div class="diagram">
+            <div class="mermaid">
+                graph LR
+                    Q[User Query] -->|Parse Intent| I[Intent Planner]
+                    I -->|Cypher Query| G[Graph Traversal (Neo4j)]
+                    I -->|Embedding Search| V[Vector Search (ChromaDB)]
+                    G --> M[Merge & Rank]
+                    V --> M
+                    M --> A[Answer Generator (LLM)]
+            </div>
+            <div class="diagram-caption">Fig 1. End‑to‑end dual‑retrieval pipeline.</div>
+        </div>
 
-    <p>A large language model reads the user's natural language query and extracts a structured <em>intent</em>. The
-        model is given the graph's own vocabulary — it knows what Zone names exist, what room types exist, and that
-        amenities are matched by name. This structured intent is what drives the graph query.</p>
+    <h2>Stage 1 — Intent Planning</h2>
+
+    <p>A Large Language Model (Groq or Gemini) reads the user's natural language query and extracts a structured <em>intent</em> using a strict Pydantic schema (<code>QueryIntent</code>). The model maps user descriptions to specific fields like <code>city</code>, <code>neighbourhood</code>, <code>bhk</code>, <code>property_type</code>, <code>amenities</code>, and <code>specific_landmarks</code>. This structured intent acts as the blueprint for the downstream retrieval.</p>
 
     <p>For example, <em>"4 BHK villa near Karnavati Club with gym and pooja room"</em> becomes:</p>
 
     <table class="no-break">
         <thead>
             <tr>
-                <th>Field</th>
+                <th>Field in <code>QueryIntent</code></th>
                 <th>Extracted Value</th>
             </tr>
         </thead>
         <tbody>
             <tr>
-                <td>property_type</td>
-                <td>VILLA</td>
+                <td><code>property_type</code></td>
+                <td>"VILLA"</td>
             </tr>
             <tr>
-                <td>bhk</td>
+                <td><code>bhk</code></td>
                 <td>4</td>
             </tr>
             <tr>
-                <td>near_landmark</td>
-                <td>"Karnavati Club"</td>
+                <td><code>specific_landmarks</code></td>
+                <td>["Karnavati Club"]</td>
             </tr>
             <tr>
-                <td>must_have_rooms</td>
-                <td>["POOJA_ROOM"]</td>
+                <td><code>amenities</code></td>
+                <td>["gym", "pooja room"]</td>
             </tr>
             <tr>
-                <td>amenity_search</td>
-                <td>"gym"</td>
-            </tr>
-            <tr>
-                <td>semantic_query</td>
-                <td>"4 BHK villa near Karnavati Club with gym and pooja room"</td>
+                <td><code>query_type</code></td>
+                <td>"SPECIFIC"</td>
             </tr>
         </tbody>
     </table>
@@ -886,66 +892,71 @@
 
     <h2>Stage 3 — Merge and Rank</h2>
 
-    <p>Results from both sources are combined into a single scored list and grouped by project. Each project's final
-        score is a weighted combination:</p>
+    <p>Results from Neo4j and ChromaDB are combined into a single, deduplicated list. Instead of a complex weighted sum, projects are ranked primarily by their source of retrieval (Graph vs. Vector vs. Both):</p>
 
     <table class="no-break">
         <thead>
             <tr>
-                <th>Match Type</th>
-                <th>Score Contribution</th>
+                <th>Priority Level</th>
+                <th>Retrieval Source</th>
+                <th>Description</th>
             </tr>
         </thead>
         <tbody>
             <tr>
-                <td>Graph — project is in the exact neighbourhood or zone</td>
-                <td>High (0.7)</td>
+                <td><strong>High (Priority 0)</strong></td>
+                <td>Found in Both (Graph + Vector)</td>
+                <td>Project precisely matches structural requirements (Neo4j) and is semantically highly relevant (ChromaDB).</td>
             </tr>
             <tr>
-                <td>Graph — project is near the requested landmark</td>
-                <td>Medium (0.5)</td>
+                <td><strong>Medium (Priority 1)</strong></td>
+                <td>Graph Only</td>
+                <td>Project precisely matches structural filters (e.g. Zone, BHK) but falls short on semantic keyword matching.</td>
             </tr>
             <tr>
-                <td>Graph — amenity name matches</td>
-                <td>Bonus (+0.2)</td>
-            </tr>
-            <tr>
-                <td>Vector — semantic similarity of unit description</td>
-                <td>0.0 – 0.5 scaled</td>
+                <td><strong>Low (Priority 2)</strong></td>
+                <td>Vector Only</td>
+                <td>Project has high semantic similarity but lacks exact structured data connections (useful for vague/fuzzy queries).</td>
             </tr>
         </tbody>
     </table>
+
+    <p>Within each priority tier, projects are tie-broken by their ChromaDB vector distance score (lower distance is better). The top-K unique projects (defined by <code>FINAL_TOP_N</code>) are then passed as context to the LLM for answer generation.</p>
 
     <div class="diagram">
         <div class="mermaid">
             sequenceDiagram
             participant U as User
-            participant QP as Query Planner
+            participant QP as Intent Planner
             participant KG as Neo4j Graph
             participant VEC as ChromaDB
             participant AG as Answer Generator
 
             U->>QP: "3 BHK near Karnavati Club with jogging track"
-            Note over QP: Extracts: bhk=3, landmark=Karnavati Club,<br />amenity_search="jogging track"
+            Note over QP: Extracts into QueryIntent:<br />bhk=3, specific_landmarks="Karnavati Club",<br />amenities="jogging track"
             par Graph + Vector run together
             QP->>KG: Traverse graph for matching projects
             KG-->>QP: [KP Villas, Swastik Park...]
             and
             QP->>VEC: Semantic similarity search
-            VEC-->>QP: [(unit_id, score), ...]
+            VEC-->>QP: [(project_id, distance), ...]
             end
-            Note over QP: Merge, score, group by project
+            Note over QP: Merge by Priority (Both, Graph, Vector) & Rank
             QP->>AG: Top projects with full context
-            AG->>U: Natural language answer
+            AG->>U: JSON-structured answer
         </div>
         <div class="diagram-caption">Fig 3. Full query flow showing parallel graph and vector search</div>
     </div>
 
+    <h2>Stage 4 — Answer Generation</h2>
+
+    <p>Finally, the top-ranked projects are compiled into a rich text context and sent to the LLM alongside the original user query. The Answer Generator strictly filters out any context that contradicts the user's hard constraints (preventing hallucinations). The LLM synthesises this data into a structured JSON response containing the matching project IDs, a natural-language explanation of why they match, and a summary. The Streamlit frontend uses this JSON to render interactive project cards for the user.</p>
+
 
     <!-- ═══════════════════════════════════════════════════════
-     SECTIONS 5-8 COMMENTED OUT (available for future use)
+     SECTION 5 — INGESTION
 ═══════════════════════════════════════════════════════ -->
-    <!--
+    <h1 id="ingestion"><span class="section-num">5</span> Data Ingestion</h1>
 
     <p>Ingestion is the process of reading each brochure JSON file and writing its data into the graph. Every write
         operation uses the graph's <strong>MERGE</strong> pattern — which means it is safe to run more than once.
@@ -1288,42 +1299,27 @@
         </thead>
         <tbody>
             <tr>
-                <td><strong>SEARCH</strong></td>
-                <td>Graph traversal + vector merge. Returns matching projects.</td>
-                <td>"3 BHK apartments in Bopal with pool"</td>
+                <td><strong>SPECIFIC</strong></td>
+                <td>Applies structural filters + vector semantic matching. Returns targeted projects matching specific property criteria.</td>
+                <td>"3 BHK apartments in Bopal with a pool"</td>
             </tr>
             <tr>
-                <td><strong>DETAIL</strong></td>
-                <td>Fetch one specific project — all units, rooms, landmarks, amenities.</td>
-                <td>"Tell me everything about KP Villas"</td>
-            </tr>
-            <tr>
-                <td><strong>COMPARE</strong></td>
-                <td>Fetch two or more named projects side by side.</td>
-                <td>"Compare OUM Orbit and KP Villas"</td>
-            </tr>
-            <tr>
-                <td><strong>AGGREGATE</strong></td>
-                <td>Count or summarise. Pure graph query, no vector needed.</td>
-                <td>"How many 3 BHK apartments are in East Ahmedabad?"</td>
+                <td><strong>GLOBAL</strong></td>
+                <td>Bypasses structural filters to return a broad overview of all projects or top-level metrics. Used when no specific intent parameters can be securely identified.</td>
+                <td>"What kinds of projects do you have available?"</td>
             </tr>
         </tbody>
     </table>
 
     <h2>Fallback Strategy</h2>
 
-    <p>If a structured graph search returns no results — for example, if the user asks for a property type that does not
-        exist in a given area — the system broadens the search automatically before giving up. First it tries removing
-        the property type constraint (showing all types in that area). If still no results, it falls back to pure
-        semantic vector search and clearly indicates to the user that results are approximate.</p>
-
-    -->
+    <p>If a structured Cypher traversal fails or returns an error, the <code>DualRetriever</code> automatically falls back to a broad graph query (<code>_get_all_projects</code>) to ensure the vector semantic search (which runs in parallel) still has baseline graph project data to merge against. This ensures the app never crashes on a malformed logic combination and always gracefully attempts a fuzzy match.</p>
 
     <!-- ═══════════════════════════════════════════════════════
-     SECTION 5 — SCALING
+     SECTION 8 — SCALING
 ═══════════════════════════════════════════════════════ -->
     <div class="page-break"></div>
-    <h1 id="scale"><span class="section-num">5</span> Scaling to 20,000 Brochures</h1>
+    <h1 id="scale"><span class="section-num">8</span> Scaling to 20,000 Brochures</h1>
 
     <p>The graph database scales naturally with the data because shared entities are stored once. Adding the 10,000th
         brochure does not add a 10,000th "Ahmedabad" node — it simply adds a new Project node and edges to the
@@ -1397,14 +1393,12 @@
 
 
     <!-- ═══════════════════════════════════════════════════════
-     SECTIONS 10-11 COMMENTED OUT (available for future use)
+     SECTION 9 — DEPLOYMENT STEPS
 ═══════════════════════════════════════════════════════ -->
-    <!--
     <div class="page-break"></div>
-    <h1 id="deployment"><span class="section-num">10</span> Deployment Steps</h1>
+    <h1 id="deployment"><span class="section-num">9</span> Deployment Steps</h1>
 
-    <p>The system is built as a set of focused Python scripts, each with a single responsibility. They are run in order
-        to stand up the complete system.</p>
+    <p>The system is built as a set of focused Python scripts, each with a single responsibility. They are split between the <code>kg/</code> folder (for building the graph) and the <code>graphrag/</code> folder (for searching it).</p>
 
     <table>
         <thead>
@@ -1418,45 +1412,27 @@
             <tr>
                 <td>1</td>
                 <td><strong>Neo4j Instance</strong></td>
-                <td>Start Neo4j via Docker or Neo4j Desktop. The graph database must be running before any other step.
-                </td>
+                <td>Start Neo4j via Docker or Neo4j Desktop. The graph database must be running before any other step.</td>
             </tr>
             <tr>
                 <td>2</td>
-                <td><strong>kg_schema.py</strong></td>
-                <td>Creates uniqueness constraints and indexes in Neo4j — ensures fast lookups on project_id,
-                    neighbourhood name, amenity name, and BHK count.</td>
+                <td><strong>kg/kg_schema.py</strong></td>
+                <td>Creates uniqueness constraints and indexes in Neo4j — ensures fast lookups on project_id, neighbourhood name, amenity name, and BHK count.</td>
             </tr>
             <tr>
                 <td>3</td>
-                <td><strong>kg_ingest.py</strong></td>
-                <td>Reads all brochure JSON files and writes to Neo4j + ChromaDB in parallel. Supports
-                    <code>--dry-run</code> (validate only), <code>--force</code> (full re-ingest), and
-                    <code>--workers N</code> (thread count).</td>
+                <td><strong>kg/kg_ingest.py</strong></td>
+                <td>Reads all brochure JSON files and writes to Neo4j + ChromaDB in parallel.</td>
             </tr>
             <tr>
                 <td>4</td>
-                <td><strong>kg_geo_enrich.py</strong></td>
-                <td>Runs once after initial ingestion. Builds the Zone → Neighbourhood hierarchy and cross-links
-                    landmark nodes to neighbourhood nodes where applicable.</td>
+                <td><strong>kg/kg_geo_enrich.py</strong></td>
+                <td>Runs once after initial ingestion. Builds the Zone → Neighbourhood hierarchy and cross-links landmark nodes to neighbourhood nodes where applicable.</td>
             </tr>
             <tr>
                 <td>5</td>
-                <td><strong>kg_query_planner.py</strong></td>
-                <td>The LLM-powered intent extractor. Reads user queries and outputs a structured intent object using
-                    the graph's vocabulary.</td>
-            </tr>
-            <tr>
-                <td>6</td>
-                <td><strong>kg_search.py</strong></td>
-                <td>The search engine. Builds and runs Cypher traversals from the intent, runs ChromaDB vector search in
-                    parallel, and merges the results.</td>
-            </tr>
-            <tr>
-                <td>7</td>
-                <td><strong>app.py</strong></td>
-                <td>Updated Streamlit UI — routes queries through the knowledge graph search instead of the previous
-                    system.</td>
+                <td><strong>graphrag/graphrag_app.py</strong></td>
+                <td>Starts the Streamlit application. This app acts as the orchestrator, importing <code>graphrag_intent.py</code> (query planning), <code>graphrag_retriever.py</code> (graph and vector search), and <code>graphrag_answer.py</code> (LLM generation) to process queries at runtime.</td>
             </tr>
         </tbody>
     </table>
@@ -1464,22 +1440,18 @@
     <div class="callout blue">
         <div class="callout-icon">🚀</div>
         <div class="callout-body">
-            <p><strong>How to start:</strong> Run Neo4j, then run <code>kg_ingest.py</code> on just 5–10 JSON files
-                first. Open Neo4j Browser at <code>http://localhost:7474</code> and visually inspect the graph. You
-                should be able to see projects, their rooms, landmarks, and amenities as a visual network. Once the
-                structure looks correct on the small dataset, run the full ingestion.</p>
+            <p><strong>How to start:</strong> Ensure Neo4j is running, then execute the scripts in the <code>kg/</code> folder sequentially. Once ingestion and enrichment are complete, run <code>streamlit run graphrag/graphrag_app.py</code> from the project root to interact with the Knowledge Graph.</p>
         </div>
     </div>
 
 
     <!-- ═══════════════════════════════════════════════════════
-     SECTION 11 — COMPARISON
+     SECTION 10 — COMPARISON
 ═══════════════════════════════════════════════════════ -->
     <div class="page-break"></div>
-    <h1 id="comparison"><span class="section-num">11</span> Knowledge Graph vs. Tabular Approach</h1>
+    <h1 id="comparison"><span class="section-num">10</span> Knowledge Graph vs. Tabular Approach</h1>
 
-    <p>Both approaches have genuine strengths. The table below is an honest assessment of where each excels for this
-        specific problem.</p>
+    <p>Both approaches have genuine strengths. The table below is an honest assessment of where each excels for this specific real estate domain.</p>
 
     <table>
         <thead>
@@ -1493,62 +1465,42 @@
             <tr>
                 <td>Geographic zone queries ("in West Ahmedabad")</td>
                 <td class="yes">✅ Native — Zone is a real node</td>
-                <td class="no">❌ Zone concept does not exist</td>
+                <td class="no">❌ Zone concept does not exist default</td>
             </tr>
             <tr>
                 <td>Landmark proximity ("near Karnavati Club")</td>
                 <td class="yes">✅ NEAR relationship — exact fact</td>
-                <td class="ok">⚠️ Text search — false positives on OCR data</td>
+                <td class="ok">⚠️ Text search — false positives</td>
             </tr>
             <tr>
                 <td>Room type filtering ("villas with terrace")</td>
                 <td class="yes">✅ Room nodes — actual room data</td>
-                <td class="ok">⚠️ Precomputed boolean flags — must be maintained</td>
+                <td class="ok">⚠️ Precomputed boolean flags needed</td>
             </tr>
             <tr>
                 <td>Amenity search ("with jogging track")</td>
-                <td class="yes">✅ Named Amenity nodes — flexible partial match</td>
-                <td class="ok">⚠️ Full-text search on raw strings — inconsistent</td>
+                <td class="yes">✅ Named Amenity nodes — flexible</td>
+                <td class="ok">⚠️ Full-text search on raw strings</td>
             </tr>
             <tr>
                 <td>Developer portfolio ("what did X build?")</td>
                 <td class="yes">✅ One relationship hop</td>
-                <td class="ok">⚠️ Text JOIN on developer name field</td>
-            </tr>
-            <tr>
-                <td>Nearby landmarks by type ("schools near X")</td>
-                <td class="yes">✅ Landmark type is stored — direct query</td>
-                <td class="no">❌ No landmark type concept</td>
+                <td class="ok">⚠️ Text JOIN on developer name</td>
             </tr>
             <tr>
                 <td>Spelling variant handling ("Vizol / Vinzol")</td>
-                <td class="yes">✅ ALIAS_OF edge — encoded once, permanent</td>
-                <td class="ok">⚠️ Requires a manually maintained lookup table</td>
+                <td class="yes">✅ ALIAS_OF edge — encoded permanently</td>
+                <td class="ok">⚠️ Requires manual lookup table</td>
             </tr>
             <tr>
                 <td>Adding new area / zone without code changes</td>
-                <td class="yes">✅ Add data to config, re-run enrichment</td>
-                <td class="ok">⚠️ Code change required in variant dictionary</td>
+                <td class="yes">✅ Add link via graph enrichment</td>
+                <td class="ok">⚠️ Code change required in mapping dictionaries</td>
             </tr>
             <tr>
-                <td>Simple equality filters (city = X, bhk = 3)</td>
-                <td class="yes">✅ Works well with indexes</td>
-                <td class="yes">✅ Equally fast with indexes</td>
-            </tr>
-            <tr>
-                <td>Count and aggregate queries</td>
-                <td class="yes">✅ Graph COUNT with traversal</td>
-                <td class="yes">✅ COUNT + GROUP BY — natural strength</td>
-            </tr>
-            <tr>
-                <td>Bulk export / spreadsheet output</td>
-                <td class="ok">⚠️ Possible but verbose</td>
-                <td class="yes">✅ Natural fit for rows and columns</td>
-            </tr>
-            <tr>
-                <td>Schema flexibility as data evolves</td>
-                <td class="yes">✅ Add nodes and edges — no migration needed</td>
-                <td class="ok">⚠️ Schema change — ALTER TABLE or new column</td>
+                <td>Fuzzy Semantic Search ("spacious homes")</td>
+                <td class="yes">✅ Supported via ChromaDB integration</td>
+                <td class="no">❌ Not supported natively</td>
             </tr>
         </tbody>
     </table>
@@ -1556,14 +1508,9 @@
     <div class="callout green">
         <div class="callout-icon">📌</div>
         <div class="callout-body">
-            <p><strong>Summary:</strong> For questions that are geographic, relational, or multi-hop in nature — which
-                is the majority of real estate search queries — the Knowledge Graph is the correct architectural choice.
-                For simple tabular reporting and bulk data exports, a relational approach remains a natural fit. The two
-                are not mutually exclusive and can coexist in a production system.</p>
+            <p><strong>Summary:</strong> For questions that are geographic, relational, or multi-hop in nature — which is the majority of real estate search queries — the Knowledge Graph is the correct architectural choice.</p>
         </div>
     </div>
-
-    -->
 
     <div class="footer">
         <span>RERA Chatbot — Knowledge Graph Architecture Documentation</span>

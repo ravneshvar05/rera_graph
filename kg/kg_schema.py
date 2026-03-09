@@ -24,6 +24,7 @@ CONSTRAINTS = [
     ("zone_unique",        "Zone",         "name"),
     ("developer_unique",   "Developer",    "name"),
     ("unit_unique",        "Unit",         "unit_id"),
+    ("floorlayout_unique", "FloorLayout",  "layout_id"),
     ("amenity_unique",     "Amenity",      "name"),
     ("landmark_unique",    "Landmark",     "name"),
 ]

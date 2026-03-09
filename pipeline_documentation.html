@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>RERA Chatbot — Full Pipeline Documentation</title>
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        mermaid.initialize({ startOnLoad: true, theme: 'default', fontFamily: 'Georgia, serif' });
+    </script>
+    <style>
+        /* ── Google Fonts ── */
+        @import url('https://fonts.googleapis.com/css2?family=Merriweather:ital,wght@0,300;0,400;0,700;1,300;1,400&family=Inter:wght@400;500;600;700&family=Fira+Code:wght@400;500&display=swap');
+        /* ── Reset ── */
+        *, *::before, *::after { box-sizing: border-box; }
+        html { font-size: 11pt; }
+        /* ── Page layout ── */
+        body { font-family: 'Merriweather', Georgia, serif; font-weight: 300; line-height: 1.85; color: #1a1a2e; background: #fff; max-width: 900px; margin: 0 auto; padding: 48px 56px 80px; }
+        /* ── Cover page ── */
+        .cover { min-height: 100vh; display: flex; flex-direction: column; justify-content: center; border-bottom: 3px solid #2c5f8a; padding-bottom: 60px; margin-bottom: 60px; }
+        .cover-tag { font-family: 'Inter', sans-serif; font-size: 9pt; font-weight: 600; letter-spacing: 0.15em; text-transform: uppercase; color: #2c5f8a; margin-bottom: 20px; }
+        .cover h1 { font-family: 'Inter', sans-serif; font-size: 32pt; font-weight: 700; color: #0f2847; line-height: 1.2; margin: 0 0 16px; border: none; }
+        .cover-sub { font-family: 'Merriweather', serif; font-size: 13pt; font-weight: 300; font-style: italic; color: #4a5568; margin-bottom: 48px; }
+        .cover-meta { font-family: 'Inter', sans-serif; font-size: 9pt; color: #718096; border-top: 1px solid #e2e8f0; padding-top: 20px; display: flex; gap: 40px; }
+        .cover-meta span { display: flex; flex-direction: column; gap: 2px; }
+        .cover-meta strong { color: #2d3748; font-weight: 600; }
+        .cover-accent { width: 60px; height: 4px; background: linear-gradient(90deg, #2c5f8a, #4299e1); border-radius: 4px; margin-bottom: 28px; }
+        /* ── Typography ── */
+        h1, h2, h3, h4 { font-family: 'Inter', sans-serif; }
+        h1 { font-size: 20pt; font-weight: 700; color: #0f2847; border-bottom: 2px solid #2c5f8a; padding-bottom: 10px; margin: 48px 0 20px; }
+        h2 { font-size: 15pt; font-weight: 700; color: #1a365d; border-bottom: 1px solid #bee3f8; padding-bottom: 6px; margin: 40px 0 16px; }
+        h3 { font-size: 12pt; font-weight: 600; color: #2c5f8a; margin: 32px 0 12px; }
+        h4 { font-size: 9.5pt; font-weight: 700; color: #2d3748; text-transform: uppercase; letter-spacing: 0.08em; margin: 20px 0 8px; }
+        p { margin-bottom: 16px; font-size: 10.5pt; }
+        ul, ol { padding-left: 1.8em; margin-bottom: 16px; }
+        li { margin: 6px 0; font-size: 10.5pt; }
+        code { font-family: 'Fira Code', monospace; background: rgba(163, 113, 247, 0.1); color: #2c5f8a; padding: 2px 6px; border-radius: 4px; font-size: 0.85em; }
+        pre { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 16px; overflow-x: auto; margin: 16px 0; }
+        pre code { background: none; padding: 0; color: inherit; }
+        .section-num { display: inline-block; background: #2c5f8a; color: #fff; font-family: 'Inter', sans-serif; font-size: 10pt; font-weight: 700; width: 28px; height: 28px; text-align: center; line-height: 28px; border-radius: 50%; margin-right: 12px; vertical-align: middle; }
+        .callout { border-radius: 6px; padding: 16px 20px; margin: 24px 0; display: flex; gap: 16px; }
+        .callout-icon { font-size: 1.3rem; flex-shrink: 0; margin-top: 2px; }
+        .callout-body { flex: 1; font-size: 9.5pt; line-height: 1.7; }
+        .callout-body p { margin: 0; font-size: 10pt; }
+        .callout.blue { background: #ebf8ff; border-left: 4px solid #2c5f8a; }
+        .callout.green { background: #f0fff4; border-left: 4px solid #276749; }
+        .callout.amber { background: #fffbeb; border-left: 4px solid #c05621; }
+        .pipeline-step { background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 24px; margin-bottom: 28px; }
+        .pipeline-header { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; }
+        .pipeline-num { font-family: 'Inter', sans-serif; font-size: 14pt; font-weight: 800; color: #fff; background: #2c5f8a; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: 8px; }
+        .pipeline-title { font-family: 'Inter', sans-serif; font-size: 13pt; font-weight: 700; color: #1a365d; }
+        .pipeline-file { display: inline-block; background: #e2e8f0; color: #4a5568; font-family: 'Fira Code', monospace; font-size: 8pt; padding: 4px 10px; border-radius: 4px; margin-bottom: 16px; }
+        .diagram { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin: 24px 0; text-align: center; }
+    </style>
+</head>
+<body>
+    <div class="cover">
+        <div class="cover-tag">Detailed Architecture</div>
+        <div class="cover-accent"></div>
+        <h1>Hybrid GraphRAG Pipeline</h1>
+        <div class="cover-sub">Comprehensive step‑by‑step documentation on Entity Extraction, Relational Geometry, and Dual Retrieval.</div>
+        <div class="cover-meta">
+            <span><strong>Project</strong>RERA Chatbot</span>
+            <span><strong>Scope</strong>Data Ingestion & Retrieval Pipeline</span>
+            <span><strong>Date</strong>March 2026</span>
+        </div>
+    </div>
+
+    <h2 id="overview"><span class="section-num">1</span> Overview of the Architecture</h2>
+    <p>This repository orchestrates a robust "Hybrid GraphRAG" architecture tailored for real‑estate data. It combines a deterministic Knowledge Graph (Neo4j) with a semantic Vector Store (ChromaDB). The LLM is only used for intent parsing and answer synthesis.</p>
+    <div class="callout blue">
+        <div class="callout-icon">💡</div>
+        <div class="callout-body">
+            <p><strong>The Core Philosophy:</strong> Real‑estate data is <em>already a graph</em>. By storing it directly in Neo4j we guarantee 100 % accuracy on structured queries (e.g., "3 BHK in Bopal").</p>
+        </div>
+    </div>
+
+    <h2 id="no-llm"><span class="section-num">2</span> Entity & Relationship Extraction – Why No LLM?</h2>
+    <p>Standard GraphRAG tutorials let an LLM extract entities from raw text. We avoid this for three reasons:</p>
+    <ol>
+        <li><strong>Structural Certainty:</strong> Deterministic mapping via Python parsers guarantees no hallucinations.</li>
+        <li><strong>Zero Data Loss:</strong> Every field from the JSON brochure is written verbatim to Neo4j.</li>
+        <li><strong>Compute Efficiency:</strong> MERGE‑based ingestion runs in seconds, whereas LLM extraction would be minutes per brochure.</li>
+    </ol>
+    <div class="callout amber">
+        <div class="callout-icon">⚠️</div>
+        <div class="callout-body">
+            <p><strong>Clustering:</strong> We deliberately omit community‑detection clustering (Leiden/Louvain) because home‑buyers need precise facts, not thematic summaries.</p>
+        </div>
+    </div>
+
+    <h2 id="step-by-step"><span class="section-num">3</span> The Step‑by‑Step Pipeline Flow</h2>
+
+    <div class="pipeline-step">
+        <div class="pipeline-header"><div class="pipeline-num">1</div><div class="pipeline-title">Data Ingestion – Graph Building</div></div>
+        <span class="pipeline-file">📁 kg/kg_ingest.py</span>
+        <p>This script converts raw JSON brochures into both Neo4j and ChromaDB:</p>
+        <ul>
+            <li><strong>JSON Structuring:</strong> Iterates over every brochure.</li>
+            <li><strong>Rule‑Based Classification:</strong> Uses regex to label amenities (e.g., "Gymnasium" → SPORTS) and landmarks (e.g., "Delhi Public School" → EDUCATION).</li>
+            <li><strong>Idempotent MERGE:</strong> Guarantees safe re‑runs – no duplicate <code>Project</code>, <code>City</code>, etc.</li>
+            <li><strong>Vector Document Creation:</strong> Builds a rich text block per <code>Unit</code> and embeds it with <code>all‑MiniLM‑L6‑v2</code> into ChromaDB.</li>
+        </ul>
+    </div>
+
+    <div class="pipeline-step">
+        <div class="pipeline-header"><div class="pipeline-num">2</div><div class="pipeline-title">Geographic Enrichment</div></div>
+        <span class="pipeline-file">📁 kg/kg_geo_enrich.py</span>
+        <p>Runs once after ingestion to add spatial intelligence:</p>
+        <ul>
+            <li><strong>Zone Linking:</strong> Creates <code>Zone → Neighbourhood → City</code> hierarchy.</li>
+            <li><strong>Landmark ↔ Neighbourhood (SAME_AS):</strong> Links landmarks to their neighbourhoods.</li>
+            <li><strong>Alias Resolution (ALIAS_OF):</strong> Handles spelling variants (e.g., "Vizol" → "Vinzol").</li>
+        </ul>
+    </div>
+
+    <div class="pipeline-step">
+        <div class="pipeline-header"><div class="pipeline-num">3</div><div class="pipeline-title">Query Intent Parsing</div></div>
+        <span class="pipeline-file">📁 graphrag/graphrag_intent.py</span>
+        <p>The LLM is invoked here to translate a natural‑language query into a strict <code>QueryIntent</code> schema:</p>
+        <ul>
+            <li><strong>Pydantic Enforcement:</strong> Guarantees fields like <code>city</code>, <code>bhk</code>, <code>amenities</code>, etc.</li>
+            <li><strong>Fact vs. Semantic Separation:</strong> Hard facts go to Neo4j, fuzzy keywords go to the vector store.</li>
+        </ul>
+    </div>
+
+    <div class="pipeline-step">
+        <div class="pipeline-header"><div class="pipeline-num">4</div><div class="pipeline-title">Dual Retriever</div></div>
+        <span class="pipeline-file">📁 graphrag/graphrag_retriever.py</span>
+        <p>Executes two parallel retrieval strategies and merges results:</p>
+        <ul>
+            <li><strong>Graph Retrieval (Cypher Builder):</strong> Dynamically builds a Cypher query from the intent, supporting location, BHK, amenity‑to‑flag mapping, and landmark types.</li>
+            <li><strong>Vector Retrieval (ChromaDB):</strong> Uses the raw query plus semantic keywords to perform similarity search, applying exact metadata filters when possible.</li>
+            <li><strong>Merge & Rank:</strong> Projects found by both sources are prioritized; results are sorted by source priority then score.</li>
+        </ul>
+    </div>
+
+    <div class="pipeline-step">
+        <div class="pipeline-header"><div class="pipeline-num">5</div><div class="pipeline-title">LLM Answer Generation & UI</div></div>
+        <span class="pipeline-file">📁 graphrag/graphrag_answer.py &amp; graphrag_app.py</span>
+        <p>The final step synthesises a user‑facing answer:</p>
+        <ul>
+            <li><strong>Strict Grounding:</strong> System prompt forces the LLM to use only the retrieved context.</li>
+            <li><strong>JSON Output:</strong> Guarantees <code>{"general_summary":..., "projects": [...], "conclusion":...}</code> for the Streamlit UI.</li>
+            <li><strong>Fallback Path:</strong> If the LLM call fails, a deterministic fallback builds simple markdown reasoning.</li>
+            <li><strong>Streamlit Front‑End:</strong> Renders project cards with source tags (graph, vector, both) and optional debug panels.</li>
+        </ul>
+    </div>
+
+    <h2 id="verification"><span class="section-num">4</span> Verification & Testing</h2>
+    <p>All components are covered by unit tests (not shown). Manual verification steps:</p>
+    <ol>
+        <li>Run <code>python kg_schema.py</code> – ensure constraints are created without errors.</li>
+        <li>Execute <code>python kg_ingest.py</code> on a sample brochure – check Neo4j node counts and ChromaDB document count.</li>
+        <li>Run <code>python kg_geo_enrich.py --reset</code> – verify <code>PART_OF</code>, <code>SAME_AS</code>, <code>ALIAS_OF</code> relationships appear.</li>
+        <li>Start the Streamlit app (<code>streamlit run graphrag_app.py</code>) and test the example queries. Cards should display correct source tags.</li>
+        <li>Inspect the JSON returned by <code>graphrag_answer.py</code> – it must conform to the schema defined in the system prompt.</li>
+    </ol>
+
+    <div class="diagram">
+        <div class="mermaid">
+            graph TD
+            subgraph "1. Ingestion Phase"
+            A[Raw JSON Brochures] --> B[kg_ingest.py]
+            B --> C[(Neo4j Knowledge Graph)]
+            B --> D[(ChromaDB Vectors)]
+            C --> E[kg_geo_enrich.py]
+            end
+
+            subgraph "2. Query Phase"
+            F[User Query String] --> G[graphrag_intent.py]
+            G --> H{QueryIntent JSON}
+            H --> I[Graph Retriever - Neo4j]
+            H --> J[Vector Retriever - ChromaDB]
+            I --> K((Merge Ranker))
+            J --> K
+            end
+
+            subgraph "3. Answer Phase"
+            K --> L[Structured Context Text]
+            L --> M[graphrag_answer.py]
+            M --> N[Streamlit UI Display]
+            end
+        </div>
+    </div>
+
+    <footer style="margin-top: 60px; font-size: 9pt; color: #718096; text-align: center;">
+        Generated by AI‑Assistant on 2026‑03‑09 | © RERA Chatbot Project
+    </footer>
+</body>
+</html>

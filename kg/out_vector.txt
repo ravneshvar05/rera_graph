@@ -1,0 +1,26 @@
+Connecting to ChromaDB at: D:\Rerachatbot\kg\db\chroma_kg
+Total documents in ChromaDB collection 'rera_kg_units': 71
+
+--- Fetching a Sample Document ---
+
+ID: OumOrbit_Brochure_1__0
+
+METADATA:
+{
+  "neighbourhood": "Vinzol",
+  "developer": "Shanti Infrastructure",
+  "bhk": 2,
+  "area_sqft": 972.0,
+  "project_name": "OUM ORBIT",
+  "amenities": "GYM, LIBRARY, JOGGING TRACK, SENIOR CITIZEN PARK, GARDEN & FOUNTAIN, CHILDREN PLAY AREA, CHESS, CAROM BOARD, CARD TABLE, CLUB HOUSE, COMMON PLOT, Clubhouse, Parking",
+  "unit_id": "OumOrbit_Brochure_1__0",
+  "city": "Ahmedabad",
+  "project_id": "OumOrbit_Brochure_1",
+  "property_type": "APARTMENT"
+}
+
+EXACT EMBEDDED TEXT (This is what the vector represents):
+
+--------------------------------------------------------------------------------
+2 BHK APARTMENT in Vinzol, Ahmedabad. Project: OUM ORBIT by Shanti Infrastructure. Address: Towards 200 ft. S.P.Ring Road, Opp. Karnavati APMC Market, Behind MADHAV school, Ropda Cross Road, Vinzol, Ahmedabad.. Society: Oum Orbit offers a unique combination of luxury for your dream home and satisfaction. It features 2 BHK contemporary apartments with modern amenities and a convenient location. The society includes a central garden area, a clubhouse, and various recreational facilities. It is accessible via 25' wide society roads and a 60' main road. Society facilities: clubhouse, park or garden, parking. Total apartment blocks: 11. Buildings: A, B, C, D, E, F, G, H, I, J. Road widths: 25' WIDE SOCIETY ROAD, 60' Road. Floor layouts: Typical Floor Plan (G.F.,F.F.,S.F.,T.F.) (4 units/floor), with lifts; Typical Floor Plan (F.F.) (4 units/floor), with lifts. A compact 2 BHK apartment featuring a well-designed layout with a combined drawing and dining area, a functional kitchen, and two comfortable bedrooms, complemented by a balcony. Super built-up area: 972.0 sqft. Balcony area: 16.5 sqft. Wash area: 29.0625 sqft. Entrance facing: South. Applicable buildings: A, B, C, D, E, F, G, H, I, J, K. Rooms: BEDROOM (Bedroom) 10'0"×10'0", 100.0 sqft; BED ROOM (Bedroom) 9'6"×12'0", 114.0 sqft [attached bath]; TOILET (Toilet) 3'9"×5'6", 20.625 sqft; TOILET (Toilet) 3'9"×6'0", 22.5 sqft; KITCHEN (Kitchen) 6'0"×7'7", 45.5 sqft; WASH (Wash Area) 6'5"×4'5", 29.0625 sqft; DRAWING / DINING (Drawing Room) 13'0"×11'0", 143.0 sqft [balcony access]; BALCONY (Balcony) 3'0"×5'6", 16.5 sqft. Amenities: GYM; LIBRARY; JOGGING TRACK; SENIOR CITIZEN PARK; GARDEN & FOUNTAIN; CHILDREN PLAY AREA; CHESS; CAROM BOARD; CARD TABLE; CLUB HOUSE; COMMON PLOT; Clubhouse; Parking. Nearby: Karnavati APMC Market (Commercial), MADHAV school (Education), Ropda Cross Road (Transport), Hathijin Circle (Transport), Railway Over Bridge (Transport), Sardar Patel Ring Road (Transport), Gamdi Cross Road (Transport), Aslali Circle (Transport), Narol Circle (Transport), Jasoda Cross Road (Transport), Vinzol Village (Other), Vatva Village (Other), Ropda Village (Other), Vishala (Education).
+--------------------------------------------------------------------------------
