@@ -185,7 +185,15 @@ class GraphRetriever:
         """Build a dynamic Cypher query from intent and run it."""
         results = []
 
-        if intent.query_type == "GLOBAL":
+        has_filters = any([
+            intent.bhk, intent.property_type, intent.city, intent.neighbourhood, 
+            intent.zone, intent.amenities, intent.landmark_types, intent.specific_landmarks,
+            intent.min_sqft, intent.max_sqft, intent.min_price_lakhs, intent.max_price_lakhs,
+            intent.has_balcony, intent.has_parking, intent.entrance_facing, 
+            intent.developer, intent.project_names, intent.min_units_per_floor, intent.max_units_per_floor
+        ])
+
+        if intent.query_type == "GLOBAL" and not has_filters:
             results = self._get_all_projects()
         else:
             results = self._get_filtered_projects(intent)
@@ -397,7 +405,10 @@ class GraphRetriever:
                 records = session.run(cypher, **params)
                 return [self._record_to_result(r) for r in records]
         except Exception as e:
-            logger.warning(f"Filtered Cypher failed ({e}), falling back to broad query.")
+            logger.warning(f"Filtered Cypher failed ({e}).")
+            if where_clauses:
+                logger.warning("Strict filters were applied. Returning empty results instead of ignoring filters.")
+                return []
             return self._get_all_projects()
 
     @staticmethod
@@ -511,13 +522,16 @@ class VectorRetriever:
                 kwargs["where"] = where_filter
 
             results = self._col.query(**kwargs)
+            
+            # If a strict metadata filter returned 0 results (e.g. city="Surat"),
+            # do NOT fall back to unfiltered search. Return empty straight away.
+            if where_filter and (not results["ids"] or len(results["ids"][0]) == 0):
+                logger.info("Vector query with strict filter returned 0 results. Respecting filter.")
+                return []
+                
         except Exception as e:
-            logger.warning(f"Vector query with filter failed ({e}), retrying without filter.")
-            results = self._col.query(
-                query_texts=[query_text],
-                n_results=min(settings.VECTOR_TOP_K, self._col.count()),
-                include=["documents", "metadatas", "distances"],
-            )
+            logger.warning(f"Vector query with filter failed ({e}). Returning empty results instead of ignoring filter.")
+            return []
 
         # Group hits by project_id (multiple units per project)
         project_map: dict[str, ProjectResult] = {}

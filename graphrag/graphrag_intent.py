@@ -157,10 +157,21 @@ def parse_intent(user_query: str) -> QueryIntent:
         return intent
 
     except Exception as e:
-        logger.warning(f"Intent parsing failed ({e}), falling back to semantic-only mode.")
+        logger.warning(f"Intent parsing failed ({e}), using simple keyword extraction.")
+        
+        # Simple fallback parsing to avoid dropping location context entirely
+        fallback_city = None
+        lower_query = user_query.lower()
+        common_cities = ["ahmedabad", "surat", "vadodara", "rajkot", "gandhinagar"]
+        for c in common_cities:
+            if c in lower_query:
+                fallback_city = c.title()
+                break
+                
         return QueryIntent(
             query_type="SPECIFIC",
-            semantic_keywords=user_query.split(),
+            city=fallback_city,
+            semantic_keywords=user_query.split() if not fallback_city else []
         )
 
 

@@ -349,18 +349,28 @@ if query:
             status.write("🧠 Understanding your query…")
             intent = parse_intent(query)
 
-            # Step 2: Retrieve
-            status.write("🔍 Searching knowledge graph and vector index…")
-            retriever: DualRetriever = st.session_state.retriever
-            context_text, results = retriever.retrieve_and_assemble(intent, query)
+            # Mandatory Slot Check: City
+            if not intent.city:
+                status.update(
+                    label="Need more information", state="complete", expanded=False
+                )
+                answer = "I have many options available! To give you the best recommendations, please mention which **city** you are looking in (e.g., Ahmedabad or Surat)."
+                results = []
+                context_text = ""
+            else:
+                # Step 2: Retrieve
+                status.write("🔍 Searching knowledge graph and vector index…")
+                retriever: DualRetriever = st.session_state.retriever
+                context_text, results = retriever.retrieve_and_assemble(intent, query)
 
-            # Step 3: Generate answer
-            status.write("✍️ Generating recommendations…")
-            answer = generate_answer(query, context_text, results)
+                # Step 3: Generate answer
+                status.write("✍️ Generating recommendations…")
+                answer = generate_answer(query, context_text, results)
 
-            status.update(
-                label=f"✅ Found {len(results)} project(s)", state="complete", expanded=False
-            )
+                final_count = len(answer.get("projects", [])) if isinstance(answer, dict) else len(results)
+                status.update(
+                    label=f"✅ Found {final_count} project(s)", state="complete", expanded=False
+                )
 
         # ── Display answer ─────────────────────────────────────────────────────
         if isinstance(answer, dict):

@@ -40,19 +40,20 @@ The JSON must have the following exact structure:
   "projects": [
     {
       "project_name": "Exact Name of the project from context",
-      "reasoning": "Brief Markdown explanation (MAX 2 bullet points) of why this project is recommended and key details. IMPORTANT: If the user asks about floor layouts or units per floor, you MUST explicitly state the 'units per floor' in this reasoning block based on the provided context. You MUST use dashes (-) for bullet points, and separate each bullet point with a newline character (\\n) so that the entire reasoning is returned as a single valid JSON string. Do NOT use asterisks (*). IF THERE ARE MORE THAN 10 PROJECTS TOTAL, LEAVE THIS STRING EMPTY \"\"."
+      "reasoning": "Brief Markdown explanation (MAX 2 bullet points) of why this project is recommended and key details. IMPORTANT: If the user asks about floor layouts or units per floor, you MUST explicitly state the 'units per floor' in this reasoning block based on the provided context. You MUST use dashes (-) for bullet points, and separate each bullet point with a newline character (\\n) so that the entire reasoning is returned as a single valid JSON string. Do NOT use asterisks (*). IF THERE ARE MORE THAN 20 PROJECTS TOTAL, LEAVE THIS STRING EMPTY \"\"."
     }
   ],
   "conclusion": "A brief summary or next steps suggestion."
 }
 
 Important rules:
-- IF THERE ARE MORE THAN 10 PROJECTS TO RECOMMEND, DO NOT WRITE ANY REASONING. JUST PROVIDE THE PROJECT NAMES AND A GOOD GENERAL SUMMARY.
+- IF THERE ARE MORE THAN 20 PROJECTS TO RECOMMEND, DO NOT WRITE ANY REASONING. JUST PROVIDE THE PROJECT NAMES AND A GOOD GENERAL SUMMARY.
 - ONLY use information from the provided context — do not invent data
 - If price/area is not in the context, do not guess it
 - Always ground your recommendations in the actual retrieved data
 - The project_name MUST perfectly match the name provided in the context.
-- CRITICAL: You MUST filter out and omit any projects from the context that do not meaningfully match the user's specific requirements (e.g. if they asked for a 1 BHK, do not list a 3 BHK).
+- CRITICAL: You MUST filter out and omit any projects from the context that do not meaningfully match the user's specific requirements (e.g. if they asked for a 1 BHK, do not list a 3 BHK). 
+- However, if the user asks a GLOBAL query (e.g., "list available projects"), DO NOT filter out any projects. Include ALL of them in the JSON.
 - STRICT LOGIC: Pay very close attention to AND vs OR conditions in the user's query. 
   - If a user asks for "Location A OR Location B AND Amenity C", a project is ONLY a perfect match if it actually HAS Amenity C AND is in either Location A OR Location B.
   - PERFECT MATCHES: Only projects that satisfy ALL strict mandatory criteria should be included in the 'projects' array (these will be rendered as detailed UI cards).
@@ -113,7 +114,9 @@ User Query: {user_query}
         logger.success(f"Answer generated ({len(answer_text)} chars)")
         
         try:
-            return json.loads(answer_text)
+            parsed = json.loads(answer_text)
+            return parsed
+            
         except json.JSONDecodeError:
             logger.error("Failed to parse LLM JSON output. Falling back.")
             return _fallback_answer(user_query, project_results)
