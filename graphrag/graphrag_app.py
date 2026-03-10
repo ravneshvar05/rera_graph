@@ -313,10 +313,9 @@ for msg in st.session_state.messages:
                 if p.get("html_content"):
                     st.markdown(p["html_content"], unsafe_allow_html=True)
                 # Reasoning is only rendered if it exists (not empty) and we are not in large list mode
-                if p.get("reasoning") and not is_large_list:
-                    st.markdown('<div class="llm-explanation">', unsafe_allow_html=True)
-                    st.markdown(p["reasoning"])
-                    st.markdown('</div>', unsafe_allow_html=True)
+                reasoning_text = str(p.get("reasoning", "")).strip()
+                if reasoning_text and not is_large_list:
+                    st.markdown(f'<div class="llm-explanation" markdown="1">\n\n{reasoning_text}\n\n</div>', unsafe_allow_html=True)
                     
             if content.get("conclusion"):
                 st.markdown(content.get("conclusion"))
@@ -400,7 +399,7 @@ if query:
             # Sequentially render matched projects and reasoning
             for p in projects_data:
                 p_name = p.get("project_name", "")
-                reasoning = p.get("reasoning", "")
+                reasoning = str(p.get("reasoning", "")).strip()
                 
                 # Robust matching: Try exact, then try substring either way
                 matched_proj = None
@@ -439,12 +438,9 @@ if query:
                     time.sleep(0.02) # faster for lists
                 
                 if reasoning and not is_large_list:
-                    # Render the top border of the explanation box
-                    st.markdown('<div class="llm-explanation">', unsafe_allow_html=True)
-                    # Use native Streamlit markdown so bullets render correctly
-                    st.markdown(reasoning)
-                    # Close the explanation box
-                    st.markdown('</div>', unsafe_allow_html=True)
+                    # Render all within a single markdown call. Streamlit parses markdown inside HTML 
+                    # if separated by blank lines
+                    st.markdown(f'<div class="llm-explanation" markdown="1">\n\n{reasoning}\n\n</div>', unsafe_allow_html=True)
                     time.sleep(0.04)
                 
                 # We store generic "html_content" to handle both the card or the row seamlessly on reload

@@ -1,0 +1,124 @@
+================================================================================
+ARCHITECTURE & PIPELINE DOCUMENTATION
+================================================================================
+This document details the complete flow and file-by-file breakdown of the two 
+main folders in the system: `kg` (Knowledge Graph Ingestion) and `graphrag` 
+(Retrieval-Augmented Generation using Graph and Vector Databases).
+
+--------------------------------------------------------------------------------
+1. PIPELINE OVERVIEW & DATA FLOW
+--------------------------------------------------------------------------------
+The system is divided into two distinct phases:
+
+PHASE 1: DATA INGESTION (`kg` folder)
+1. Brochure JSON files containing extracted real estate project information are read from the `output/` directory.
+2. The data is processed and inserted into a Neo4j Knowledge Graph. Entities such as Projects, Developers, Units, Rooms, Amenities, and Landmarks are created as nodes, and relationships (e.g., HAS_UNIT, NEAR, HAS_AMENITY) are established.
+3. Simultaneously, a comprehensive, rich-text embedding string is generated combining all details for each unit/project. This string is embedded using a SentenceTransformer model and stored in ChromaDB for vector-based semantic search.
+4. Finally, a post-ingestion geographical enrichment script runs to wire zones, cross-link landmarks to neighbourhoods, and resolve neighbourhood aliases for better graph traversals.
+
+PHASE 2: RETRIEVAL & ANSWER GENERATION (`graphrag` folder)
+1. A user enters a natural language query via the Streamlit Chat UI.
+2. The query is sent to an LLM (Groq API) which parses it into a structured JSON `QueryIntent` object (e.g., requested BHK, city, amenities, price, property type).
+3. The DualRetriever uses this `QueryIntent` to query both databases:
+   a. Neo4j (Graph): Constructs dynamic Cypher queries to strictly filter projects by structure (exact matching for BHK, amenities, zone, etc.).
+   b. ChromaDB (Vector): Converts the intent into a natural language query to perform fuzzy/semantic similarity search.
+4. Results from both databases are merged, deduplicated, and scored.
+5. The merged context list is passed to an Answer Generator LLM, which synthesizes the data and responds with a strictly formatted JSON output containing specific project recommendations and bullet-pointed reasoning.
+6. The Streamlit UI parses this JSON and renders dynamic project cards and LLM-generated explanations for the user.
+
+
+--------------------------------------------------------------------------------
+2. FILE-BY-FILE BREAKDOWN (`kg` - Knowledge Graph Ingestion)
+--------------------------------------------------------------------------------
+
+> kg_config.py
+Function: Single source of truth for ingestion configuration.
+Details: 
+- Uses Pydantic to read environment variables from a `.env` file.
+- Defines configurations for Neo4j (URI, credentials), LLMs (Groq/Gemini keys and models), file paths (JSON output dir, ChromaDB path), and ChromaDB embedding model (`all-MiniLM-L6-v2`).
+- Defines ingestion batch sizes and worker thread counts for performance.
+
+> kg_schema.py
+Function: Initializes Neo4j database constraints and indexes.
+Details:
+- Must be run once before ingestion.
+- Creates unique node constraints (e.g., Project via `project_id`, City via `name`, Amenity, Landmark, Unit, etc.) to ensure no duplicate nodes are created during idempotent `MERGE` operations.
+- Creates single-property and composite indexes (e.g., on Unit `bhk` and `property_type`, Landmark `landmark_type`) to drastically speed up future read queries.
+
+> kg_ingest.py
+Function: The core production batch ingestion pipeline.
+Details:
+- Reads every brochure JSON file. Multi-threaded execution for speed.
+- Normalization: Cleans null strings, normalizes boolean flags, and normalizes City/Neighbourhood names (e.g., mapping Gujarati script to English, grouping specific Ahmedabad/Surat localities).
+- Classification: Categorizes amenities (e.g., SPORTS, WELLNESS, SECURITY) and landmarks (e.g., EDUCATION, HEALTHCARE, COMMERCIAL) based on predefined keyword mapping dictionaries.
+- Cypher Execution: Uses Neo4j driver to dynamically construct and execute Cypher MERGE and CREATE statements, building nodes (Project, FloorLayout, Developer, Landmark, Amenity, Unit, Room) and linking them. Wait/Rooms are deleted and re-created to handle unit nested structures seamlessly.
+- Vector Embedding text builder: Concatenates every descriptive field (project identity, society description, floor layouts, unit specs, room details, amenities, landmarks) into a single dense paragraph of text.
+- ChromaDB Upsert: Batches these rich text descriptions along with metadata and inserts them into ChromaDB for vector similarity search.
+
+> kg_geo_enrich.py
+Function: Post-ingestion geographic enrichment.
+Details:
+- Run ONCE after the main ingestion.
+- Zone creation: Uses predefined dictionaries linking cities to zones to neighbourhoods (e.g., "Bopal" -> "West Ahmedabad" -> "Ahmedabad"). Creates `PART_OF` relationships.
+- Landmark cross-linking: Connects specific landmarks directly to neighbourhoods via `SAME_AS` edges (e.g., if a project is near the landmark "BOPAL", it implies it's in the Bopal neighbourhood).
+- Aliases: Connects alternate spellings of neighbourhoods to a canonical name using `ALIAS_OF` edges (e.g., "Vizol" -> "Vinzol").
+
+> validate_counts.py
+Function: Sanity check utility script.
+Details:
+- Connects to both Neo4j and ChromaDB to fetch and print the total counts of Nodes (by label), Relationships (by type), and Vector Embeddings to ensure data was ingested correctly.
+
+
+--------------------------------------------------------------------------------
+3. FILE-BY-FILE BREAKDOWN (`graphrag` - Retrieval-Augmented Generation)
+--------------------------------------------------------------------------------
+
+> graphrag_config.py
+Function: Configuration management for the retrieval system.
+Details:
+- Shared settings mechanism using Pydantic, pulling from `.env`.
+- Holds Neo4j credentials, LLM keys, and ChromaDB paths.
+- Holds specific parameters for retrieval tuning: `VECTOR_TOP_K` (how many vectors to fetch), `GRAPH_MAX_RESULTS` (max graph outputs), and `FINAL_TOP_N` (max results passed to the LLM to prevent token-limit exceedance).
+
+> graphrag_intent.py
+Function: LLM-powered Natural Language to Structured Query parser.
+Details:
+- Contains a strict Pydantic `QueryIntent` schema representing filter parameters (BHK, property type, city, neighbourhood, amenities, landmarks, square footage, budget, etc.).
+- Takes raw user input and sends it to the Groq LLM (with a strict system prompt) requiring a JSON output matching the schema.
+- Categorizes query as "SPECIFIC" (filtered) or "GLOBAL" (overview).
+- Identifies and extracts semantic/subjective keywords ("luxury", "spacious") for vector search usage.
+
+> graphrag_retriever.py
+Function: Dual-retrieval engine acting as the core search logic.
+Details:
+- `GraphRetriever`: Takes the `QueryIntent` and logically constructs a massive dynamic Cypher query. Supports complex `WHERE` clause chaining (e.g., handling array conditions for multiple cities, fetching amenities by exact relation or boolean flags, resolving alias nodes). Returns structurally exact matches.
+- `VectorRetriever`: Takes the `QueryIntent`, strings the parameters together into a pseudo-sentence, and performs semantic similarity search against ChromaDB. Applies metadata exact-match filtering (for BHK/City) if provided in the intent to improve accuracy.
+- `DualRetriever`: Coordinates the two. It fetches from both sources, merges the `ProjectResult` objects based on `project_id`, tags them by source (`graph`, `vector`, `both`), sorts them (prioritizing `both` and `graph` over `vector`), and assembles a massive formatted context string defining every project's details perfectly to be fed to the LLM.
+
+> graphrag_answer.py
+Function: LLM Synthesis generation.
+Details:
+- Takes the assembled string context from the DualRetriever and the user's raw query.
+- Passes them to the Groq LLM with a strict system prompt instructing it to act as a real-estate advisor.
+- Forces the LLM to output a JSON dictionary consisting of `general_summary`, `projects` (array of perfect matches with reasoning bullet points), and `conclusion`.
+- Has strict instructions to NOT hallucinate, filtering out partial matches to plain text in the conclusion, and formatting exact project names. Implements a programmatic fallback parser just in case the LLM fails to return valid JSON.
+
+> graphrag_app.py
+Function: Streamlit Chat User Interface.
+Details:
+- The frontend of the application. Handles UI layout, custom CSS styling, and session state.
+- Instantiates the `DualRetriever` on boot.
+- Renders the chat interface. Upon user input, sequentially triggers: 
+  1. `parse_intent()` (shows debug visualizers for intent).
+  2. `retriever.retrieve_and_assemble()` (shows metrics on retrieval count).
+  3. `generate_answer()` to stream and structure the UI answer.
+- Iterates over the returned JSON to render beautiful HTML/CSS "Project Cards" alongside the specific bullet-point reasoning provided by the LLM.
+
+--------------------------------------------------------------------------------
+SUMMARY OF FLOW
+--------------------------------------------------------------------------------
+1. `kg_schema.py` -> 2. `kg_ingest.py` (JSON files to Neo4j & ChromaDB) -> 3. `kg_geo_enrich.py`
+4. Streamlit User Prompt (`graphrag_app.py`) -> 5. `graphrag_intent.py` (LLM converts prompt to JSON filters)
+6. `graphrag_retriever.py` (Uses JSON filters to fetch from DBs -> Context String)
+7. `graphrag_answer.py` (LLM digests Context String & Query -> Final formatted JSON Answer)
+8. `graphrag_app.py` renders final output.

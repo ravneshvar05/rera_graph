@@ -105,6 +105,21 @@ class ProjectResult:
         if self.landmarks:
             lines.append(f"  Nearby: {', '.join(self.landmarks[:10])}")
 
+        # All other extra properties not explicitly formatted above
+        already_used = {
+            "address", "project_status", "possession_date", "rera_number",
+            "has_clubhouse", "has_pool", "has_park", "has_parking", "has_sports_courts",
+            "society_description"
+        }
+        other_props = []
+        for k, v in self.extra_props.items():
+            if k not in already_used and v is not None and v != "" and v != []:
+                # format keys from snake_case to readable text
+                readable_k = k.replace("_", " ").title()
+                other_props.append(f"{readable_k}: {v}")
+        if other_props:
+            lines.append(f"  Other Details: {', '.join(other_props)}")
+
         lines.append(f"  [Source: {self.source}]")
         return "\n".join(lines)
 
