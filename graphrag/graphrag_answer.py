@@ -13,6 +13,7 @@ from groq import Groq
 from loguru import logger
 
 from graphrag_config import settings
+from graphrag_intent import QueryIntent
 from graphrag_retriever import ProjectResult
 
 # ── Configure Groq client ───────────────────────────────────────────────────
@@ -52,8 +53,7 @@ Important rules:
 - If price/area is not in the context, do not guess it
 - Always ground your recommendations in the actual retrieved data
 - The project_name MUST perfectly match the name provided in the context.
-- CRITICAL: You MUST filter out and omit any projects from the context that do not meaningfully match the user's specific requirements (e.g. if they asked for a 1 BHK, do not list a 3 BHK). 
-- However, if the user asks a GLOBAL query (e.g., "list available projects"), DO NOT filter out any projects. Include ALL of them in the JSON.
+- CRITICAL: You MUST filter out and omit any projects from the context that do not meaningfully match the user's specific requirements (e.g. if they asked for a 1 BHK, do not list a 3 BHK, if they asked for a clubhouse, do not list projects without a clubhouse). 
 - STRICT LOGIC: Pay very close attention to AND vs OR conditions in the user's query. 
   - If a user asks for "Location A OR Location B AND Amenity C", a project is ONLY a perfect match if it actually HAS Amenity C AND is in either Location A OR Location B.
   - PERFECT MATCHES: Only projects that satisfy ALL strict mandatory criteria should be included in the 'projects' array (these will be rendered as detailed UI cards).
@@ -68,6 +68,7 @@ def generate_answer(
     user_query: str,
     context_text: str,
     project_results: list[ProjectResult],
+    intent: QueryIntent,
 ) -> dict:
     """
     Generate a JSON-structured recommendation answer using Gemini.
@@ -76,6 +77,7 @@ def generate_answer(
         user_query: The original user query string.
         context_text: The assembled context from DualRetriever.
         project_results: Structured project results (for fallback display).
+        intent: The structured parser intent.
 
     Returns:
         A formatted dictionary answer suitable for display in the chat UI.
@@ -86,6 +88,23 @@ def generate_answer(
             "projects": [],
             "conclusion": ""
         }
+
+    # Optimization: bypass LLM to prevent long inference times ONLY for genuine global/overview queries.
+    # We check if there are ANY specific filters applied in the intent.
+    has_specific_filters = any([
+        intent.bhk, intent.property_type, intent.amenities, intent.landmark_types,
+        intent.specific_landmarks, intent.min_sqft, intent.max_sqft,
+        intent.min_price_lakhs, intent.max_price_lakhs, intent.has_balcony,
+        intent.has_parking, intent.entrance_facing, intent.developer,
+        intent.project_names, intent.min_units_per_floor, intent.max_units_per_floor
+    ])
+
+    is_global_command = any(ph in user_query.lower() for ph in ["show all", "list all", "all available", "what's available"])
+    
+    # Bypass ONLY if it's a generic "list all" without ANY specific criteria (amenities, BHK, etc.)
+    if is_global_command and not has_specific_filters and len(project_results) > 10:
+        logger.info("Bypassing LLM generation for genuine filter-free global query to save time.")
+        return _fallback_answer(user_query, project_results)
 
     prompt = f"""{_ANSWER_SYSTEM_PROMPT}
 
@@ -115,6 +134,15 @@ User Query: {user_query}
         
         try:
             parsed = json.loads(answer_text)
+            
+            if hasattr(response, "usage") and response.usage:
+                parsed["llm_metadata"] = {
+                    "model_name": response.model,
+                    "prompt_tokens": response.usage.prompt_tokens,
+                    "completion_tokens": response.usage.completion_tokens,
+                    "total_tokens": response.usage.total_tokens
+                }
+
             return parsed
             
         except json.JSONDecodeError:

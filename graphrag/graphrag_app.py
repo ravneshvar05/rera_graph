@@ -319,6 +319,10 @@ for msg in st.session_state.messages:
                     
             if content.get("conclusion"):
                 st.markdown(content.get("conclusion"))
+                
+            if "llm_metadata" in content:
+                meta = content["llm_metadata"]
+                st.markdown(f"<div style='font-size: 0.8rem; color: #718096; margin-top: 10px; text-align: right;'>🤖 Engine: {meta.get('model_name', 'unknown')} &nbsp;|&nbsp; 🪙 Tokens: {meta.get('total_tokens', 0)} ({meta.get('prompt_tokens', 0)} prompt + {meta.get('completion_tokens', 0)} completion)</div>", unsafe_allow_html=True)
         else:
             st.markdown(content)
 
@@ -365,7 +369,7 @@ if query:
 
                 # Step 3: Generate answer
                 status.write("✍️ Generating recommendations…")
-                answer = generate_answer(query, context_text, results)
+                answer = generate_answer(query, context_text, results, intent)
 
                 final_count = len(answer.get("projects", [])) if isinstance(answer, dict) else len(results)
                 status.update(
@@ -459,6 +463,10 @@ if query:
                 
             if answer.get("conclusion"):
                 st.markdown(answer.get("conclusion"))
+
+            if "llm_metadata" in answer:
+                meta = answer["llm_metadata"]
+                st.markdown(f"<div style='font-size: 0.8rem; color: #718096; margin-top: 10px; text-align: right;'>🤖 Engine: {meta.get('model_name', 'unknown')} &nbsp;|&nbsp; 🪙 Tokens: {meta.get('total_tokens', 0)} ({meta.get('prompt_tokens', 0)} prompt + {meta.get('completion_tokens', 0)} completion)</div>", unsafe_allow_html=True)
         else:
             st.markdown(answer)
 
