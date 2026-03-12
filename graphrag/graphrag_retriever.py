@@ -22,6 +22,7 @@ from neo4j import GraphDatabase
 
 from graphrag_config import settings
 from graphrag_intent import QueryIntent
+from graphrag_cypher import generate_cypher, CypherQuery
 
 
 # ── Data structures ────────────────────────────────────────────────────────────
@@ -181,25 +182,31 @@ class GraphRetriever:
     def close(self):
         self._driver.close()
 
-    def retrieve(self, intent: QueryIntent) -> list[ProjectResult]:
-        """Build a dynamic Cypher query from intent and run it."""
-        results = []
-
-        has_filters = any([
-            intent.bhk, intent.property_type, intent.city, intent.neighbourhood, 
-            intent.zone, intent.amenities, intent.landmark_types, intent.specific_landmarks,
-            intent.min_sqft, intent.max_sqft, intent.min_price_lakhs, intent.max_price_lakhs,
-            intent.has_balcony, intent.has_parking, intent.entrance_facing, 
-            intent.developer, intent.project_names, intent.min_units_per_floor, intent.max_units_per_floor
-        ])
-
-        if intent.query_type == "GLOBAL" and not has_filters:
+    def retrieve(self, cypher_result: CypherQuery) -> list[ProjectResult]:
+        """
+        Execute a Text-to-Cypher generated query against Neo4j.
+        Falls back to _get_all_projects() for GLOBAL queries or on error.
+        """
+        if cypher_result.query_type == "GLOBAL":
             results = self._get_all_projects()
         else:
-            results = self._get_filtered_projects(intent)
+            results = self._execute_cypher(cypher_result)
 
         logger.info(f"Graph retrieval → {len(results)} project(s)")
         return results
+
+    def _execute_cypher(self, cq: CypherQuery) -> list[ProjectResult]:
+        """Execute the LLM-generated Cypher and return project results."""
+        try:
+            with self._driver.session() as session:
+                records = session.run(cq.cypher, **cq.params)
+                return [self._record_to_result(r) for r in records]
+        except Exception as e:
+            logger.warning(f"Text-to-Cypher execution failed: {e}")
+            logger.warning(f"Failed Cypher:\n{cq.cypher}")
+            logger.warning(f"Params: {cq.params}")
+            # Fallback: return empty so vector search handles it
+            return []
 
     def _get_all_projects(self) -> list[ProjectResult]:
         """Return all projects with their core data."""
@@ -456,10 +463,10 @@ class VectorRetriever:
         )
         logger.debug(f"VectorRetriever: ChromaDB collection has {self._col.count()} docs.")
 
-    def retrieve(self, intent: QueryIntent) -> list[ProjectResult]:
+    def retrieve(self, intent: QueryIntent, query_override: Optional[str] = None) -> list[ProjectResult]:
         """
-        Build a natural language query string from the intent and run vector search.
-        Also applies metadata filters where possible (bhk, city).
+        Build a natural language query string from the intent (or use query_override)
+        and run vector search. Also applies metadata filters where possible (bhk, city).
         """
         # Build a rich query text from intent components
         query_parts = []
@@ -492,7 +499,11 @@ class VectorRetriever:
         if intent.project_names:
             query_parts.extend(intent.project_names)
 
-        query_text = " ".join(query_parts) if query_parts else "residential apartment"
+        # Use query_override from Text-to-Cypher if provided, otherwise build from intent
+        if query_override:
+            query_text = query_override
+        else:
+            query_text = " ".join(query_parts) if query_parts else "residential apartment"
 
         # Metadata filters for ChromaDB (exact match only)
         where_filter = None
@@ -601,15 +612,20 @@ class DualRetriever:
         Returns:
             (context_text, merged_project_results)
         """
-        # 1. Graph retrieval — precise structural filtering
-        graph_results = self._graph.retrieve(intent)
+        # 1. Generate precise Cypher + vector query string from the raw user query
+        cypher_result = generate_cypher(raw_query)
+
+        # 2. Graph retrieval — precise structural filtering via LLM-generated Cypher
+        graph_results = self._graph.retrieve(cypher_result)
         graph_ids = {r.project_id for r in graph_results}
 
-        # 2. Vector retrieval — semantic/fuzzy matching
-        # Always run vector search; use raw query for maximum recall
-        vector_results = self._vector.retrieve(intent)
+        # 3. Vector retrieval — semantic/fuzzy matching using LLM's vector_query
+        vector_results = self._vector.retrieve(
+            intent,
+            query_override=cypher_result.vector_query,
+        )
 
-        # 3. Merge: graph results are canonical; vector fills in semantic gaps
+        # 4. Merge: graph results are canonical; vector fills in semantic gaps
         merged: dict[str, ProjectResult] = {}
 
         for r in graph_results:
