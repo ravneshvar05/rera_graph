@@ -1,0 +1,99 @@
+# Plan for Normalizing Entities (Rooms, Amenities, Landmarks) in the Knowledge Graph
+
+This plan outlines the "Right Way" to permanently solve the issue of synonymous entities having different names in the generated JSON data (e.g., "Hall" vs "Drawing Room", "Pool" vs "Swimming Pool").
+
+## Approach 1: Entity Normalization during KG Creation (Recommended)
+**What it is:** Passing all JSON data through a mapping dictionary BEFORE it gets inserted into the Neo4j database.
+**Why it's best:** It keeps the database perfectly clean. Queries don't have to guess what synonyms might exist because only one canonical name is ever stored.
+
+### Implementation Steps:
+1.  **Create a Normalization Map (`kg/normalization.py` or similar):**
+    Create a Python dictionary mapping all known variants to a single "Canonical" name.
+
+    ```python
+    NORMALIZATION_MAP = {
+        # Rooms
+        "drawing room": "Living Room",
+        "hall": "Living Room",
+        "living room": "Living Room",
+        "family room": "Living Room",
+        "master bed": "Master Bedroom",
+        "washroom": "Bathroom",
+        "toilet": "Bathroom",
+
+        # Amenities
+        "swimming pool": "Swimming Pool",
+        "pool": "Swimming Pool",
+        "club house": "Clubhouse",
+        "clubhouse": "Clubhouse",
+        "gym": "Gymnasium",
+        "gymnasium": "Gymnasium",
+        "fitness center": "Gymnasium",
+        "car park": "Parking",
+        "parking": "Parking",
+        "24x7 security": "Security",
+        
+        # Landmarks / Neighborhoods (Optional)
+        "sg highway": "S.G. Highway",
+        "s g highway": "S.G. Highway"
+    }
+    ```
+
+2.  **Apply Map during Ingestion (`kg/kg_ingest.py`):**
+    Modify the script that reads the `Brochure X.json` files and creates nodes.
+    Whenever extracting an amenity, room type, or unit name, pass the extracted text sequentially through the map:
+    ```python
+    raw_name = amenity["name"].strip()
+    clean_name = NORMALIZATION_MAP.get(raw_name.lower(), raw_name)
+    # create Neo4j node with `clean_name`
+    ```
+
+3.  **Update Graph Cypher Queries:**
+    No major changes needed to `graphrag_retriever.py`, but you can simplify `_AMENITY_TO_FLAG` since the graph will only contain "Swimming Pool" from now on.
+
+---
+
+## Approach 2: Knowledge Graph Aliases
+**What it is:** Storing exactly what is written in the JSON, but creating `[:ALIAS_OF]` relationships bridging the synonyms in the graph.
+
+### Implementation Steps:
+1.  **Define Canonical Nodes & Aliases (`kg/kg_schema.py` or `kg/kg_ingest.py`):**
+    - Create a canonical node: `(c:Amenity {name: "Living Room", canonical: true})`
+    - Ingest the JSON exactly as it is: `(a:Amenity {name: "Hall", canonical: false})`
+    - Create the relationship: `(a)-[:ALIAS_OF]->(c)`
+
+2.  **Update Cypher Retrieval (`graphrag/graphrag_retriever.py`):**
+    Update queries to search aliases (like what is already done for Neighborhoods).
+    ```cypher
+    MATCH (p:Project)-[:HAS_AMENITY|HAS_UNIT_ROOM]->(a)
+    WHERE toLower(a.name) CONTAINS toLower($keyword)
+       OR EXISTS { 
+           MATCH (a)-[:ALIAS_OF*1..2]->(canonical) 
+           WHERE toLower(canonical.name) CONTAINS toLower($keyword) 
+       }
+    ```
+
+---
+
+## Approach 3: LLM Intent Standardization
+**What it is:** Teaching the LLM that parses the initial query (Groq) to automatically convert keywords.
+
+### Implementation Steps:
+1.  **Update System Prompt (`graphrag/graphrag_intent.py`):**
+    Add explicit standardizations to `_INTENT_SYSTEM_PROMPT`.
+    ```prompt
+    Rules for Standardization:
+    - If user asks for "hall", "drawing room", or "family room", standardized to "amenities": ["Living Room"] or "property_type": "Living Room".
+    - Standardize "pool" to "swimming pool".
+    - Standardize "fitness center" to "gym".
+    ```
+    
+**Pros:** Easy to implement.
+**Cons:** Unreliable. LLMs can occasionally forget instructions, and doing this on a 100+ keyword list burns through tokens and context window size.
+
+---
+
+## Conclusion & Recommendation
+The best long-term architecture is a combination of **Approach 1 (Data Normalization mapping during ingestion)**, paired with **Approach 3 (LLM standardizing the user query)**. 
+1. Clean the messy real-world brochure data to standard types before inserting it into Neo4j.
+2. Ask the Intent Parser (Groq) to map human questions about "Halls" into queries for "Living Rooms."
