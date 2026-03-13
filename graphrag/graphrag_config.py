@@ -37,7 +37,7 @@ class GraphRAGSettings(BaseSettings):
 
     # ── Retrieval tuning ──────────────────────────────────────────────────────
     VECTOR_TOP_K:      int  = Field(25,  description="How many ChromaDB results to retrieve")
-    GRAPH_MAX_RESULTS: int  = Field(40,  description="Max projects from Neo4j Cypher queries")
+    GRAPH_MAX_RESULTS: int  = Field(25,  description="Max projects from Neo4j Cypher queries")
     FINAL_TOP_N:       int  = Field(25,  description="Max projects to include in final answer")
 
     model_config = {

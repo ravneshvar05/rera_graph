@@ -88,6 +88,24 @@ class ProjectResult:
                 if u.get("description"):
                     u_line += f"\n      Description: {u['description']}"
                 lines.append(u_line)
+                
+                # Append Rooms if available
+                if u.get("rooms"):
+                    rooms_list = []
+                    for r in u["rooms"]:
+                        r_desc = r.get("name", "Room")
+                        dims = []
+                        if r.get("length") and r.get("width"):
+                            dims.append(f"{r['length']} x {r['width']}")
+                        if r.get("area_sqft"):
+                            dims.append(f"{r['area_sqft']} sqft")
+                        if dims:
+                            r_desc += f" ({', '.join(dims)})"
+                        if r.get("attached_bathroom") == 1:
+                            r_desc += " with attached bath"
+                        rooms_list.append(r_desc)
+                    if rooms_list:
+                        lines.append(f"      Rooms: {'; '.join(rooms_list)}")
 
         # Floor Layouts
         if getattr(self, "floor_layouts", None):
@@ -620,10 +638,13 @@ class DualRetriever:
         graph_ids = {r.project_id for r in graph_results}
 
         # 3. Vector retrieval — semantic/fuzzy matching using LLM's vector_query
-        vector_results = self._vector.retrieve(
-            intent,
-            query_override=cypher_result.vector_query,
-        )
+        # ────────── TEMPORARILY DISABLED VECTOR SEARCH ──────────
+        # vector_results = self._vector.retrieve(
+        #     intent,
+        #     query_override=cypher_result.vector_query,
+        # )
+        vector_results = []
+        # ────────────────────────────────────────────────────────
 
         # 4. Merge: graph results are canonical; vector fills in semantic gaps
         merged: dict[str, ProjectResult] = {}

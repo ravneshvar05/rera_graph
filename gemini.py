@@ -16,6 +16,7 @@ import os
 import re
 import time
 import uuid
+import json
 import logging
 import argparse
 from enum import Enum
@@ -51,6 +52,8 @@ MODEL = "gemini-2.5-flash"
 
 # ══════════════════════════════════════════════════════════════════════════════
 # SCHEMA
+# Note: project_id is intentionally EXCLUDED from BrochureData so the LLM
+# never sees or touches it. We inject it ourselves in postprocess().
 # ══════════════════════════════════════════════════════════════════════════════
 
 class RoomType(str, Enum):
@@ -92,9 +95,9 @@ class PropertyType(str, Enum):
     OTHER           = "OTHER"
 
 class BaseRoomSchema(BaseModel):
-    name: str = Field(description="Exact room label on the plan e.g. 'Master Bedroom'")
-    length: Optional[str] = Field(default=None, description="Raw length EXACTLY as printed e.g. \"10'-6\\\"\" or \"3.20\"")
-    width:  Optional[str] = Field(default=None, description="Raw width EXACTLY as printed e.g. \"11'-0\\\"\" or \"3.45\"")
+    name: str = Field(description="Normalized common room label (e.g., 'Hall' instead of 'Drawing Room', 'Balcony' instead of 'Balc'). Use original name if not a common room type.")
+    length: Optional[str] = Field(default=None, description="Raw length ONLY. Must be part of a length x width pair explicitly written on the plan. DO NOT guess from single numbers, sequence IDs, or areas. DO NOT include 'x' or 'X' (e.g., \"10'-6\\\"\"). Avoid partial extractions like \"12'x\". Set to null if missing.")
+    width:  Optional[str] = Field(default=None, description="Raw width ONLY. Must be part of a length x width pair explicitly written on the plan. DO NOT guess from single numbers, sequence IDs, or areas. DO NOT include 'x' or 'X' (e.g., \"11'-0\\\"\"). Set to null if missing.")
     area_sqft: Optional[float] = Field(default=None, description="Area in sqft — fill if printed, or will be computed from length x width")
     floor_level: Optional[str] = Field(default=None, description="Ground / First / Second / Terrace")
 
@@ -114,7 +117,7 @@ class StandardRoomSchema(BaseRoomSchema):
     ] = RoomType.OTHER
 
 class SocietyLayoutSchema(BaseModel):
-    description: Optional[str] = None
+    description: Optional[str] = Field(default=None, description="A rich, informative paragraph describing the overall vibe, environment, lifestyle, layout, and architectural style of the society. This is used for semantic/vector search, so include keywords about the surroundings and atmosphere instead of leaving it null.")
     total_apartment_blocks: Optional[int] = Field(default=None, description="ONLY for apartments")
     total_independent_villas_or_tenements: Optional[int] = Field(default=None, description="ONLY for villas/tenements/row-houses")
     building_names: list[str] = Field(default_factory=list, description="Tower names for apartments only. Empty for villas.")
@@ -139,7 +142,7 @@ class UnitSchema(BaseModel):
     property_type: PropertyType = Field(default=PropertyType.OTHER)
     applicable_buildings: list[str] = Field(default_factory=list, description="Empty for villas/row-houses")
     entrance_Facing: Optional[str] = Field(default=None, description="Compass direction main door faces e.g. 'East'. null if no compass found.")
-    description: Optional[str] = Field(default=None, description="Short description of layout, vibe, or special features")
+    description: Optional[str] = Field(default=None, description="A comprehensive 1-2 sentence description of the unit capturing its vibe, unique architectural aspects, layout (e.g. open-concept, courtyard, spacious), or special features. This is critical for vector search, so synthesize a good description instead of leaving it blank.")
     bhk: Optional[int] = None
     carpet_area_sqft: Optional[float] = None
     balcony_area_sqft: Optional[float] = None
@@ -154,8 +157,8 @@ class LocationSchema(BaseModel):
     pin_code: Optional[str] = None
     nearby_landmarks: list[str] = Field(default_factory=list, description="Real landmarks only: schools, hospitals, malls, transit. NOT competing residential societies.")
 
+# FIX: project_id removed — LLM never sees it, we inject UUID ourselves
 class BrochureData(BaseModel):
-    project_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     brochure_file: str = Field(description="Filename of the processed brochure")
     project_name: Optional[str] = None
     developer_name: Optional[str] = None
@@ -170,102 +173,145 @@ class BrochureData(BaseModel):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# PROMPT  (single-pass — proven to give complete output)
+# PROMPT
 # ══════════════════════════════════════════════════════════════════════════════
 
 PROMPT = """
-You are an expert real estate architect and data extraction AI.
-Analyze this ENTIRE brochure PDF from first page to last page and extract ALL data.
+You are a real estate data extraction AI. Analyze this ENTIRE brochure PDF (every page) and extract ALL data into the JSON schema.
 
-CRITICAL INSTRUCTIONS:
+RULES:
 
-1. UNITS — MOST IMPORTANT:
-   - Extract EVERY unit/variant shown in the brochure. Do NOT leave units as an empty list.
-   - Each variant (1A, 1B, 1C ...) is a completely SEPARATE unit with its OWN floor plans.
-   - Read EACH floor plan image independently. Never copy room dimensions from one variant to another.
+1. UNITS (most important):
+   - Extract EVERY unit/variant (1A, 1B, 1C...) as a SEPARATE unit with its OWN rooms and dimensions.
+   - Never copy dimensions from one variant to another. Read each floor plan independently.
+   - Scan every page — do NOT stop early.
 
-2. DIMENSIONS:
-   - For every room, extract length and width as SEPARATE fields, EXACTLY as printed.
-     Examples: "10'-6\"" or "3.05" — character for character, no conversion.
-   - Dimensions are inside or beside each room boundary, often small or rotated — look carefully.
+2. ROOM NAMES — use these canonical names in the `name` field:
+   - Drawing Room / Living Room / Lounge / Family Room / L-D / Drg Room → "Hall"
+   - Mast Bed / M. Bedroom / Master Bed / M.B.R → "Master Bedroom"
+   - Bed / Bed Room / BED ROOM → "Bedroom"
+   - Dining Room / Dinning / Dinning Room → "Dining"
+   - Toi / W.C / WC / Powder Room → "Toilet"
+   - Balc / Deck / Verandah → "Balcony"
+   - Wash / W.A / Utility (wash area context) → "Wash Area"
+   - Puja Room / Prayer Room / Mandir / Puja / Pooja → "Pooja Room"
+   - Storage Room / Store / Storeroom → "Store Room"
+   - Study → "Study Room"
+   - Maid Room / Maid / Servant → "Servant Room"
+   - Bath Room → "Bathroom"
+   - Dress Room / Wardrobe Room → "Dressing Room"
+   - Foyer / Entrance (lobby context) → "Lobby"
+   - Corridor / Common Passage → "Passage"
+   - For anything else, use the brochure's exact printed name.
+
+3. DIMENSIONS (STRICTLY PAIRED ONLY):
+   - ONLY extract dimensions if explicitly printed as a length and width pair (e.g., "10'0\" x 11'4\"" or "3.05 x 3.45").
+   - Extract length and width into their SEPARATE fields. NEVER include 'x' or 'X' in the value.
+   - Example printed text "12' x 10'1\"" → length="12'", width="10'1\"" (NOT "12'x").
+   - NEVER hallucinate dimensions from single numbers (e.g., room counts, sequence numbers, or total sqft areas).
+   - If a room does NOT have an explicitly printed Length x Width pair on the floor plan, you MUST leave both `length` and `width` as `null`. NEVER GUESS.
    - Sanity check: Master Bedroom > Bedroom > Kitchen ≈ Dining > Toilet (toilet width ≤ 5').
-   - If you genuinely cannot read a dimension, use null. A null is better than a wrong number.
 
-3. ROOM AREA:
-   - If area_sqft is explicitly printed for a room, fill it.
-   - If not printed but length and width are available, compute: area_sqft = length_ft × width_ft.
-     Convert metric to feet first if needed (1 metre = 3.281 ft).
+4. ROOM AREA: Use printed value if available. Otherwise compute area_sqft = length_ft × width_ft (1m = 3.281ft).
 
-4. MISSING DATA:
-   - Use JSON null (never the string "null") for anything not found.
-   - super_built_up_area_sqft and carpet_area_sqft come ONLY from printed schedule tables.
+5. MISSING DATA & TOTAL AREAS:
+   - JSON null only (never "null", "NA", "None").
+   - EXTRACT TOTAL AREAS (super_built_up_area_sqft, carpet_area_sqft) wherever printed (tables, unit titles, floor plans).
+   - ALWAYS convert Sq. Yard / Sq. Yds to Sq. Ft. (1 Sq. Yard = 9 Sq. Ft.). Example: "100 sq yds" -> 900.
+   - If the area is genuinely not printed anywhere for the unit, use null. Do NOT estimate it yourself.
 
-5. ROOM CONNECTIONS (read the floor plan visually):
-   - attached_bathroom = true only if a bathroom door opens directly into that bedroom/drawing room.
-   - has_balcony_access = true only if a balcony is directly connected to that bedroom/drawing room.
+6. ROOM CONNECTIONS (VERIFY CAREFULLY — LLMs commonly make mistakes here):
+   For EACH bedroom, follow these steps:
+   a) Look at every wall of that bedroom in the floor plan.
+   b) Is there a door from that bedroom wall directly into a Toilet or Bathroom? → attached_bathroom = true
+   c) IMPORTANT: A Toilet that can ONLY be entered from ONE specific bedroom is always "attached". A common/shared toilet entered from the passage/hall is NOT attached to any bedroom.
+   d) Is there a balcony directly joined to that bedroom (sliding door or opening)? → has_balcony_access = true
+   - Default to false only after completing steps a-d. Never default to false without checking.
+   - A faintly drawn door still counts. A shared common toilet does NOT count as attached.
 
-6. ENTRANCE FACING:
-   - Find compass symbols and trace which direction the main entrance door faces.
-   - For apartments: door facing the corridor. For villas: door facing the street/plot.
-   - Set null ONLY if the entire brochure has no compass symbol at all.
+7. ENTRANCE FACING: Trace compass to find which direction main door faces. null only if NO compass exists anywhere.
 
-7. VILLA vs APARTMENT:
-   - Floor layouts (lifts, corridors) → apartments only.
-   - Villas/Row-houses → applicable_buildings must be [].
+8. VILLAS: applicable_buildings = []. No floor layout data needed.
 
-8. NEARBY LANDMARKS:
-   - Only real landmarks: schools, hospitals, malls, transit hubs.
-   - Do NOT include other residential society names from the location map.
+9. LANDMARKS: Real landmarks only (schools, hospitals, malls, transit). Correct OCR errors ("ISION TEMPLE" → "ISKCON TEMPLE").
 
-9. AMENITIES:
-   - List every amenity mentioned anywhere in the brochure.
+10. AMENITIES: List every amenity mentioned anywhere in the brochure.
 
-Output strictly as a JSON object matching the schema. Cover every page, every unit, every room.
+11. DESCRIPTIONS (CRITICAL): Synthesize informative, rich descriptions for both `SocietyLayoutSchema.description` and `UnitSchema.description`. Capture the vibe, lifestyle, architecture, layout, and any special features. This is vital for semantic search matching. DO NOT leave these fields null if you can infer details from the imagery or text.
+
+Output strictly as JSON matching the schema.
 """
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# HELPERS
+# POST-PROCESSING HELPERS
 # ══════════════════════════════════════════════════════════════════════════════
 
+def repair_truncated_json(text: str) -> str:
+    """
+    If Gemini cuts off mid-JSON, close all open brackets/braces so the
+    output is at least parseable.
+    """
+    text = text.strip()
+    if text.startswith("```json"): text = text[7:].strip()
+    if text.endswith("```"): text = text[:-3].strip()
+    text = re.sub(r",\s*$", "", text)
+    
+    stack, in_string, escape = [], False, False
+    for ch in text:
+        if escape: escape = False; continue
+        if ch == "\\" and in_string: escape = True; continue
+        if ch == '"': in_string = not in_string; continue
+        if in_string: continue
+        if ch in "{[": stack.append(ch)
+        elif ch in "}]" and stack: stack.pop()
+        
+    if in_string: text += '"'
+    closing = {"[": "]", "{": "}"}
+    for opener in reversed(stack): text += closing[opener]
+    return text
+
+# FIX 1: clean "null" strings, "NA", "None" → Python None recursively
+_NULL_STRINGS = {"null", "na", "none", "n/a", "nil", "undefined", "-"}
+
+def clean_null_strings(obj):
+    """Recursively replace null-like strings with None throughout the dict."""
+    if isinstance(obj, dict):
+        return {k: clean_null_strings(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [clean_null_strings(i) for i in obj]
+    if isinstance(obj, str) and obj.strip().lower() in _NULL_STRINGS:
+        return None
+    return obj
+
+
 def parse_ft(raw: str) -> Optional[float]:
-    """
-    Try to parse a raw dimension string into feet (float).
-    Handles formats like: 10'-6", 10'6", 10-6, 3.05 (metres), 10.5
-    Returns None if unparseable.
-    """
+    """Parse a raw dimension string into feet (float)."""
     if not raw:
         return None
     raw = raw.strip()
-
-    # Format: 10'-6" or 10'6" or 10'0"
-    m = re.match(r"(\d+)['\u2019][\s\-]?(\d+)[\"\u201d]?", raw)
+    # 10'-6" or 10'6" or 10'
+    m = re.match(r"(\d+)['\u2019](?:[\s\-]?(\d+)[\"\u201d]?)?", raw)
     if m:
-        return int(m.group(1)) + int(m.group(2)) / 12
-
-    # Format: 10-6 (feet-inches with dash)
+        return int(m.group(1)) + (int(m.group(2)) / 12 if m.group(2) else 0)
+    # 10-6 (feet-inches with dash)
     m = re.match(r"^(\d+)-(\d+)$", raw)
     if m:
         return int(m.group(1)) + int(m.group(2)) / 12
-
-    # Plain decimal — could be metres or feet
+    # Plain decimal — metres if < 15, else feet
     m = re.match(r"^(\d+\.?\d*)$", raw)
     if m:
         val = float(m.group(1))
-        # Heuristic: if < 15 assume metres, convert to feet
         return val * 3.281 if val < 15 else val
-
     return None
 
 
 def compute_room_areas(data: dict) -> dict:
-    """
-    For any room that has length + width but no area_sqft, compute and fill it.
-    """
+    """Fill area_sqft for rooms that have length + width but no explicit area."""
     for unit in data.get("units", []):
         for room in unit.get("rooms", []):
             if room.get("area_sqft") is not None:
-                continue  # already filled
+                continue
             l = parse_ft(room.get("length") or "")
             w = parse_ft(room.get("width") or "")
             if l and w:
@@ -273,86 +319,242 @@ def compute_room_areas(data: dict) -> dict:
     return data
 
 
-def postprocess(data: dict) -> dict:
-    """Sanity checks + compute missing room areas."""
-    data = compute_room_areas(data)
 
+# FIX 2: actively DELETE hallucinated copy-pasted dimensions across variants
+def fix_hallucinated_dimensions(data: dict) -> dict:
+    """
+    If two or more unit variants share the exact same room dimension signature,
+    it means the LLM copy-pasted. We null out the dimensions on the duplicates
+    (keeping only the first occurrence as likely correct).
+    """
     units = data.get("units", [])
-    fingerprints: dict[str, list[str]] = {}
+
+    def dim_signature(unit):
+        return "|".join(
+            f"{r.get('name')}:{r.get('length')}x{r.get('width')}"
+            for r in unit.get("rooms", [])
+            if r.get("length") or r.get("width")
+        )
+
+    seen: dict[str, str] = {}   # signature → first unit_type that had it
 
     for unit in units:
-        bhk   = unit.get("bhk") or 0
-        sba   = unit.get("super_built_up_area_sqft")
-        ptype = unit.get("property_type", "")
+        sig = dim_signature(unit)
+        if not sig:
+            continue
         utype = unit.get("unit_type", "?")
 
-        # Flag impossible SBA
-        if sba and bhk >= 4 and ptype in ("VILLA", "ROW_HOUSE", "TENEMENT") and sba < 1500:
-            logging.warning(f"  [SANITY] SBA={sba} sqft too small for {bhk}BHK {ptype} '{utype}'. Nulling.")
-            unit["super_built_up_area_sqft"] = None
-
-        # Clear zero areas
-        for room in unit.get("rooms", []):
-            if room.get("area_sqft") == 0:
+        if sig in seen:
+            # This is a duplicate — null out all dimensions in this unit
+            logging.warning(
+                f"  [HALLUCINATION] '{utype}' has identical room dimensions as "
+                f"'{seen[sig]}' — clearing copied dimensions."
+            )
+            for room in unit.get("rooms", []):
+                room["length"] = None
+                room["width"]  = None
                 room["area_sqft"] = None
-
-        # Detect dimension copying across variants
-        sig = "|".join(
-            f"{r.get('name')}:{r.get('length')}x{r.get('width')}"
-            for r in unit.get("rooms", []) if r.get("length")
-        )
-        fingerprints.setdefault(sig, []).append(utype)
-
-    for sig, utypes in fingerprints.items():
-        if len(utypes) > 1 and sig:
-            logging.warning(f"  [SANITY] Identical room dims across variants {utypes} — possible hallucination.")
+        else:
+            seen[sig] = utype
 
     return data
 
 
+# ── Room name normalisation (deterministic, runs AFTER LLM extraction) ────────
+#
+# Maps lowercase substrings → canonical room name.
+# Checked IN ORDER — first match wins. More-specific patterns listed first.
+# This guarantees consistent names in the JSON regardless of LLM output.
+
+_ROOM_NORM: list[tuple[str, str]] = [
+    # Master Bedroom — check BEFORE generic "bedroom"/"bed"
+    ("master bed",     "Master Bedroom"),
+    ("m.bed",          "Master Bedroom"),
+    ("m bed",          "Master Bedroom"),
+    ("m.b.r",          "Master Bedroom"),
+    ("mbr",            "Master Bedroom"),
+    # Hall / Drawing Room variants
+    ("drawing room",   "Hall"),
+    ("living room",    "Hall"),
+    ("family room",    "Hall"),
+    ("drg room",       "Hall"),
+    ("dr room",        "Hall"),
+    ("lounge",         "Hall"),
+    ("l/d",            "Hall"),
+    ("l-d",            "Hall"),
+    # Bedroom — after master bedroom checks
+    ("bed room",       "Bedroom"),
+    # Dining
+    ("dining room",    "Dining"),
+    ("dinning room",   "Dining"),
+    ("dinning",        "Dining"),
+    # Toilet / WC
+    ("powder room",    "Toilet"),
+    ("w.c",            "Toilet"),
+    # Balcony
+    ("verandah",       "Balcony"),
+    ("balc",           "Balcony"),
+    ("deck",           "Balcony"),
+    # Wash Area — "wash area" already correct, catch abbrevs
+    ("utility",        "Wash Area"),
+    ("laundry",        "Wash Area"),
+    ("w.a",            "Wash Area"),
+    # Pooja Room variants
+    ("puja room",      "Pooja Room"),
+    ("prayer room",    "Pooja Room"),
+    ("mandir",         "Pooja Room"),
+    # Store Room
+    ("storage room",   "Store Room"),
+    ("storeroom",      "Store Room"),
+    # Study Room
+    ("study room",     "Study Room"),   # already canonical — keep for case normalisation
+    # Servant Room
+    ("servant room",   "Servant Room"), # already canonical — keep for case normalisation
+    ("maid room",      "Servant Room"),
+    # Bathroom
+    ("bath room",      "Bathroom"),
+    # Dressing Room
+    ("dressing room",  "Dressing Room"),# already canonical
+    ("dress room",     "Dressing Room"),
+    ("wardrobe room",  "Dressing Room"),
+    # Lobby
+    ("foyer",          "Lobby"),
+    # Passage
+    ("corridor",       "Passage"),
+    ("common passage", "Passage"),
+    # Generic single-word catches — keep LAST to avoid over-matching
+    ("wash",           "Wash Area"),
+    ("puja",           "Pooja Room"),
+    ("pooja",          "Pooja Room"),
+    ("store",          "Store Room"),
+    ("study",          "Study Room"),
+    ("servant",        "Servant Room"),
+    ("maid",           "Servant Room"),
+    ("bed",            "Bedroom"),
+]
+
+
+def normalize_room_names(data: dict) -> dict:
+    """
+    Post-process: apply canonical room name normalisation to every room in every unit.
+    Uses substring matching (case-insensitive) so abbreviations, typos, and
+    mixed-case variants are all caught.  First match in _ROOM_NORM wins.
+    """
+    for unit in data.get("units", []):
+        for room in unit.get("rooms", []):
+            raw = (room.get("name") or "").strip()
+            if not raw:
+                continue
+            lower = raw.lower()
+            for fragment, canonical in _ROOM_NORM:
+                if fragment in lower:
+                    if raw != canonical:
+                        logging.debug(f"  [NORM] room '{raw}' → '{canonical}'")
+                        room["name"] = canonical
+                    break   # first match wins
+    return data
+
+
+def postprocess(data: dict, filename: str) -> dict:
+    """Apply all fixes and return cleaned data with injected project_id."""
+
+    # FIX 1: clean "null" strings everywhere
+    data = clean_null_strings(data)
+
+    # FIX 3: inject project_id ourselves (never trust LLM for this)
+    data["project_id"] = str(uuid.uuid4())
+
+    # Always stamp correct filename
+    data["brochure_file"] = filename
+
+    # FIX 2: remove hallucinated copy-pasted dimensions
+    data = fix_hallucinated_dimensions(data)
+
+    # Compute room areas from dimensions
+    data = compute_room_areas(data)
+
+    # Unit area estimation removed per user request.
+
+    # Normalize room names to canonical form (deterministic, after LLM)
+    data = normalize_room_names(data)
+
+    # Sanity: impossible SBA values
+    for unit in data.get("units", []):
+        bhk   = unit.get("bhk") or 0
+        sba   = unit.get("super_built_up_area_sqft")
+        ptype = unit.get("property_type", "")
+        utype = unit.get("unit_type", "?")
+        if sba and bhk >= 4 and ptype in ("VILLA", "ROW_HOUSE", "TENEMENT") and sba < 1500:
+            logging.warning(f"  [SANITY] SBA={sba} sqft too small for {bhk}BHK {ptype} '{utype}'. Nulling.")
+            unit["super_built_up_area_sqft"] = None
+        for room in unit.get("rooms", []):
+            if room.get("area_sqft") == 0:
+                room["area_sqft"] = None
+
+    return data
+
+
+
+
 # ══════════════════════════════════════════════════════════════════════════════
-# CORE EXTRACTION  (same proven structure as original, with fixes)
+# CORE EXTRACTION
 # ══════════════════════════════════════════════════════════════════════════════
 
-def process_pdf(client: genai.Client, pdf_path: Path) -> str | None:
+def process_pdf(client_factory: callable, pdf_path: Path, max_retries: int = 3) -> str | None:
     logging.info(f"  Uploading: {pdf_path.name} ({pdf_path.stat().st_size / 1e6:.1f} MB)")
 
-    try:
-        pdf_file = client.files.upload(file=str(pdf_path), config={"mime_type": "application/pdf"})
-
-        logging.info("  Waiting for Gemini to process file ...")
-        while pdf_file.state.name == "PROCESSING":
-            print(".", end="", flush=True)
-            time.sleep(2)
-            pdf_file = client.files.get(name=pdf_file.name)
-        print()
-
-        if pdf_file.state.name == "FAILED":
-            logging.error("  File processing failed on the server.")
-            return None
-
-        logging.info(f"  Calling {MODEL} ...")
-        response = client.models.generate_content(
-            model=MODEL,
-            contents=[pdf_file, PROMPT],
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                response_schema=BrochureData,
-                temperature=0.0,
-                max_output_tokens=32000,   # high limit — prevents cut-off mid-JSON
-            ),
-        )
-
+    for attempt in range(max_retries):
         try:
-            client.files.delete(name=pdf_file.name)
-        except Exception:
-            pass
+            client, key_idx = client_factory()
+            logging.info(f"  Attempt {attempt + 1}: Using API Key #{key_idx + 1}")
+            
+            pdf_file = client.files.upload(file=str(pdf_path), config={"mime_type": "application/pdf"})
 
-        return response.text
+            logging.info("  Waiting for Gemini to process file ...")
+            while pdf_file.state.name == "PROCESSING":
+                print(".", end="", flush=True)
+                time.sleep(2)
+                pdf_file = client.files.get(name=pdf_file.name)
+            print()
 
-    except Exception as e:
-        logging.error(f"  API call failed: {str(e)[:400]}")
-        return None
+            if pdf_file.state.name == "FAILED":
+                logging.error("  File processing failed on the server.")
+                return None
+
+            logging.info(f"  Calling {MODEL} ...")
+            response = client.models.generate_content(
+                model=MODEL,
+                contents=[pdf_file, PROMPT],
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    response_schema=BrochureData,
+                    temperature=0.0,
+                    max_output_tokens=65000,
+                ),
+            )
+
+            try:
+                client.files.delete(name=pdf_file.name)
+            except Exception:
+                pass
+
+            return response.text
+
+        except Exception as e:
+            err_msg = str(e)
+            if "429" in err_msg or "Resource Exhausted" in err_msg or "quota" in err_msg.lower():
+                logging.warning(f"  Rate limit hit (429) on attempt {attempt + 1}. Error: {str(e)[:150]}")
+                if attempt < max_retries - 1:
+                    logging.info("  Retrying with next API key...")
+                    time.sleep(2)
+                    continue
+                else:
+                    logging.error("  Max retries reached on rate limit.")
+            else:
+                 logging.error(f"  API call failed: {err_msg[:400]}")
+                 return None
+                 
+    return None
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -361,10 +563,10 @@ def process_pdf(client: genai.Client, pdf_path: Path) -> str | None:
 
 def parse_args():
     p = argparse.ArgumentParser(description="Extract JSON from real estate brochures using Gemini.")
-    p.add_argument("--no-preprocess", action="store_true", help="Skip PDF preprocessing")
-    p.add_argument("--dpi",      type=int,  default=250,            help="Preprocessing DPI (default: 250)")
-    p.add_argument("--quality",  type=int,  default=82,             help="JPEG quality (default: 82)")
-    p.add_argument("--overwrite-preprocessed", action="store_true", help="Re-preprocess existing files")
+    p.add_argument("--no-preprocess",            action="store_true", help="Skip PDF preprocessing")
+    p.add_argument("--dpi",      type=int,  default=250,             help="Preprocessing DPI (default: 250)")
+    p.add_argument("--quality",  type=int,  default=82,              help="JPEG quality (default: 82)")
+    p.add_argument("--overwrite-preprocessed",   action="store_true", help="Re-preprocess existing files")
     p.add_argument("--input-dir",  type=Path, default=Path("data"))
     p.add_argument("--output-dir", type=Path, default=Path("output"))
     p.add_argument("--prep-dir",   type=Path, default=Path("preprocessed"))
@@ -374,12 +576,22 @@ def parse_args():
 def main():
     args = parse_args()
 
-    api_key = os.getenv("GEMINI_API_KEY")
-    if not api_key:
-        logging.error("GEMINI_API_KEY not found in .env file.")
+    api_key_1 = os.getenv("GEMINI_API_KEY")
+    api_key_2 = os.getenv("GEMINI_API_KEY_2")
+    
+    api_keys = [k for k in [api_key_1, api_key_2] if k]
+
+    if not api_keys:
+        logging.error("No valid GEMINI_API_KEY found in .env file.")
         return
 
-    client = genai.Client(api_key=api_key)
+    # Simple round-robin key tracking
+    current_key_idx = [0]
+    
+    def get_client() -> tuple[genai.Client, int]:
+        idx = current_key_idx[0] % len(api_keys)
+        current_key_idx[0] += 1
+        return genai.Client(api_key=api_keys[idx]), idx
     args.output_dir.mkdir(parents=True, exist_ok=True)
     args.prep_dir.mkdir(parents=True, exist_ok=True)
 
@@ -391,7 +603,6 @@ def main():
     use_preprocess = (not args.no_preprocess) and PREPROCESS_AVAILABLE
     logging.info(f"Found {len(pdf_files)} PDF(s) | Preprocessing: {'ON' if use_preprocess else 'OFF'}")
 
-    import json
     success = 0
 
     for idx, pdf_path in enumerate(pdf_files):
@@ -418,21 +629,29 @@ def main():
 
         # Step 2: Extract
         logging.info("  Step 2: Extracting ...")
-        result_text = process_pdf(client, work_path)
+        result_text = process_pdf(get_client, work_path)
 
         if not result_text:
             logging.error(f"  SKIPPED — no result for {pdf_path.name}")
             continue
 
-        # Step 3: Postprocess + save
+        # Step 3: Parse and Postprocess
+        data = None
         try:
             data = json.loads(result_text)
-            data["brochure_file"] = pdf_path.name
-            data = postprocess(data)
+        except json.JSONDecodeError:
+            logging.warning("  JSON truncated — attempting auto-repair ...")
+            repaired = repair_truncated_json(result_text)
+            try:
+                data = json.loads(repaired)
+                logging.info("  Auto-repair succeeded.")
+            except json.JSONDecodeError as e:
+                logging.error(f"  Repair failed: {e} — saving raw output.")
+                final_json = result_text
+
+        if data is not None:
+            data = postprocess(data, pdf_path.name)
             final_json = json.dumps(data, ensure_ascii=False, indent=2)
-        except json.JSONDecodeError as e:
-            logging.error(f"  JSON parse error: {e} — saving raw output.")
-            final_json = result_text
 
         out_file = args.output_dir / f"{pdf_path.stem}.json"
         out_file.write_text(final_json, encoding="utf-8")

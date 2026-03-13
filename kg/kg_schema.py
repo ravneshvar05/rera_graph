@@ -32,7 +32,7 @@ CONSTRAINTS = [
 # ─── Index definitions ───────────────────────────────────────────────────────
 
 INDEXES = [
-    # Single-property indexes
+    # Existing indexes
     ("idx_unit_bhk",         "Unit",     ["bhk"]),
     ("idx_unit_ptype",       "Unit",     ["property_type"]),
     ("idx_unit_sqft",        "Unit",     ["super_builtup_sqft"]),
@@ -42,6 +42,14 @@ INDEXES = [
 
     # Composite indexes for the most common traversal patterns
     ("idx_unit_bhk_ptype",   "Unit",     ["bhk", "property_type"]),
+
+    # New indexes for Text-to-Cypher room/unit filtering
+    ("idx_room_name",         "Room",    ["name"]),
+    ("idx_room_type",         "Room",    ["room_type"]),
+    ("idx_room_area",         "Room",    ["area_sqft"]),
+    ("idx_unit_carpet",       "Unit",    ["carpet_sqft"]),
+    ("idx_unit_facing",       "Unit",    ["entrance_facing"]),
+    ("idx_amenity_tags",      "Amenity", ["canonical_tags"]),
 ]
 
 

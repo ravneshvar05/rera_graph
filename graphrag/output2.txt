@@ -1,0 +1,636 @@
+
+==================================================
+USER QUERY: flat with hall > 150 sqft in ahmedabad
+==================================================
+
+Parsed Intent: {
+  "query_type": "SPECIFIC",
+  "bhk": null,
+  "property_type": "APARTMENT",
+  "city": "Ahmedabad",
+  "neighbourhood": null,
+  "zone": null,
+  "amenities": null,
+  "landmark_types": null,
+  "specific_landmarks": null,
+  "min_sqft": 150.0,
+  "max_sqft": null,
+  "min_price_lakhs": null,
+  "max_price_lakhs": null,
+  "has_balcony": null,
+  "has_parking": null,
+  "entrance_facing": null,
+  "developer": null,
+  "project_names": null,
+  "semantic_keywords": null,
+  "min_units_per_floor": null,
+  "max_units_per_floor": null
+}
+
+
+--- ASSEMBLED CONTEXT FOR LLM ---
+
+User query: flat with hall > 150 sqft in ahmedabad
+
+Retrieved 17 relevant residential project(s):
+
+[1] PROJECT: AMBER
+  Developer: GHOGHARI Developers pvt. ltd.
+  Location: Sarkhej, Ahmedabad
+  Address: Opp. Amber Tower, B/h. Kadri Party Plot, TP 85-FP7, Subplot 2, Sarkhej Highway Road, Ahmedabad-55.
+  Society Features: Park/Garden, Parking
+  Units:
+    - 2 BHK - Type 105 (Without Dining) (APARTMENT) 1372.14 sqft super built-up
+      Description: Built-Up Area: 90.93 sqft
+      Rooms: Hall (16'-0" x 10'-6", 168.0 sqft); Kitchen (8'-0" x 9'); Wash Area; Balcony; Bedroom (12'-4" x 10'-6", 129.5 sqft); Toilet (4'-3" x 3'-6", 14.9 sqft); Toilet (7'-0" x 4'-7", 32.1 sqft); Bedroom (10'-6" x 12'-4", 129.5 sqft)
+    - 2 BHK - Type 102 (With Dining) (APARTMENT) 1459.35 sqft super built-up
+      Description: Built-Up Area: 99.93 sqft
+      Rooms: Hall (10'-6" x 18'-0", 189.0 sqft); Dining (12' x 10'-3"); Kitchen (8'-8" x 8'-0", 69.3 sqft); Wash Area; Balcony; Bedroom (11'-0" x 10'-0", 110.0 sqft); Toilet (3'9" x 4'); Toilet (7'-7" x 4'-3", 32.2 sqft); Bedroom (10'-0" x 10'-0", 100.0 sqft); Toilet (4'-0" x 7'-0", 28.0 sqft)
+    - 2 BHK - Type 108 (APARTMENT) 1413.18 sqft super built-up
+      Description: Built-Up Area: 96.27 sqft
+      Rooms: Hall (10'-6" x 18'-0", 189.0 sqft); Kitchen (8' x 9'); Wash Area; Balcony; Bedroom (10'-9" x 12'-6", 134.4 sqft); Toilet (7'3" x 5'); Bedroom (11'-3" x 10'-0", 112.5 sqft); Toilet (4'-0" x 3'-6", 14.0 sqft); Passage
+    - 2 BHK - Type 109 (APARTMENT) 1427.58 sqft super built-up
+      Description: Built-Up Area: 96.38 sqft
+      Rooms: Hall (10'-6" x 18'-0", 189.0 sqft); Dining (8'-0" x 10'); Kitchen (8' x 9'); Wash Area; Balcony; Bedroom (10'-3" x 12'-0", 123.0 sqft); Toilet (5'-5" x 3'-6", 19.0 sqft); Bedroom (11'-3" x 10'-0", 112.5 sqft); Toilet (4' x 7')
+    - 2 BHK - Type 106 (APARTMENT) 1439.01 sqft super built-up
+      Description: Built-Up Area: 98.00 sqft
+      Rooms: Hall (10'-6" x 18'-0", 189.0 sqft); Kitchen (8' x 9'); Wash Area; Balcony; Bedroom (10'-9" x 12'-6", 134.4 sqft); Toilet (7'3" x 5'6", 39.9 sqft); Bedroom (11'-3" x 11'-0", 123.8 sqft); Toilet (6'-9" x 4'); Passage
+    - 2 BHK - Type 107 (APARTMENT) 1394.82 sqft super built-up
+      Description: Built-Up Area: 93.94 sqft
+      Rooms: Hall (10'-6" x 18'-0", 189.0 sqft); Kitchen (8' x 9'); Wash Area; Balcony; Bedroom (11'-3" x 10'-0", 112.5 sqft); Toilet (6'-6" x 5'-6", 35.8 sqft); Bedroom (11'-3" x 10'-0", 112.5 sqft); Toilet (5'-5" x 3'-6", 19.0 sqft); Passage
+    - 2 BHK - Type 103 (APARTMENT) 1428.03 sqft super built-up
+      Description: Built-Up Area: 97.60 sqft
+      Rooms: Hall (10'-6" x 18'-0", 189.0 sqft); Dining (12'-0" x 9'-0", 108.0 sqft); Kitchen (8'-8" x 8'-0", 69.3 sqft); Wash Area; Balcony; Bedroom (11' x 11'); Toilet (7'-3" x 4'-3", 30.8 sqft); Bedroom (8'-0" x 10'-0", 80.0 sqft); Toilet (5'-3" x 3'-6", 18.4 sqft); Toilet (6'-6" x 5'-3", 34.1 sqft)
+    - 2 BHK - Type 101 (APARTMENT) 1372.14 sqft super built-up
+      Description: Built-Up Area: 90.93 sqft
+      Rooms: Hall (9'-0" x 8'-0", 72.0 sqft); Dining (9'-6" x 9'); Kitchen; Wash Area; Balcony; Bedroom (11'-0" x 11'-0", 121.0 sqft); Toilet (7' x 4'); Bedroom (13'-0" x 10'-0", 130.0 sqft); Toilet (5'-6" x 5'-9", 31.6 sqft); Toilet (4' x 4'-6")
+    - 2 BHK - Type 104 (APARTMENT) 1463.4 sqft super built-up
+      Description: Built-Up Area: 100.79 sqft
+      Rooms: Hall (10'-6" x 18'-0", 189.0 sqft); Dining (12' x 10'); Kitchen (8'-8" x 8'-0", 69.3 sqft); Wash Area; Balcony; Bedroom (11' x 10'); Toilet (7'-0" x 4'-3", 29.8 sqft); Bedroom (10'-0" x 11'-0", 110.0 sqft); Toilet (4'-0" x 7'-0", 28.0 sqft); Toilet (4' x 4'-3")
+  Amenities: Garden, Parking Area, Park, Watchman Cabin
+  Nearby: Kadri Party Plot, GULZAR PARK, ARSHAD PARK, Juhapura-Sarkhej Road, 100 Feet Ring Road
+  Other Details: Building Names: ['Amber Tower'], Ingested At: 2026-03-12T17:27:46Z, Total Buildings: 2, Source File: Brochure6.json
+  [Source: both]
+
+[2] PROJECT: NEELKANTH STATUS
+  Developer: Neelkanth
+  Location: Kubernagar, Ahmedabad
+  Society Features: Park/Garden, Parking
+  Units:
+    - 3 BHK (APARTMENT) | Balcony: 17.0 sqft | Facing: East
+      Description: Exclusive Premium Flats
+      Rooms: Hall (17'4" x 13'10", 239.8 sqft); Kitchen (7'11" x 9'6", 75.2 sqft); Wash Area (5'11" x 5'1", 30.1 sqft); Store Room (3'2" x 5'7", 17.7 sqft); Toilet (5'11" x 4'0", 23.7 sqft); Master Bedroom (13'1" x 9'10", 128.7 sqft) with attached bath; Toilet (4'0" x 5'11", 23.7 sqft); Bedroom (12' x 10'1"); Balcony (4'3" x 4'0", 17.0 sqft); Bedroom (11' x 9'8") with attached bath; Toilet (4'0" x 5'9", 23.0 sqft)
+  Amenities: 24 Hours water supply from borewell, Pavers in parking, Common garden, R.C.C paved road, 24 Hours security with security cabin
+  Other Details: Has Commercial Shops: 0, Building Names: ['J', 'H', 'I'], Road Widths: ["25' WIDE APPROACH ROAD"], Ingested At: 2026-03-12T17:27:39Z, Total Buildings: 4, Source File: Brochure2.json
+  [Source: both]
+
+[3] PROJECT: Gandhi Galaxy
+  Developer: Reliable Developers
+  Location: Paldi, Ahmedabad
+  Address: Gandhi Galaxy Apartments, 1A/2A Fazl Mohammad Co. Op. Housing Society Ltd., Opp Fazl Hills, Sheikh Adam Abuvala Road, Narayan Nagar Road, Paldi, Ahmedabad
+  Society Features: Park/Garden, Parking
+  Society Description: Gandhi Galaxy offers luxurious, ultra-modern apartments in Paldi, Ahmedabad. The society features two distinct blocks, A and B, with ample parking, security, and automatic elevators. Residents can enjoy green spaces and well-maintained surroundings, with access via 30 and 50 feet wide roads.
+  Units:
+    - 2 BHK (APARTMENT) | Facing: North
+      Description: A well-appointed 2 BHK apartment in B-BLOCK, featuring a spacious drawing room, separate dining area, and two bedrooms, each with an attached toilet. One bedroom also offers direct access to a private balcony.
+      Rooms: Hall (11'0" x 18'3", 200.8 sqft); Dining (9'0" x 12'3", 110.2 sqft); Kitchen (9'0" x 9'6", 85.5 sqft); Wash Area (5'6" x 5'3", 28.9 sqft); Store Room (4'0" x 4'3", 17.0 sqft); Bedroom (10'0" x 11'6", 115.0 sqft) with attached bath; Bedroom (10'0" x 14'6", 145.0 sqft) with attached bath; Balcony (11'0" x 5'0", 55.0 sqft); Lobby (13'6" x 3'3", 43.9 sqft); Lobby (3'9" x 4'3", 15.9 sqft); Toilet (4'0" x 3'6", 14.0 sqft); Toilet (5'6" x 5'6", 30.2 sqft); Bathroom (4'6" x 6'0", 27.0 sqft); Bathroom (5'3" x 6'0", 31.5 sqft); Toilet (7'0" x 4'0", 28.0 sqft)
+    - 2 BHK (APARTMENT) | Facing: North
+      Description: A comfortable 2 BHK apartment in B-BLOCK, featuring a spacious drawing room, separate dining area, and two bedrooms, each with an attached toilet. One bedroom also provides direct access to a private balcony.
+      Rooms: Hall (11'0" x 18'3", 200.8 sqft); Dining (9'0" x 12'3", 110.2 sqft); Kitchen (9'0" x 9'6", 85.5 sqft); Wash Area (5'6" x 5'3", 28.9 sqft); Store Room (4'0" x 4'3", 17.0 sqft); Bedroom (10'0" x 11'6", 115.0 sqft) with attached bath; Bedroom (10'0" x 14'6", 145.0 sqft) with attached bath; Balcony (11'0" x 5'0", 55.0 sqft); Lobby (13'6" x 3'3", 43.9 sqft); Lobby (5'0" x 6'0", 30.0 sqft); Toilet (4'0" x 3'6", 14.0 sqft); Toilet (5'6" x 5'6", 30.2 sqft); Bathroom (4'6" x 6'0", 27.0 sqft); Bathroom (5'3" x 6'0", 31.5 sqft); Toilet (7'0" x 4'0", 28.0 sqft)
+    - 3 BHK (APARTMENT) | Facing: West
+      Description: A spacious 3 BHK apartment in A-BLOCK, featuring a large drawing room, separate dining area, and three bedrooms, with one bedroom having an attached toilet, designed for comfortable family living.
+      Rooms: Hall (16'6" x 10'6", 173.2 sqft); Dining (7'6" x 8'0", 60.0 sqft); Kitchen (7'3" x 8'0", 58.0 sqft); Wash Area (4'6" x 5'0", 22.5 sqft); Store Room (4'3" x 4'0", 17.0 sqft); Bedroom (10'0" x 10'9", 107.5 sqft) with attached bath; Bedroom (10'0" x 15'3", 152.5 sqft); Bedroom (10'0" x 15'3", 152.5 sqft); Lobby (16'0" x 5'10", 93.3 sqft); Toilet (8'6" x 4'0", 34.0 sqft); Toilet (5'3" x 4'10", 25.4 sqft); Balcony (3'9" x 2'6", 9.4 sqft)
+    - 3 BHK (APARTMENT) | Facing: West
+      Description: A comfortable 3 BHK apartment in A-BLOCK, featuring a drawing room, separate dining area, and three bedrooms, with a dressing room attached to one of the bedrooms.
+      Rooms: Hall (10'6" x 15'3", 160.1 sqft); Dining (8'6" x 10'6", 89.2 sqft); Kitchen (7'0" x 10'6", 73.5 sqft); Wash Area (5'0" x 5'6", 27.5 sqft); Bedroom (13'3" x 10'0", 132.5 sqft); Bedroom (10'0" x 15'3", 152.5 sqft); Bedroom (10'0" x 15'3", 152.5 sqft); Lobby (16'0" x 5'10", 93.3 sqft); Toilet (5'3" x 4'10", 25.4 sqft); Toilet (4'0" x 4'0", 16.0 sqft); Dressing Room (4'0" x 4'0", 16.0 sqft)
+  Amenities: Ample parking space, Security With CCTV camera, Intercom facility, Automatic Elevators, Under ground water tank, Overhead water tank for 24 hour water supply, Park or Garden
+  Nearby: Fazl-e-Mohammad Masjid, Petrol Pump
+  Other Details: Building Names: ['A-BLOCK', 'B-BLOCK'], Road Widths: ['30" WIDE ROAD', '50" WIDE ROAD'], Ingested At: 2026-03-12T17:27:21Z, Total Buildings: 2, Source File: Brochure 14.json
+  [Source: both]
+
+[4] PROJECT: PALAK ELINA
+  Developer: Shree Developers
+  Location: Iscon-Ambli Road, Ahmedabad
+  Address: PALAK ELINA, Iscon-Ambli Road, Ahmedabad-380058
+  Society Features: Clubhouse, Swimming Pool, Park/Garden, Parking
+  Society Description: Palak Elina offers a community of high-end luxurious residences, designed as an architectural marvel for a regal living experience. The society features multiple apartment blocks, a common plot with lush greenery, a children's play area, and a swimming pool, creating a paradise elegantly crafted for its residents.
+  Units:
+    - 5 BHK (APARTMENT) | Balcony: 250.0 sqft | Facing: West
+      Description: A spacious 5 BHK apartment designed for luxurious living, featuring multiple bedrooms with attached dressing areas and balconies, a dedicated servant room, and distinct living and dining spaces, offering an expansive and comfortable residential experience.
+      Rooms: Lobby (6'9" x 12'7", 84.58 sqft); Hall (12'0" x 21'0", 252.0 sqft); Hall (13'0" x 25'0", 325.0 sqft); Balcony (25'0" x 10'0", 250.0 sqft); Kitchen (12'0" x 15'0", 180.0 sqft); Wash Area (5'0" x 10'1", 50.416 sqft); Store Room (5'3" x 8'3", 43.31 sqft); Dining (11'0" x 17'3", 189.25 sqft); Toilet (5'0" x 4'6", 22.5 sqft); Pooja Room (9'0" x 3'6", 31.5 sqft); Bedroom (17'0" x 11'0", 187.0 sqft) with attached bath; Bedroom (21'0" x 12'0", 252.0 sqft) with attached bath; Toilet (10'6" x 7'7", 80.125 sqft); Master Bedroom (21'0" x 14'0", 294.0 sqft) with attached bath; Toilet (13'0" x 10'6", 136.5 sqft); Master Bedroom (21'0" x 14'0", 294.0 sqft) with attached bath; Toilet (13'0" x 10'0", 130.0 sqft); Bedroom (19'0" x 12'0", 228.0 sqft) with attached bath; Toilet (10'0" x 7'7", 75.83 sqft); Servant Room (8'0" x 6'0", 48.0 sqft); Toilet (4'0" x 6'0", 24.0 sqft)
+  Amenities: Children Play Area, Swimming Pool, Mini Theater, Gymnasium, Reception Area, Clubhouse, Entrance Foyer, Garden / Park, Parking
+  Other Details: Building Names: ['Block A', 'Block B'], Road Widths: ['12.00M ROAD'], Pin Code: 380058, Total Buildings: 4, Source File: Brochure 12.json, Has Commercial Shops: 0, Ingested At: 2026-03-12T17:27:21Z
+  [Source: both]
+
+[5] PROJECT: SURYA KUTIR
+  Developer: SHREE SIDDHIVINAYAK ASSETS
+  Location: NARANPURA, Ahmedabad
+  Address: NR. BHOOMI PARTY PLOT, OPP, TORRENT OFFICE, NARANPURA, AHMEDABAD.
+  Status: NEW_LAUNCH
+  Society Features: Park/Garden, Parking
+  Society Description: Surya Kutir offers a modern residential experience with multi-story apartment blocks designed for comfortable family living. The society emphasizes a relaxing and recharging environment, featuring contemporary architecture and thoughtful landscaping to create a pleasant atmosphere.
+  Units:
+    - 3 BHK (Block A - Type 1) (APARTMENT) / 1196.3 sqft carpet | Facing: South-West
+      Description: This spacious 3 BHK apartment in Block A features a well-designed layout with a large drawing room, a dedicated pooja area, and two bedrooms with attached bathrooms and one with balcony access, providing ample natural light and ventilation.
+      Rooms: Hall (5.94 x 3.24, 207.2 sqft); Dining; Kitchen (5.49 x 3.20, 189.1 sqft); Master Bedroom (4.34 x 3.20, 149.5 sqft) with attached bath; Bedroom (3.05 x 3.61, 118.5 sqft); Bedroom (3.35 x 3.61, 130.2 sqft) with attached bath; Toilet (1.37 x 2.13, 31.4 sqft); Toilet (1.83 x 1.37, 27.0 sqft); Toilet (2.44 x 1.37, 36.0 sqft); Balcony (1.41 x 1.40, 21.3 sqft); Wash Area (1.83 x 2.59, 51.0 sqft); Store Room (1.52 x 1.60, 26.2 sqft); Balcony (2.02 x 3.24, 70.5 sqft); Lobby (1.64 x 1.52, 26.8 sqft); Pooja Room
+    - 3 BHK (Block A - Type 2) (APARTMENT) / 1170.9 sqft carpet | Facing: South-East
+      Description: This 3 BHK apartment in Block A offers a functional layout with a spacious drawing room, a well-appointed kitchen, and three comfortable bedrooms, two of which include attached bathrooms and one with direct balcony access, enhancing the living experience.
+      Rooms: Hall (5.49 x 3.51, 207.4 sqft); Dining; Kitchen (5.41 x 3.35, 195.1 sqft); Master Bedroom (3.35 x 4.27, 154.0 sqft) with attached bath; Bedroom (3.66 x 3.35, 132.0 sqft) with attached bath; Bedroom (3.66 x 3.05, 120.2 sqft); Toilet (1.52 x 2.44, 39.9 sqft); Toilet (1.52 x 1.63, 26.7 sqft); Toilet (2.13 x 1.52, 34.9 sqft); Balcony (1.45 x 1.41, 22.0 sqft); Wash Area (2.44 x 1.68, 44.1 sqft); Store Room (1.37 x 1.52, 22.4 sqft); Balcony (3.45 x 2.02, 75.0 sqft); Lobby (1.22 x 1.52, 20.0 sqft); Pooja Room
+    - 3 BHK (Block B) (APARTMENT) / 1188.6 sqft carpet | Facing: North-East
+      Description: This 3 BHK apartment in Block B features a well-proportioned layout with a spacious drawing room, a functional kitchen, and three bedrooms, two of which include attached bathrooms and one with direct balcony access, providing a comfortable and airy living space.
+      Rooms: Hall (3.24 x 5.71, 199.2 sqft); Dining; Kitchen (5.48 x 3.20, 188.8 sqft); Master Bedroom (3.20 x 4.50, 155.0 sqft) with attached bath; Bedroom (3.66 x 3.35, 132.0 sqft) with attached bath; Bedroom (3.66 x 3.05, 120.2 sqft); Toilet (1.37 x 2.74, 40.4 sqft); Toilet (1.37 x 1.94, 28.6 sqft); Toilet (2.13 x 1.52, 34.9 sqft); Balcony (1.45 x 1.45, 22.6 sqft); Wash Area (2.44 x 1.83, 48.1 sqft); Store Room (1.50 x 1.52, 24.5 sqft); Balcony (3.20 x 2.02, 69.6 sqft); Lobby (1.52 x 1.64, 26.8 sqft); Pooja Room
+  Amenities: Garden / Park, Parking, Modern entrance foyer, Vitrified flooring, Wooden flooring in master bedroom, Granite kitchen platform with SS sink, Designer digital tiles in kitchen and bathrooms, Designer washbasin in common area, Wall hung closet, Decorative main door with designer laminate, Anodized aluminium windows with reflective glass, Full size windows for air ventilation, 24-hour water supply (underground & overhead tanks), Double coat terrace waterproofing, High-speed automatic elevators (two per tower), Acrylic waterproof paint on external walls, Modular electrical switches, Concealed modern plumbing system
+  Nearby: Torrent Office, St Kabir School, May Flower Hospital, AEC Fly Over, Jain Upashray, Swaminarayan Temple, Kameshwor Mahadev, Helmet Circle, Vijay Cross Road, GMDC Ground
+  Other Details: Building Names: ['BLOCK-A', 'BLOCK-B'], Total Buildings: 2, Source File: Brochure 7.json, Ingested At: 2026-03-12T17:27:39Z
+  [Source: both]
+
+[6] PROJECT: Satyesh Residency
+  Developer: Applewoods
+  Location: Bopal, Ahmedabad
+  Address: Shantipura Cross Roads, Sardar Patel Ring Road, Ahmedabad
+  Status: READY_TO_MOVE
+  Society Features: Clubhouse, Park/Garden, Parking
+  Society Description: Satyesh Residency is a modern, secure residential complex designed for families, featuring ample green spaces, a dedicated play area for children, and essential facilities like parking, lifts, and power backup. The layout includes well-planned internal roads and commercial shops, creating a self-sufficient and comfortable living environment.
+  Units:
+    - 1 HK (Small) - Type A (APARTMENT)
+      Description: A compact and efficient 1BHK apartment featuring a combined living and dining area, a functional kitchen, and a separate wash area, designed for comfortable urban living.
+      Rooms: Wash Area (7'0" x 2'9", 19.2 sqft); Kitchen (7'0" x 6'3", 43.8 sqft); Bathroom (4'0" x 3'9", 15.0 sqft); WC; Hall (10'0" x 17'0", 170.0 sqft); Bedroom
+    - 1 HK (Big) - Type B (APARTMENT)
+      Description: A slightly larger 1BHK apartment offering a spacious living area, a well-appointed kitchen, and dedicated wash and bath areas, providing enhanced comfort and utility.
+      Rooms: Wash Area; Kitchen; Bathroom; WC; Hall; Bedroom
+    - 1 BHK - Type C, D (APARTMENT)
+      Description: A well-designed 1BHK apartment with a distinct bedroom, a generous living space, and a practical kitchen, offering a balanced layout for modern residents.
+      Rooms: Wash Area; Kitchen (6'9" x 8'0", 54.0 sqft); Bathroom (5'6" x 3'0", 16.5 sqft); WC (4'3" x 2'7", 11.0 sqft); Hall (10'0" x 16'9", 167.5 sqft); Bedroom (10'0" x 10'0", 100.0 sqft)
+  Amenities: Central location, Suitable for every budget, Secure residence, Ample parking, Open green spaces, Lift for every tower, Clubhouse, Earthquake-resistant construction, Commercial Shops, Spacious areas, Housing scheme by a reputed developer, Party area for small/large functions, Play area and garden for children, Well-planned internal roads and street lights, 24-hour water supply, 24-hour security, 24-hour power backup for essential facilities
+  Nearby: S.P. Ring Road, Iscon-Ambli Road, Mandir, YMCA
+  Other Details: Road Widths: ["100' WIDE ROAD", "400' WIDE ROAD", '84 MT WIDE STATE HIGHWAY'], Source File: Brochure 17.json, Has Commercial Shops: 1, Ingested At: 2026-03-12T17:27:21Z
+  [Source: both]
+
+[7] PROJECT: NIVAAN GREENS
+  Developer: Unknown Developer
+  Location: Isanpur, Ahmedabad
+  Society Features: Clubhouse, Park/Garden, Parking
+  Society Description: Nivaan Greens offers 4 BHK bungalows in the peaceful and developed area of Isanpur, Ahmedabad. The society emphasizes spacious living, comfort, and a serene environment, featuring lush gardens, a children's play area, a jogging track, and a clubhouse. The layout includes wide internal roads and individual parking for each bungalow, reflecting a modern architectural style designed for a luxurious and satisfying lifestyle.
+  Units:
+    - 4 BHK Bungalow F Type (VILLA)
+      Description: A spacious 4 BHK bungalow with a ground, first, and second floor layout. This F Type unit features a dedicated puja room, multiple balconies, and a large open terrace on the second floor, offering ample living space and outdoor areas for a comfortable lifestyle.
+      Rooms: Hall (15'-4½" x 11'-4", 173.8 sqft); Kitchen (8'-0" x 10'-0", 80.0 sqft); Dining (10'-0" x 8'-2", 81.7 sqft); Toilet (4'-0" x 8'-2", 32.7 sqft); Balcony (4'-4½" x 6'-0", 26.0 sqft); Bedroom (11'-0" x 10'-0", 110.0 sqft); Toilet (6'-4½" x 6'-0", 38.0 sqft); Bedroom (13'-0" x 10'-0", 130.0 sqft); Balcony (6'-4½" x 4'-4½", 27.4 sqft); Pooja Room (5'-0" x 8'-3", 41.2 sqft); Lobby; Bedroom (10'-0" x 11'-3", 112.5 sqft); Toilet (5'-0" x 7'-0", 35.0 sqft); Store Room (5'-0" x 8'-3", 41.2 sqft); Balcony (5'-4½" x 4'-7½", 24.4 sqft); Terrace
+    - 4 BHK Bungalow C Type (VILLA)
+      Description: A contemporary 4 BHK bungalow spread across three levels, the C Type unit features an open-concept drawing/dining area, a well-appointed kitchen, and multiple bedrooms with attached balconies. The design includes a dedicated puja space and a large open terrace for leisure and outdoor enjoyment.
+      Rooms: Bedroom (11'-4½" x 10'-3", 116.2 sqft); Kitchen (8'-0" x 10'-3", 82.0 sqft); Hall (10'-0" x 19'-0", 190.0 sqft); Toilet (4'-0" x 8'-3", 33.0 sqft); Balcony (7'-6" x 3'-6", 26.2 sqft); Bedroom (12'-9" x 10'-3", 130.7 sqft); Balcony (6'-7½" x 5'-1½", 33.5 sqft); Toilet (5'-0" x 8'-0", 40.0 sqft); Bedroom (10'-0" x 12'-6", 125.0 sqft); Balcony (5'-4½" x 4'-10½", 25.8 sqft); Pooja Room (5'-7½" x 8'-3", 46.1 sqft); Lobby; Bedroom (12'-9" x 10'-3", 130.7 sqft); Balcony (6'-7½" x 5'-1½", 33.5 sqft); Toilet (6'-7½" x 5'-6", 36.2 sqft); Store Room (5'-7½" x 8'-3", 46.1 sqft); Terrace
+  Amenities: Garden, Security Cabin, Clubhouse, Jogging Track, Parking Area, Children's Play Area, Senior Citizen Seating, Water Borewell, Overhead Water Tank, Municipal Water Supply, Auto Timer Street Lights, RCC Roads, Common Plots
+  Nearby: PD Pandya College, Smruti Mandir, Hanumanji & Sitaram Mandir, Saurabh School, AMC School, Gebanshah Bus Stop, AMC Garden, Shriji Corner, Partheshwar Mahadev, Umiya Dham
+  Other Details: Total Villas: 78, Road Widths: ['12 mt. wide road', '24\'-7½" wide road'], Ingested At: 2026-03-12T17:27:39Z, Source File: Brochure 18.json
+  [Source: both]
+
+[8] PROJECT: Devnandan Sankalp City
+  Developer: Unknown Developer
+  Location: Naroda, Ahmedabad
+  Address: Opp. 108 Institute, Hanspura Road, Nr. 200' FT. Ring Road, Naroda, Ahmedabad
+  Society Features: Park/Garden, Parking
+  Society Description: Devnandan Sankalp City offers affordable apartments in a modern residential complex. It features extensive architectural design, unique elevation, and a superb layout, creating a paradise-like living environment. The society emphasizes quality construction and includes landscaped gardens and ample parking.
+  Units:
+    - 1 BHK (Blocks A, B, C, D, O, P, Q) (APARTMENT)
+      Description: A compact 1 BHK apartment featuring a combined drawing room, a single bedroom, a kitchen, and a common toilet, designed for efficient living with a connected balcony and wash area.
+      Rooms: Hall (10'-0" x 16'-0", 160.0 sqft); Bedroom (10'-0" x 10'-0", 100.0 sqft); Kitchen (7'-0" x 7'-0", 49.0 sqft); Toilet (4'-0" x 6'-3", 25.0 sqft); Balcony (5'-0" x 6'-3", 31.25 sqft); Wash Area (6'-3" x 2'-6", 15.625 sqft)
+    - 1 BHK (Blocks E, F, G, H, K, L, M, N, R) (APARTMENT)
+      Description: A well-designed 1 BHK apartment featuring a spacious drawing room, a comfortable bedroom, a functional kitchen, and a common toilet, offering a practical living space with a connected balcony and wash area.
+      Rooms: Hall (10'-6" x 16'-0", 168.0 sqft); Bedroom (10'-0" x 10'-0", 100.0 sqft); Kitchen (7'-0" x 7'-0", 49.0 sqft); Toilet (4'-0" x 6'-3", 25.0 sqft); Balcony (5'-0" x 6'-3", 31.25 sqft); Wash Area (6'-3" x 2'-6", 15.625 sqft)
+    - 2 BHK (Blocks S, T, U, V, W, X, Y, Z, I, J) (APARTMENT)
+      Description: A spacious 2 BHK apartment featuring a combined drawing and dining area, two comfortable bedrooms, a well-appointed kitchen, and two common toilets, offering ample space for families with a connected balcony and wash area.
+      Rooms: Hall (11'-0" x 18'-9", 206.25 sqft); Bedroom (11'-0" x 10'-0", 110.0 sqft); Bedroom (10'-0" x 10'-0", 100.0 sqft); Kitchen (7'-0" x 10'-0", 70.0 sqft); Toilet 1 (4'-0" x 6'-3", 25.0 sqft); Toilet 2 (4'-0" x 6'-3", 25.0 sqft); Balcony (5'-0" x 6'-3", 31.25 sqft); Wash Area (6'-3" x 2'-6", 15.625 sqft); Passage
+  Amenities: Lifts, Landscaped Garden, Parking Area, Attractive Entrance Gate, Quality Construction
+  Nearby: 108 Institute, 200' FT. Ring Road
+  Other Details: Building Names: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'], Ingested At: 2026-03-12T17:27:39Z, Total Buildings: 26, Source File: Brochure 19.json
+  [Source: graph]
+
+[9] PROJECT: Swastik Harmony
+  Developer: Swastik
+  Location: New Nikol - Naroda Road, Ahmedabad
+  Address: Opp. Galaxy Banglow, B/h A.M.C. Water Works, Nr. Haridarsan Cross Road, New Nikol - Naroda Road, Ahmedabad
+  Society Features: Clubhouse, Swimming Pool, Park/Garden, Parking
+  Society Description: Swastik Harmony is a modern residential complex featuring three distinct apartment blocks: Saumya, Manoramya, and Ananya. The layout emphasizes community living with dedicated spaces for children's play, a senior citizen area, a swimming pool, and a clubhouse with a gym. Lush green spaces, a party lawn, and a jogging track contribute to a vibrant and active lifestyle, all accessible via well-maintained driveways and a wide main road.
+  Units:
+    - 3BHK (APARTMENT) | Facing: East
+      Description: This spacious 3BHK apartment offers a comfortable living experience with a large hall, separate dining area, and three bedrooms. It features a master bedroom with an attached dressing room and toilet, a second bedroom also with an attached dressing room and toilet, and a dedicated pooja room. Two balconies provide outdoor space and natural light.
+      Rooms: Lobby (6'0" x 6'0", 36.0 sqft); Hall (20'0" x 11'6", 230.0 sqft); Store Room (6'0" x 6'0", 36.0 sqft); Kitchen (10'7" x 10'0", 105.8 sqft); Dining (12'0" x 11'5", 137.0 sqft); Wash Area (5'5" x 9'2", 49.7 sqft); Toilet (6'0" x 4'0", 24.0 sqft); Master Bedroom (11'3" x 14'0", 157.5 sqft) with attached bath; Dressing Room (5'0" x 10'0", 50.0 sqft); Bedroom (11'6" x 14'0", 161.0 sqft) with attached bath; Balcony (5'0" x 14'9", 73.8 sqft); Dressing Room (11'0" x 5'0", 55.0 sqft); Bedroom (13'0" x 10'0", 130.0 sqft); Pooja Room (2'9" x 6'3", 17.2 sqft); Balcony (11'10" x 6'6", 76.9 sqft)
+    - 4BHK (APARTMENT) | Facing: East
+      Description: An expansive 4BHK apartment designed for luxurious living, featuring a grand hall, separate dining area, and four generously sized bedrooms. This unit includes multiple attached dressing rooms and toilets for enhanced privacy, a dedicated pooja room, and three balconies, ensuring ample natural light and outdoor views.
+      Rooms: Lobby (5'6" x 6'0", 33.0 sqft); Hall (21'0" x 12'0", 252.0 sqft); Store Room (5'6" x 6'0", 33.0 sqft); Kitchen (10'0" x 10'0", 100.0 sqft); Dining (10'2" x 10'5", 105.9 sqft); Wash Area (10'0" x 6'5", 64.2 sqft); Toilet (4'0" x 6'0", 24.0 sqft); Bedroom (10'0" x 11'3", 112.5 sqft); Bedroom (12'0" x 14'6", 174.0 sqft) with attached bath; Balcony (12'9" x 5'0", 63.8 sqft); Dressing Room (7'0" x 9'7", 67.1 sqft); Dressing Room (7'0" x 9'7", 67.1 sqft); Master Bedroom (15'5" x 11'0", 169.6 sqft) with attached bath; Bedroom (10'0" x 14'6", 145.0 sqft) with attached bath; Balcony (5'5" x 6'8", 36.1 sqft); Toilet (5'0" x 7'6", 37.5 sqft); Pooja Room (4'3" x 6'9", 28.7 sqft); Balcony (12'9" x 6'0", 76.5 sqft)
+  Amenities: Children Play Area, Swimming Pool, Gym, Clubhouse, Jogging Track, Parking, Senior Citizen Theatre, Club House, Party Lawn, Park/Garden
+  Nearby: Sardar Patel Ring Road, Divine School, Devasiya School, 108 EMRI, Kunj Mall
+  Other Details: Building Names: ['SAUMYA', 'MANORAMYA', 'ANANYA'], Road Widths: ['15.00 MT. WIDE T.P. ROAD'], Total Buildings: 3, Source File: Brochure 9.json, Ingested At: 2026-03-12T17:27:39Z
+  [Source: graph]
+
+[10] PROJECT: OUM ORBIT
+  Developer: Shanti Infrastructure
+  Location: Vinzol, Ahmedabad
+  Address: Towards 200 ft. S.P.Ring Road, Opp. Karnavati APMC Market, Behind MADHAV school, Ropda Cross Road, Vinzol, Ahmedabad.
+  Society Features: Clubhouse, Park/Garden, Parking
+  Society Description: Oum Orbit homes offers the best of the amenities with an affordable rates that is very rare to find in a 2 BHK contemporary apartments, in other words it's simply affordable. These apartments elevates your lifestyle and takes you one step further towards the idea of comfortable, spacious & luxurious living
+  Units:
+    - 2 BHK (108 Sq. Yard) (APARTMENT) / 972.0 sqft carpet
+      Rooms: Bedroom (10'0" x 10'0", 100.0 sqft); Toilet (3'9" x 5'6", 20.63 sqft); Bedroom (9'6" x 12'0", 114.0 sqft); Toilet (3'9" x 6'0", 22.5 sqft); Kitchen (6'0" x 7'7", 45.5 sqft); Wash Area (6'5" x 4'5", 28.54 sqft); Hall (13'0" x 11'0", 143.0 sqft); Balcony (3'0" x 5'6", 16.5 sqft)
+    - 2 BHK (109 Sq. Yard) (APARTMENT) / 981.0 sqft carpet
+      Rooms: Bedroom (10'0" x 12'0", 120.0 sqft); Toilet (3'9" x 6'0", 22.5 sqft); Bedroom (9'6" x 12'0", 114.0 sqft); Toilet (3'9" x 5'6", 20.63 sqft); Kitchen (6'0" x 7'7", 45.5 sqft); Wash Area (6'5" x 4'5", 28.54 sqft); Hall (13'0" x 10'0", 130.0 sqft); Balcony (3'0" x 5'6", 16.5 sqft)
+    - 2 BHK (110 Sq. Yard) (APARTMENT) / 990.0 sqft carpet
+      Rooms: Bedroom (10'6" x 12'0", 126.0 sqft); Toilet (3'9" x 5'6", 20.63 sqft); Bedroom (9'6" x 12'0", 114.0 sqft); Toilet (3'9" x 6'0", 22.5 sqft); Kitchen (6'0" x 7'7", 45.5 sqft); Wash Area (6'5" x 4'5", 28.54 sqft); Hall (13'0" x 10'0", 130.0 sqft); Balcony (3'0" x 5'6", 16.5 sqft)
+    - 2 BHK (113 Sq. Yard) (APARTMENT) / 1017.0 sqft carpet
+      Rooms: Bedroom (12'0" x 10'0", 120.0 sqft); Toilet (6'0" x 3'9", 22.5 sqft); Bedroom (12'0" x 10'6", 126.0 sqft); Toilet (5'6" x 3'9", 20.63 sqft); Kitchen (7'7" x 6'0", 45.5 sqft); Wash Area (4'5" x 6'5", 28.54 sqft); Hall (10'0" x 13'6", 135.0 sqft); Balcony (5'6" x 3'0", 16.5 sqft)
+    - 2 BHK (117 Sq. Yard) (APARTMENT) / 1053.0 sqft carpet
+      Rooms: Bedroom (10'9" x 11'9", 126.56 sqft) with attached bath; Toilet (6'0" x 5'0", 30.0 sqft); Bedroom (9'6" x 12'0", 114.0 sqft); Toilet (6'0" x 5'0", 30.0 sqft); Kitchen (6'0" x 7'7", 45.5 sqft); Wash Area (6'5" x 4'5", 28.54 sqft); Hall (14'5" x 10'0", 144.17 sqft); Balcony (3'0" x 5'6", 16.5 sqft)
+    - 2 BHK (119 Sq. Yard) (APARTMENT) / 1071.0 sqft carpet
+      Rooms: Bedroom (12'0" x 10'0", 120.0 sqft); Toilet (5'0" x 6'0", 30.0 sqft); Bedroom (12'0" x 10'6", 126.0 sqft); Toilet (5'0" x 6'0", 30.0 sqft); Kitchen (7'7" x 6'0", 45.5 sqft); Wash Area (4'5" x 6'5", 28.54 sqft); Hall (10'0" x 13'6", 135.0 sqft); Balcony (5'6" x 3'0", 16.5 sqft)
+    - 2 BHK (123 Sq. Yard) (APARTMENT) / 1107.0 sqft carpet
+      Rooms: Bedroom (13'0" x 10'0", 130.0 sqft); Toilet (6'0" x 3'9", 22.5 sqft); Bedroom (10'0" x 11'0", 110.0 sqft); Toilet (3'9" x 6'8", 25.0 sqft); Kitchen (7'0" x 9'0", 63.0 sqft); Wash Area (4'0" x 7'6", 30.0 sqft); Hall (14'9" x 10'0", 147.5 sqft); Balcony (3'10" x 5'0", 19.17 sqft)
+    - 2 BHK (124 Sq. Yard) (APARTMENT) / 1116.0 sqft carpet
+      Rooms: Bedroom (13'0" x 10'0", 130.0 sqft); Toilet (6'0" x 3'9", 22.5 sqft); Bedroom (10'0" x 12'0", 120.0 sqft); Toilet (3'9" x 6'7.5", 24.84 sqft); Kitchen (7'0" x 9'0", 63.0 sqft); Wash Area (4'0" x 7'6", 30.0 sqft); Hall (15'4" x 10'0", 153.33 sqft); Balcony (3'10" x 5'0", 19.17 sqft)
+    - 2 BHK (128 Sq. Yard) (APARTMENT) / 1152.0 sqft carpet
+      Rooms: Bedroom (13'0" x 10'0", 130.0 sqft); Toilet (5'4" x 6'0", 32.0 sqft); Bedroom (10'10.5" x 10'0", 108.75 sqft); Toilet (5'4" x 5'6", 29.33 sqft); Kitchen (7'0" x 9'0", 63.0 sqft); Wash Area (4'0" x 7'6", 30.0 sqft); Hall (16'0" x 10'0", 160.0 sqft); Balcony (3'10" x 5'0", 19.17 sqft)
+  Amenities: CHILDREN PLAY AREA, Clubhouse, Parking, GYM, LIBRARY, JOGGING TRACK, SENIOR CITIZEN PARK, GARDEN & FOUNTAIN, CHESS, CAROM BOARD, CARD TABLE, CLUB HOUSE
+  Nearby: Sardar Patel Ring Road, Hathijin Circle, Railway Over Bridge, Karnavati APMC Market, Madhav School, Ropda Cross Road, Gamdi Cross Road, Aslali Circle, Narol Circle
+  Other Details: Building Names: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K'], Road Widths: ["25' WIDE SOCIETY ROAD", "60' Road"], Total Buildings: 11, Source File: Brochure4.json, Ingested At: 2026-03-12T17:27:45Z
+  [Source: graph]
+
+[11] PROJECT: K.P. Villas
+  Developer: KP SANGHVI
+  Location: Gokuldham, Ahmedabad
+  Society Features: Clubhouse, Park/Garden, Parking, Sports Courts
+  Society Description: K.P. Villa is a unique endeavor to offer a solution to anyone who is looking for a modern living, smart space planning, sensitivity to climate and solid looks. These modern homes personify elegance and clustered away from the main road, thereby offering ultimate serenity maintaining excellent connectivity with outside. These luxurious villas make bold architectural statement as they stand on the main road with confidence. The outwardly tough looking house has a soft inside the unique Courtyard that offers a private open space a design master stroke that is a sensible climatic response to the harsh Ahmedabad sun.
+  Units:
+    - Villa Serene Variant 1A (VILLA) 918.0 sqft super built-up | Facing: North
+      Description: This Villa has been planned for Mr. & Mrs. Shah who are looking for a house that offers bigger spaces within a relatively small construction area. They need a room for their aging parents on the ground floor, a room for their lovely daughters Rupal (8 years old) and Meghna (13 years old). Meghna is fond of gardening and she is longing to have her personal garden. Mrs. Shah's parents visits them often and she wants a guest room that is delightful and complete with an exclusive dressing area and lavish bathroom.
+      Rooms: Hall (10'0" x 16'0", 160.0 sqft); Dining (10'0" x 10'0", 100.0 sqft); Kitchen (10'0" x 8'0", 80.0 sqft); Bedroom (10'0" x 12'0", 120.0 sqft) with attached bath; Toilet (5'0" x 8'0", 40.0 sqft); Pooja Room (5'0" x 4'0", 20.0 sqft); Wash Area (5'0" x 4'0", 20.0 sqft); Store Room (5'0" x 4'0", 20.0 sqft); Lobby; Courtyard; Master Bedroom (10'0" x 16'0", 160.0 sqft) with attached bath; Toilet (5'0" x 8'0", 40.0 sqft); Bedroom (10'0" x 12'0", 120.0 sqft) with attached bath; Toilet (5'0" x 8'0", 40.0 sqft); Dressing Room (5'0" x 4'0", 20.0 sqft); Passage; Terrace; Bedroom (10'0" x 12'0", 120.0 sqft) with attached bath; Toilet (5'0" x 8'0", 40.0 sqft); Dressing Room (5'0" x 4'0", 20.0 sqft); Passage; Terrace
+    - Villa Serene Variant 1B (VILLA) 3888.0 sqft super built-up | Facing: North
+      Description: This Villa has been planned on insistence of Mr. Agrawal, who has a fairly large family with her sister also staying with him. He would not settle for anything less than a 3 bedroom house, however without making it large. His parents prefer a bedroom on the ground floor, where as the two little kids Siddharth (4 years old) and Shreya (7 years old) would love to play their Play Station in the necessary family room. The sister would occupy the bedroom on the terrace that looks into terrace garden on both sides of the bedroom.
+      Rooms: Hall (10'0" x 16'0", 160.0 sqft); Dining (10'0" x 10'0", 100.0 sqft); Kitchen (10'0" x 8'0", 80.0 sqft); Bedroom (10'0" x 12'0", 120.0 sqft) with attached bath; Toilet (5'0" x 8'0", 40.0 sqft); Pooja Room (5'0" x 4'0", 20.0 sqft); Wash Area (5'0" x 4'0", 20.0 sqft); Store Room (5'0" x 4'0", 20.0 sqft); Lobby; Courtyard; Master Bedroom (10'0" x 16'0", 160.0 sqft) with attached bath; Toilet (5'0" x 8'0", 40.0 sqft); Bedroom (10'0" x 12'0", 120.0 sqft) with attached bath; Toilet (5'0" x 8'0", 40.0 sqft); Dressing Room (5'0" x 4'0", 20.0 sqft); Passage; Hall (10'0" x 16'0", 160.0 sqft); Terrace; Bedroom (10'0" x 12'0", 120.0 sqft) with attached bath; Toilet (5'0" x 8'0", 40.0 sqft); Dressing Room (5'0" x 4'0", 20.0 sqft); Passage; Terrace
+    - Villa Serene Variant 1C (VILLA) 3888.0 sqft super built-up | Facing: North
+      Description: This Villa has been designed for a couple Mr. & Mrs. Desai, in their middle age and have made a quiet fortune in Ahmedabad through their hard work and persistence. They want a house that is not too big but should have a spacious bed room with lot of wardrobe space, dressing area and a lavish bathroom with it. The younger son has just started his engineering and wants to spend time with their parents before he goes abroad for his post graduation studies. The parent room at the ground floor would be necessary for the parents if the couple can not climb at times.
+      Rooms: Hall; Dining; Kitchen; Bedroom with attached bath; Toilet; Pooja Room; Wash Area; Store Room; Lobby; Courtyard; Master Bedroom with attached bath; Toilet; Bedroom with attached bath; Toilet; Dressing Room; Passage; Hall; Terrace; Bedroom with attached bath; Toilet; Dressing Room; Passage; Terrace
+    - Villa Serene Variant 1D (VILLA) 3888.0 sqft super built-up | Facing: North
+      Description: This Villa has been designed for all the families like that of Mr. Sharma who really want to enjoy various pleasures the world has to offer. He wants a home which offers a large guest room for her old mother, a great home theatre for watching all his Big B films, a spacious library and study room for his wife and his 9 year old twins Sapna and Shekhar, to have a great time together reading and surfing on the internet.
+      Rooms: Hall (10'0" x 16'0", 160.0 sqft); Dining (10'0" x 10'0", 100.0 sqft); Kitchen (10'0" x 8'0", 80.0 sqft); Bedroom (10'0" x 12'0", 120.0 sqft) with attached bath; Toilet (5'0" x 8'0", 40.0 sqft); Pooja Room (5'0" x 4'0", 20.0 sqft); Wash Area (5'0" x 4'0", 20.0 sqft); Store Room (5'0" x 4'0", 20.0 sqft); Lobby; Courtyard; Master Bedroom (10'0" x 16'0", 160.0 sqft) with attached bath; Toilet (5'0" x 8'0", 40.0 sqft); Bedroom (10'0" x 12'0", 120.0 sqft) with attached bath; Toilet (5'0" x 8'0", 40.0 sqft); Dressing Room (5'0" x 4'0", 20.0 sqft); Passage; Study Room (10'0" x 16'0", 160.0 sqft); Terrace; Bedroom (10'0" x 12'0", 120.0 sqft) with attached bath; Toilet (5'0" x 8'0", 40.0 sqft); Dressing Room (5'0" x 4'0", 20.0 sqft); Passage; Home Theatre (10'0" x 16'0", 160.0 sqft); Terrace
+    - Villa Serene Variant 1E (VILLA) 3888.0 sqft super built-up | Facing: North
+      Description: This Villa has been specially designed for the Kapoors who stand for all the happy upwardly mobile and health conscious families. This 4 Bedroom house has a well designed Home Theatre and a Home Gym to meet the demands of their two teenage sons Mokul (16 years old & Kapil (19 years old). The well planned house offers adequate sized rooms to take care of the growing individual and family needs.
+      Rooms: Hall (10'0" x 16'0", 160.0 sqft); Dining (10'0" x 10'0", 100.0 sqft); Kitchen (10'0" x 8'0", 80.0 sqft); Bedroom (10'0" x 12'0", 120.0 sqft) with attached bath; Toilet (5'0" x 8'0", 40.0 sqft); Pooja Room (5'0" x 4'0", 20.0 sqft); Wash Area (5'0" x 4'0", 20.0 sqft); Store Room (5'0" x 4'0", 20.0 sqft); Lobby; Courtyard; Master Bedroom (10'0" x 16'0", 160.0 sqft) with attached bath; Toilet (5'0" x 8'0", 40.0 sqft); Bedroom (10'0" x 12'0", 120.0 sqft) with attached bath; Toilet (5'0" x 8'0", 40.0 sqft); Dressing Room (5'0" x 4'0", 20.0 sqft); Passage; Home Theatre (10'0" x 16'0", 160.0 sqft); Terrace; Bedroom (10'0" x 12'0", 120.0 sqft) with attached bath; Toilet (5'0" x 8'0", 40.0 sqft); Dressing Room (5'0" x 4'0", 20.0 sqft); Passage; Gym (10'0" x 16'0", 160.0 sqft); Terrace
+    - Villa Serene Variant 1F (VILLA) 3888.0 sqft super built-up | Facing: North
+      Description: This Villa has been designed for the families of two enterprising brothers Mr. Anurag Patel & Mr. Samant Patel who hold the family values at very high esteem. Both of them are blessed with a beautiful daughter and share a hobby of watching cricket matches. The well designed Home Theatre room is designed just for the ultimate cricketing experience. At times, the families have different visitors that need to be attended to in different spaces. This shall be catered by the extra living room / family room at the first floor and the large living room at the ground floor.
+      Rooms: Hall (10'0" x 16'0", 160.0 sqft); Dining (10'0" x 10'0", 100.0 sqft); Kitchen (10'0" x 8'0", 80.0 sqft); Bedroom (10'0" x 12'0", 120.0 sqft) with attached bath; Toilet (5'0" x 8'0", 40.0 sqft); Pooja Room (5'0" x 4'0", 20.0 sqft); Wash Area (5'0" x 4'0", 20.0 sqft); Store Room (5'0" x 4'0", 20.0 sqft); Lobby; Courtyard; Master Bedroom (10'0" x 16'0", 160.0 sqft) with attached bath; Toilet (5'0" x 8'0", 40.0 sqft); Bedroom (10'0" x 12'0", 120.0 sqft) with attached bath; Toilet (5'0" x 8'0", 40.0 sqft); Dressing Room (5'0" x 4'0", 20.0 sqft); Passage; Hall (10'0" x 16'0", 160.0 sqft); Terrace; Bedroom (10'0" x 12'0", 120.0 sqft) with attached bath; Toilet (5'0" x 8'0", 40.0 sqft); Dressing Room (5'0" x 4'0", 20.0 sqft); Passage; Home Theatre (10'0" x 16'0", 160.0 sqft); Terrace
+    - Villa Exotica (VILLA) 6363.0 sqft super built-up | Facing: North
+      Description: If you have it, flaunt it! These luxurious villas make bold architectural statement as they stand on the main road with confidence. The outwardly tough looking house has a soft inside the unique Courtyard that offers a private open space a design master stroke that is a sensible climatic response to the harsh Ahmedabad sun. The villa offers 5 bedrooms - each with a dedicated dressing area and attached bathroom. The huge garden in the front allows you to stand on the road and reconfirm how correct you decision has been.
+      Rooms: Hall (15'0" x 18'0", 270.0 sqft); Dining (15'0" x 12'0", 180.0 sqft); Kitchen (10'0" x 12'0", 120.0 sqft); Master Bedroom (12'0" x 15'0", 180.0 sqft) with attached bath; Toilet (5'0" x 8'0", 40.0 sqft); Pooja Room (5'0" x 4'0", 20.0 sqft); Wash Area (5'0" x 4'0", 20.0 sqft); Store Room (5'0" x 4'0", 20.0 sqft); Lobby; Courtyard; Master Bedroom (12'0" x 15'0", 180.0 sqft) with attached bath; Toilet (5'0" x 8'0", 40.0 sqft); Bedroom (12'0" x 15'0", 180.0 sqft) with attached bath; Toilet (5'0" x 8'0", 40.0 sqft); Dressing Room (5'0" x 4'0", 20.0 sqft); Passage; Terrace; Bedroom (12'0" x 15'0", 180.0 sqft) with attached bath; Toilet (5'0" x 8'0", 40.0 sqft); Bedroom (12'0" x 15'0", 180.0 sqft) with attached bath; Toilet (5'0" x 8'0", 40.0 sqft); Dressing Room (5'0" x 4'0", 20.0 sqft); Passage; Terrace
+  Amenities: Clubhouse, Garden / Park, Sports Courts, Parking, Exclusively gated community with hi-tech security system, Well planned site layout with prominent location of the COP, All internal roads of RCC and Payer Blocks with adequate & attractive street lighting, Abundant greenery all over the site with the highlight being the huge COP right at the entrance, A Celebration lounge spilling over the COP lawns, Indoor Sports Room, Gymnasium and Health Club, A netted sports zone for outdoor sports like volleyball, cricket and basket ball avoiding nuisance to the residents, A well-equipped children play zone, Jogging track amidst the exclusively landscaped COP, Power backup facility for all common amenities, A Grand Dehraser Complex with Upashray & Bhojanshala
+  Nearby: NAUFATH COLLEGE, ISKCON TEMPLE, BIG BAZZAR, FUN REPUBLIC, KARNAWATI CLUB, PRAHLADNAGAR CROSSROADS, SAFAL PROFITAIRE, NIRMA UNIVERSITY, SAFAL CAMPUS, ESLAVON SCHOOL
+  Other Details: Total Villas: 91, Road Widths: ['7.50 MT. WIDE ROAD', '9.00 MT. WIDE ROAD', '13.50 MT. WIDE ROAD'], Source File: KP_Villa Bochure.json, Has Commercial Shops: 0, Ingested At: 2026-03-12T17:27:47Z
+  [Source: graph]
+
+[12] PROJECT: SATYAMEV ELYSIUM
+  Developer: Satyamev DEVELOPERS
+  Location: Science City Road, Ahmedabad
+  Address: Nr. Shukan Palace Bunglows, Opp. Ugati Lake View, Science City Road, Ahmedabad.
+  Society Features: Clubhouse, Park/Garden, Parking, Sports Courts
+  Society Description: Satyamev Elysium offers a serene and elevated living experience, where residents can enjoy the chirps of sparrows and the sight of birds returning to their nests, with the sky feeling close and blue. It is designed to foster a community where families prosper, featuring lush landscapes, ample parking, and robust security. The architectural style emphasizes elevated dreams and a peaceful environment, providing a pure and true home made of love and magic dreams, with modern amenities for all ages.
+  Units:
+    - 4 BHK UNIT-101 (APARTMENT) | Facing: West
+      Description: A spacious 4 BHK apartment featuring a dedicated waiting area, a large drawing room, and separate living and dining spaces. It includes a puja room, a well-appointed kitchen with a store and wash yard, and four bedrooms, each with attached toilets, and a master bedroom with a dressing area.
+      Rooms: Waiting (5'9" x 9'6", 54.6 sqft); Hall (12'0" x 20'0", 240.0 sqft); Toilet (7'0" x 5'0", 35.0 sqft); Bedroom (11'6" x 11'0", 126.5 sqft); Dining (10'6" x 12'0", 126.0 sqft); Hall (11'6" x 19'0", 218.5 sqft); Balcony (9'9" x 9'0", 87.8 sqft); Pooja Room (5'6" x 3'9", 20.6 sqft); Kitchen (10'0" x 11'6", 115.0 sqft); Store Room (5'6" x 4'0", 22.0 sqft); Wash Area (10'0" x 4'9", 47.5 sqft); Bedroom (11'0" x 14'0", 154.0 sqft) with attached bath; Toilet (8'0" x 7'0", 56.0 sqft); Bedroom (12'0" x 16'0", 192.0 sqft) with attached bath; Balcony (9'0" x 5'0", 45.0 sqft); Toilet (8'0" x 5'6", 44.0 sqft); Master Bedroom (12'0" x 17'0", 204.0 sqft) with attached bath; Dressing Room (5'6" x 13'0", 71.5 sqft); Toilet (5'6" x 13'0", 71.5 sqft)
+    - 4 BHK UNIT-102 (APARTMENT) | Facing: East
+      Description: A well-designed 4 BHK apartment featuring a welcoming waiting area, a spacious drawing room, and distinct dining and living spaces. It includes a puja room, a functional kitchen with a store and wash yard, and four comfortable bedrooms, each with an attached toilet, and a master bedroom with a dressing area.
+      Rooms: Waiting (5'9" x 9'6", 54.6 sqft); Hall (12'0" x 20'0", 240.0 sqft); Toilet (6'9" x 5'3", 35.4 sqft); Bedroom (10'0" x 13'6", 135.0 sqft); Dining (10'6" x 12'0", 126.0 sqft); Hall (11'6" x 19'0", 218.5 sqft); Balcony (9'9" x 9'0", 87.8 sqft); Pooja Room (5'6" x 3'9", 20.6 sqft); Kitchen (10'0" x 11'6", 115.0 sqft); Store Room (5'6" x 8'0", 44.0 sqft); Wash Area (5'0" x 8'0", 40.0 sqft); Bedroom (11'0" x 14'0", 154.0 sqft) with attached bath; Toilet (5'0" x 8'0", 40.0 sqft); Bedroom (12'0" x 16'0", 192.0 sqft) with attached bath; Toilet (8'0" x 5'6", 44.0 sqft); Master Bedroom (12'0" x 17'0", 204.0 sqft) with attached bath; Dressing Room (5'6" x 13'0", 71.5 sqft); Toilet (5'6" x 13'0", 71.5 sqft)
+    - 4 BHK UNIT-103 (APARTMENT) | Facing: East
+      Description: A contemporary 4 BHK apartment featuring a compact waiting area, a large drawing room, and an open-concept dining and living space. It includes a well-equipped kitchen with a store and wash yard, and four comfortable bedrooms, each with an attached toilet, and a master bedroom with a dressing area.
+      Rooms: Waiting (5'0" x 7'0", 35.0 sqft); Hall (19'6" x 12'0", 234.0 sqft); Toilet (4'6" x 6'9", 30.4 sqft); Bedroom (11'3" x 12'0", 135.0 sqft); Dining/Living (13'0" x 21'6", 279.5 sqft); Balcony (8'6" x 10'6", 89.2 sqft); Kitchen (11'6" x 10'0", 115.0 sqft); Store Room (6'6" x 5'0", 32.5 sqft); Wash Area (4'6" x 10'0", 45.0 sqft); Bedroom (16'0" x 12'0", 192.0 sqft) with attached bath; Toilet (9'0" x 5'0", 45.0 sqft); Bedroom (14'0" x 12'0", 168.0 sqft) with attached bath; Toilet (8'0" x 5'6", 44.0 sqft); Master Bedroom (17'0" x 12'0", 204.0 sqft) with attached bath; Dressing Room (11'9" x 5'6", 64.6 sqft); Toilet (11'9" x 5'6", 64.6 sqft)
+    - 5 BHK Penthouse UNIT-1301 (PENTHOUSE) | Facing: West
+      Description: An expansive 5 BHK penthouse duplex unit offering a luxurious living experience across two floors. The lower level features a waiting area, large drawing room, combined living/dining, a puja room, a well-equipped kitchen with store and wash yard, and four bedrooms, each with attached toilets. The upper level boasts a spacious lounge, an additional bedroom with attached dressing and toilet, a servant room with its own toilet, and an open terrace for outdoor enjoyment.
+      Rooms: Waiting (5'0" x 9'6", 47.5 sqft); Hall (12'0" x 20'0", 240.0 sqft); Toilet (7'0" x 5'0", 35.0 sqft); Bedroom (11'6" x 11'0", 126.5 sqft); Dining/Living (21'9" x 12'0", 261.0 sqft); Balcony (9'0" x 5'0", 45.0 sqft); Pooja Room (5'6" x 4'0", 22.0 sqft); Kitchen (10'0" x 11'6", 115.0 sqft); Store Room (5'6" x 4'0", 22.0 sqft); Wash Area (10'0" x 4'9", 47.5 sqft); Bedroom (11'0" x 14'0", 154.0 sqft) with attached bath; Toilet (8'0" x 7'0", 56.0 sqft); Bedroom (12'0" x 16'0", 192.0 sqft) with attached bath; Balcony (9'0" x 5'0", 45.0 sqft); Toilet (8'0" x 5'6", 44.0 sqft); Master Bedroom (12'0" x 17'0", 204.0 sqft) with attached bath; Dressing Room (5'6" x 13'0", 71.5 sqft); Toilet (5'6" x 13'0", 71.5 sqft); Hall (24'7½" x 13'0", 319.6 sqft); Bedroom (16'0" x 14'0", 224.0 sqft) with attached bath; Dressing Room (6'6" x 7'0", 45.5 sqft); Toilet (10'9" x 7'0", 75.2 sqft); Servant Room (11'6" x 6'6", 74.8 sqft); Toilet (6'0" x 4'0", 24.0 sqft); Terrace; Passage
+    - 5 BHK Penthouse UNIT-1302 (PENTHOUSE) | Facing: East
+      Description: A luxurious 5 BHK penthouse duplex unit spread across two floors, offering a grand living experience. The lower level features a welcoming waiting area, a spacious drawing room, combined living/dining, a puja room, a well-appointed kitchen with store and wash yard, and four bedrooms, each with attached toilets. The upper level includes a large lounge, an additional bedroom with attached dressing and toilet, a servant room with its own toilet, and an open terrace for relaxation.
+      Rooms: Waiting (5'9" x 9'6", 54.6 sqft); Hall (12'0" x 20'0", 240.0 sqft); Toilet (6'9" x 5'3", 35.4 sqft); Bedroom (10'0" x 13'6", 135.0 sqft); Dining/Living (21'9" x 12'0", 261.0 sqft); Balcony (21'6" x 9'0", 193.5 sqft); Pooja Room (5'6" x 3'9", 20.6 sqft); Kitchen (10'0" x 11'6", 115.0 sqft); Store Room (5'6" x 8'0", 44.0 sqft); Wash Area (5'0" x 8'0", 40.0 sqft); Bedroom (11'0" x 14'0", 154.0 sqft) with attached bath; Toilet (5'0" x 8'0", 40.0 sqft); Bedroom (12'0" x 16'0", 192.0 sqft) with attached bath; Toilet (8'0" x 5'6", 44.0 sqft); Master Bedroom (12'0" x 17'0", 204.0 sqft) with attached bath; Dressing Room (5'6" x 13'0", 71.5 sqft); Toilet (5'6" x 13'0", 71.5 sqft); Hall (26'7" x 11'6", 305.7 sqft); Bedroom (16'0" x 14'0", 224.0 sqft) with attached bath; Dressing Room (8'0" x 5'7½", 44.7 sqft); Toilet (9'4½" x 6'3", 58.3 sqft); Servant Room (10'0" x 8'7½", 85.8 sqft); Toilet (5'0" x 3'6", 17.5 sqft); Terrace; Passage
+    - 5 BHK Penthouse UNIT-1303 (PENTHOUSE) | Facing: East
+      Description: An elegant 5 BHK penthouse duplex unit spanning two floors, designed for sophisticated living. The lower level features a cozy waiting area, a grand drawing room, an integrated dining/living space, a well-appointed kitchen with store and wash yard, and four bedrooms, each with attached toilets. The upper level offers a comfortable lounge, an additional bedroom with attached dressing and toilet, a servant room with its own toilet, and an open terrace for outdoor leisure.
+      Rooms: Waiting (5'0" x 7'0", 35.0 sqft); Hall (19'6" x 12'0", 234.0 sqft); Toilet (4'6" x 6'9", 30.4 sqft); Bedroom (11'3" x 12'0", 135.0 sqft); Dining/Living (13'0" x 15'0", 195.0 sqft); Balcony (8'6" x 22'6", 191.2 sqft); Kitchen (11'6" x 10'0", 115.0 sqft); Store Room (6'6" x 5'0", 32.5 sqft); Wash Area (4'6" x 10'0", 45.0 sqft); Bedroom (16'0" x 12'0", 192.0 sqft) with attached bath; Toilet (9'0" x 5'0", 45.0 sqft); Bedroom (14'0" x 12'0", 168.0 sqft) with attached bath; Toilet (8'0" x 5'6", 44.0 sqft); Master Bedroom (17'0" x 12'0", 204.0 sqft) with attached bath; Dressing Room (11'9" x 5'6", 64.6 sqft); Toilet (11'9" x 5'6", 64.6 sqft); Hall (14'6" x 15'6", 224.8 sqft); Bedroom (21'6" x 12'0", 258.0 sqft) with attached bath; Dressing Room (5'6" x 6'7½", 36.2 sqft); Toilet (5'6" x 8'0", 44.0 sqft); Terrace (4'6" x 12'0", 54.0 sqft); Servant Room (11'6" x 7'7½", 87.2 sqft); Toilet (6'0" x 4'0", 24.0 sqft)
+  Amenities: Gym, Mini Theatre, Wi-Fi Spots, Kids Play Area, Tennis Court, Cricket Grounds, Senior Citizen Sitouts, Clubhouse, Indoor Games, Carrom, Cards, Garden / Park, Book Reading Zones, Pick and Drop Zone, Elegant Landscape, 2 Level Basement Parking, 5 AC Per Unit, Earthquake Resistant Construction, 3 Layer Security, CCTV Cameras, Intruder-Free System, Generator Provision, Sports Courts
+  Nearby: Science City, Science City Park, McDonald's, Ugati Lake View
+  Other Details: Building Names: ['101', '102', '103'], Road Widths: ["20' Wide Drive Way", "14' Wide Drive Way", '30.00 MT. WIDE ROAD'], Total Buildings: 3, Source File: Brochure 10.json, Ingested At: 2026-03-12T17:27:21Z
+  [Source: graph]
+
+[13] PROJECT: Sudama Homes
+  Developer: Shrinath Corporation
+  Location: Chiloda-Kotarpur, Ahmedabad
+  Address: Nr. Kotarpur Water Works, Nr. Nandigram Society, Airport Chiloda Road, Nana Chiloda, Ahmedabad.
+  Status: UNDER_CONSTRUCTION
+  Society Features: Park/Garden, Parking
+  Society Description: Sudama Homes offers a serene residential environment with well-planned bungalows in the Chiloda-Kotarpur area of Ahmedabad. The society features R.C.C. finished internal roads, adequate streetlights, paved footpaths, and a decorative main gate with a security cabin, ensuring a secure and pleasant living experience. Residents can enjoy a professionally designed central garden and reliable water supply from a bore-well and individual water tanks, fostering a comfortable and community-oriented lifestyle.
+  Units:
+    - TYPE A (VILLA) | Balcony: 46.0 sqft | Facing: East
+      Description: Type A villa presents a spacious four-bedroom layout across two floors, designed for comfortable family living. The ground floor features an expansive drawing room, a well-appointed kitchen, dining area, and two bedrooms, complemented by a private parking space and a welcoming verandah. The first floor offers two additional large bedrooms, a cozy lounge, and a generous open terrace, providing ample space for relaxation and outdoor activities.
+      Rooms: Bedroom (10'0 x 11'0, 110.0 sqft); Toilet (4'0 x 8'0, 32.0 sqft); Bedroom (11'0 x 11'0, 121.0 sqft); Toilet (6'0 x 4'0, 24.0 sqft); Dining (6'3 x 8'0, 50.66 sqft); Kitchen (10'4 x 11'0, 113.67 sqft); Hall (11'0 x 19'0, 209.0 sqft); Parking (11'0 x 14'8, 161.33 sqft); Balcony (11'1.5 x 5'7.5, 62.91 sqft); Open Terrace (14'8 x 11'0, 161.33 sqft); Hall (6'9 x 10'6, 71.06 sqft); Bedroom (11'0 x 14'0, 154.0 sqft); Toilet (6'0 x 4'0, 24.0 sqft); Bedroom (11'0 x 18'0, 198.0 sqft) with attached bath; Toilet (6'0 x 4'0, 24.0 sqft); Dressing Room (4'0 x 7'0, 28.0 sqft); Balcony (8'0 x 5'7.5, 46.0 sqft)
+    - TYPE B (VILLA) | Balcony: 18.0 sqft | Facing: East
+      Description: Type B villa offers a thoughtfully designed three-bedroom layout, perfect for modern families seeking both comfort and functionality. The ground floor includes a practical kitchen, dining area, a drawing room, and one bedroom, along with dedicated parking and a verandah. The first floor hosts two more comfortable bedrooms, a lounge area, and an open terrace, creating a balanced living space with options for indoor and outdoor enjoyment.
+      Rooms: Kitchen (8'8 x 12'0, 104.0 sqft); Bedroom (10'0 x 12'0, 120.0 sqft); Toilet (6'0 x 5'0, 30.0 sqft); Store Room; WC; Dining (6'0 x 7'6, 45.0 sqft); Hall (10'0 x 19'0, 190.0 sqft); Parking (10'4 x 14'0, 144.67 sqft); Balcony (5'0 x 7'0, 35.0 sqft); Open Terrace (8'8 x 12'0, 104.0 sqft); Hall (8'0 x 10'0, 80.0 sqft); Bedroom (10'0 x 14'0, 140.0 sqft); Toilet (6'0 x 4'0, 24.0 sqft); Bedroom (10'0 x 14'0, 140.0 sqft); Balcony (6'0 x 3'0, 18.0 sqft)
+    - TYPE C (VILLA) | Balcony: 22.0 sqft | Facing: East
+      Description: Type C villa provides a compact yet efficient three-bedroom layout, ideal for contemporary living. The ground floor features a functional kitchen, a combined drawing and dining area, and one bedroom, alongside a private parking space and a verandah. The first floor comprises two additional bedrooms, a comfortable lounge, and an open terrace, offering a well-utilized space for relaxation and daily activities.
+      Rooms: Kitchen (8'0 x 10'0, 80.0 sqft); Bedroom (10'0 x 11'0, 110.0 sqft); Toilet (6'0 x 4'0, 24.0 sqft); Toilet (4'5 x 5'0, 22.08 sqft); Hall (10'9 x 15'0, 161.25 sqft); Parking (8'4 x 14'0, 116.67 sqft); Balcony (10'9 x 5'0, 53.75 sqft); Terrace (8'0 x 7'9, 62.0 sqft); Hall (8'0 x 10'1.5, 81.0 sqft); Bedroom (10'0 x 13'0, 130.0 sqft); Bedroom (10'0 x 13'5, 134.17 sqft) with attached bath; Toilet (5'0 x 5'0, 25.0 sqft); Balcony (8'0 x 2'9, 22.0 sqft)
+  Amenities: Garden, Internal Roads, Streetlights, Security Cabin, Paved Footpaths, Main Gate, Bore-Well, Water Storage Tanks, Car Parking Area
+  Nearby: Kotarpur Water Works
+  Other Details: Road Widths: ['R.C.C. finished internal road'], Ingested At: 2026-03-12T17:27:21Z, Source File: Brochure 16.json
+  [Source: graph]
+
+[14] PROJECT: DWARKESH GREENS
+  Developer: Dharmnandan DEVELOPERS
+  Location: Thaltej, Ahmedabad
+  Address: Nr. Anand Niketan School, Opp. Venetian Villa Thaltej-Shilaj Road, Thaltej, Ahmedabad
+  Society Features: Park/Garden, Parking
+  Society Description: Dwarkesh Greens offers a nature-friendly and location-ideal living experience, providing homes that maintain a strong bond with nature. The society features modern architectural design, landscaped gardens, and is surrounded by full-grown trees, creating a serene and harmonious environment. It includes dedicated children's play areas and senior citizen sitting spaces, fostering a community-oriented lifestyle.
+  Units:
+    - 3 BHK Unit Plan Block A - B (APARTMENT) | Balcony: 52.08 sqft
+      Description: This 3 BHK apartment in Blocks A and B offers a well-designed layout with three comfortable bedrooms, a spacious living room, and a combined kitchen and dining area. It includes multiple toilets, a dedicated wash area, a store room, and a private balcony, providing a functional and relaxing living space.
+      Rooms: Bedroom (10'6" x 13'6", 141.75 sqft); Bedroom (10'8" x 11'6", 122.83 sqft); Bedroom (10'8" x 10'0", 106.67 sqft); Toilet (6'0" x 4'0", 24.0 sqft); Toilet (5'4" x 6'0", 32.0 sqft); Toilet (5'0" x 6'0", 30.0 sqft); Kitchen (15'5" x 10'0", 154.17 sqft); Dining (15'5" x 10'0", 154.17 sqft); Hall (17'0" x 10'5", 175.83 sqft); Balcony (5'0" x 10'5", 52.08 sqft); Wash Area (4'6" x 6'5", 28.87 sqft); Store Room (4'6" x 4'8", 21.0 sqft); Lobby (4'11" x 5'5", 26.69 sqft)
+    - 3 BHK Unit Plan Block C - D (APARTMENT) | Balcony: 53.75 sqft
+      Description: A thoughtfully planned 3 BHK apartment in Blocks C and D, featuring three bedrooms, a generous living room, and an integrated kitchen and dining space. The unit also includes multiple toilets, a wash area, a store room, and a private balcony, designed for comfortable and modern living.
+      Rooms: Bedroom (10'6" x 11'8", 122.5 sqft); Bedroom (10'0" x 10'9", 107.5 sqft); Bedroom (10'6" x 13'11", 146.46 sqft); Toilet (6'0" x 5'0", 30.0 sqft); Toilet (6'0" x 6'4", 38.0 sqft); Toilet (6'0" x 4'6", 27.0 sqft); Kitchen (10'0" x 14'11", 149.17 sqft); Dining (10'0" x 14'11", 149.17 sqft); Hall (10'5" x 16'6", 172.08 sqft); Balcony (10'9" x 5'0", 53.75 sqft); Wash Area (6'0" x 4'11", 29.5 sqft); Store Room (4'8" x 4'6", 21.0 sqft); Lobby (5'5" x 4'11", 26.69 sqft)
+  Amenities: CHILDREN PLAY AREA, SENIOR CITIZEN SITTING, DECORATIVE MAIN ENTRY, VIDEO DOOR PHONE, SECURITY CABIN, 24 HOUR WATER SUPPLY, Garden / Park, Multi apartment Security system, Central Satellite dish, 2 elevators, Allotted parking spaces per unit in basement and ground level, Designated waiting area for staff, Backup Generator for Lift and water Pumps
+  Nearby: Anand Niketan School, Murli Restaurant, Satya Vikas School, ISCON MEGA MALL, Nandigham Party Plot, Party Plot, AUDA Garden, Thaltej Village, Thaltej Lake, Gurudwara Acropolis
+  Other Details: Building Names: ['A', 'B', 'C', 'D'], Road Widths: ['60\'0" WIDE T. P. ROAD', '40\'0" WIDE T. P. ROAD'], Ingested At: 2026-03-12T17:27:21Z, Total Buildings: 4, Source File: Brochure 13.json
+  [Source: graph]
+
+[15] PROJECT: svasaar pravesh
+  Developer: Svasaar value builders
+  Location: Vatva, Ahmedabad
+  Units:
+    - 1 BHK (APARTMENT)
+    - 2 BHK (APARTMENT)
+  Amenities: Garden / Park, Parking
+  [Source: vector]
+
+[16] PROJECT: Sitaram City
+  Developer: Tulsidham Developers
+  Location: Vastral Road, Mahadevnagar Tekra, Ahmedabad
+  Units:
+    - 2 BHK (APARTMENT)
+    - 1 BHK (APARTMENT)
+  Amenities: Parking Area, Clubhouse, Children's Park, Jogging Track, Health Club, Garden, 24-hour Water Supply, Security
+  [Source: vector]
+
+[17] PROJECT: Sky Avenue
+  Developer: Sky High ORGANISER PVT. LTD.
+  Location: Sarkhej-Vasna Road, Ahmedabad
+  Units:
+    - 2 BHK (APARTMENT)
+  Amenities: Attractive main entrance gate with security, Kid's play area, Internal paved roads, Street lights, Standard elevators, 24-hour water supply, Common bore well with submersible pumps, Underground water tanks, Overhead water tanks, Garden, Parking
+  [Source: vector]
+
+---------------------------------
+
+
+==================================================
+USER QUERY: give me the hall size of 2 bhk projects in ahmedabad
+==================================================
+
+Parsed Intent: {
+  "query_type": "SPECIFIC",
+  "bhk": 2,
+  "property_type": "APARTMENT",
+  "city": "Ahmedabad",
+  "neighbourhood": null,
+  "zone": null,
+  "amenities": null,
+  "landmark_types": null,
+  "specific_landmarks": null,
+  "min_sqft": null,
+  "max_sqft": null,
+  "min_price_lakhs": null,
+  "max_price_lakhs": null,
+  "has_balcony": null,
+  "has_parking": null,
+  "entrance_facing": null,
+  "developer": null,
+  "project_names": null,
+  "semantic_keywords": null,
+  "min_units_per_floor": null,
+  "max_units_per_floor": null
+}
+
+
+--- ASSEMBLED CONTEXT FOR LLM ---
+
+User query: give me the hall size of 2 bhk projects in ahmedabad
+
+Retrieved 9 relevant residential project(s):
+
+[1] PROJECT: Gandhi Galaxy
+  Developer: Reliable Developers
+  Location: Paldi, Ahmedabad
+  Address: Gandhi Galaxy Apartments, 1A/2A Fazl Mohammad Co. Op. Housing Society Ltd., Opp Fazl Hills, Sheikh Adam Abuvala Road, Narayan Nagar Road, Paldi, Ahmedabad
+  Society Features: Park/Garden, Parking
+  Society Description: Gandhi Galaxy offers luxurious, ultra-modern apartments in Paldi, Ahmedabad. The society features two distinct blocks, A and B, with ample parking, security, and automatic elevators. Residents can enjoy green spaces and well-maintained surroundings, with access via 30 and 50 feet wide roads.
+  Units:
+    - 2 BHK (APARTMENT) | Facing: North
+      Description: A well-appointed 2 BHK apartment in B-BLOCK, featuring a spacious drawing room, separate dining area, and two bedrooms, each with an attached toilet. One bedroom also offers direct access to a private balcony.
+      Rooms: Hall (11'0" x 18'3", 200.8 sqft); Dining (9'0" x 12'3", 110.2 sqft); Kitchen (9'0" x 9'6", 85.5 sqft); Wash Area (5'6" x 5'3", 28.9 sqft); Store Room (4'0" x 4'3", 17.0 sqft); Bedroom (10'0" x 11'6", 115.0 sqft) with attached bath; Bedroom (10'0" x 14'6", 145.0 sqft) with attached bath; Balcony (11'0" x 5'0", 55.0 sqft); Lobby (13'6" x 3'3", 43.9 sqft); Lobby (3'9" x 4'3", 15.9 sqft); Toilet (4'0" x 3'6", 14.0 sqft); Toilet (5'6" x 5'6", 30.2 sqft); Bathroom (4'6" x 6'0", 27.0 sqft); Bathroom (5'3" x 6'0", 31.5 sqft); Toilet (7'0" x 4'0", 28.0 sqft)
+    - 2 BHK (APARTMENT) | Facing: North
+      Description: A comfortable 2 BHK apartment in B-BLOCK, featuring a spacious drawing room, separate dining area, and two bedrooms, each with an attached toilet. One bedroom also provides direct access to a private balcony.
+      Rooms: Hall (11'0" x 18'3", 200.8 sqft); Dining (9'0" x 12'3", 110.2 sqft); Kitchen (9'0" x 9'6", 85.5 sqft); Wash Area (5'6" x 5'3", 28.9 sqft); Store Room (4'0" x 4'3", 17.0 sqft); Bedroom (10'0" x 11'6", 115.0 sqft) with attached bath; Bedroom (10'0" x 14'6", 145.0 sqft) with attached bath; Balcony (11'0" x 5'0", 55.0 sqft); Lobby (13'6" x 3'3", 43.9 sqft); Lobby (5'0" x 6'0", 30.0 sqft); Toilet (4'0" x 3'6", 14.0 sqft); Toilet (5'6" x 5'6", 30.2 sqft); Bathroom (4'6" x 6'0", 27.0 sqft); Bathroom (5'3" x 6'0", 31.5 sqft); Toilet (7'0" x 4'0", 28.0 sqft)
+    - 3 BHK (APARTMENT) | Facing: West
+      Description: A spacious 3 BHK apartment in A-BLOCK, featuring a large drawing room, separate dining area, and three bedrooms, with one bedroom having an attached toilet, designed for comfortable family living.
+      Rooms: Hall (16'6" x 10'6", 173.2 sqft); Dining (7'6" x 8'0", 60.0 sqft); Kitchen (7'3" x 8'0", 58.0 sqft); Wash Area (4'6" x 5'0", 22.5 sqft); Store Room (4'3" x 4'0", 17.0 sqft); Bedroom (10'0" x 10'9", 107.5 sqft) with attached bath; Bedroom (10'0" x 15'3", 152.5 sqft); Bedroom (10'0" x 15'3", 152.5 sqft); Lobby (16'0" x 5'10", 93.3 sqft); Toilet (8'6" x 4'0", 34.0 sqft); Toilet (5'3" x 4'10", 25.4 sqft); Balcony (3'9" x 2'6", 9.4 sqft)
+    - 3 BHK (APARTMENT) | Facing: West
+      Description: A comfortable 3 BHK apartment in A-BLOCK, featuring a drawing room, separate dining area, and three bedrooms, with a dressing room attached to one of the bedrooms.
+      Rooms: Hall (10'6" x 15'3", 160.1 sqft); Dining (8'6" x 10'6", 89.2 sqft); Kitchen (7'0" x 10'6", 73.5 sqft); Wash Area (5'0" x 5'6", 27.5 sqft); Bedroom (13'3" x 10'0", 132.5 sqft); Bedroom (10'0" x 15'3", 152.5 sqft); Bedroom (10'0" x 15'3", 152.5 sqft); Lobby (16'0" x 5'10", 93.3 sqft); Toilet (5'3" x 4'10", 25.4 sqft); Toilet (4'0" x 4'0", 16.0 sqft); Dressing Room (4'0" x 4'0", 16.0 sqft)
+  Amenities: Ample parking space, Security With CCTV camera, Intercom facility, Automatic Elevators, Under ground water tank, Overhead water tank for 24 hour water supply, Park or Garden
+  Nearby: Fazl-e-Mohammad Masjid, Petrol Pump
+  Other Details: Building Names: ['A-BLOCK', 'B-BLOCK'], Road Widths: ['30" WIDE ROAD', '50" WIDE ROAD'], Ingested At: 2026-03-12T17:27:21Z, Total Buildings: 2, Source File: Brochure 14.json
+  [Source: both]
+
+[2] PROJECT: Devnandan Sankalp City
+  Developer: Unknown Developer
+  Location: Naroda, Ahmedabad
+  Address: Opp. 108 Institute, Hanspura Road, Nr. 200' FT. Ring Road, Naroda, Ahmedabad
+  Society Features: Park/Garden, Parking
+  Society Description: Devnandan Sankalp City offers affordable apartments in a modern residential complex. It features extensive architectural design, unique elevation, and a superb layout, creating a paradise-like living environment. The society emphasizes quality construction and includes landscaped gardens and ample parking.
+  Units:
+    - 1 BHK (Blocks A, B, C, D, O, P, Q) (APARTMENT)
+      Description: A compact 1 BHK apartment featuring a combined drawing room, a single bedroom, a kitchen, and a common toilet, designed for efficient living with a connected balcony and wash area.
+      Rooms: Hall (10'-0" x 16'-0", 160.0 sqft); Bedroom (10'-0" x 10'-0", 100.0 sqft); Kitchen (7'-0" x 7'-0", 49.0 sqft); Toilet (4'-0" x 6'-3", 25.0 sqft); Balcony (5'-0" x 6'-3", 31.25 sqft); Wash Area (6'-3" x 2'-6", 15.625 sqft)
+    - 1 BHK (Blocks E, F, G, H, K, L, M, N, R) (APARTMENT)
+      Description: A well-designed 1 BHK apartment featuring a spacious drawing room, a comfortable bedroom, a functional kitchen, and a common toilet, offering a practical living space with a connected balcony and wash area.
+      Rooms: Hall (10'-6" x 16'-0", 168.0 sqft); Bedroom (10'-0" x 10'-0", 100.0 sqft); Kitchen (7'-0" x 7'-0", 49.0 sqft); Toilet (4'-0" x 6'-3", 25.0 sqft); Balcony (5'-0" x 6'-3", 31.25 sqft); Wash Area (6'-3" x 2'-6", 15.625 sqft)
+    - 2 BHK (Blocks S, T, U, V, W, X, Y, Z, I, J) (APARTMENT)
+      Description: A spacious 2 BHK apartment featuring a combined drawing and dining area, two comfortable bedrooms, a well-appointed kitchen, and two common toilets, offering ample space for families with a connected balcony and wash area.
+      Rooms: Hall (11'-0" x 18'-9", 206.25 sqft); Bedroom (11'-0" x 10'-0", 110.0 sqft); Bedroom (10'-0" x 10'-0", 100.0 sqft); Kitchen (7'-0" x 10'-0", 70.0 sqft); Toilet 1 (4'-0" x 6'-3", 25.0 sqft); Toilet 2 (4'-0" x 6'-3", 25.0 sqft); Balcony (5'-0" x 6'-3", 31.25 sqft); Wash Area (6'-3" x 2'-6", 15.625 sqft); Passage
+  Amenities: Lifts, Landscaped Garden, Parking Area, Attractive Entrance Gate, Quality Construction
+  Nearby: 108 Institute, 200' FT. Ring Road
+  Other Details: Building Names: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'], Ingested At: 2026-03-12T17:27:39Z, Total Buildings: 26, Source File: Brochure 19.json
+  [Source: both]
+
+[3] PROJECT: AMBER
+  Developer: GHOGHARI Developers pvt. ltd.
+  Location: Sarkhej, Ahmedabad
+  Address: Opp. Amber Tower, B/h. Kadri Party Plot, TP 85-FP7, Subplot 2, Sarkhej Highway Road, Ahmedabad-55.
+  Society Features: Park/Garden, Parking
+  Units:
+    - 2 BHK - Type 105 (Without Dining) (APARTMENT) 1372.14 sqft super built-up
+      Description: Built-Up Area: 90.93 sqft
+      Rooms: Hall (16'-0" x 10'-6", 168.0 sqft); Kitchen (8'-0" x 9'); Wash Area; Balcony; Bedroom (12'-4" x 10'-6", 129.5 sqft); Toilet (4'-3" x 3'-6", 14.9 sqft); Toilet (7'-0" x 4'-7", 32.1 sqft); Bedroom (10'-6" x 12'-4", 129.5 sqft)
+    - 2 BHK - Type 102 (With Dining) (APARTMENT) 1459.35 sqft super built-up
+      Description: Built-Up Area: 99.93 sqft
+      Rooms: Hall (10'-6" x 18'-0", 189.0 sqft); Dining (12' x 10'-3"); Kitchen (8'-8" x 8'-0", 69.3 sqft); Wash Area; Balcony; Bedroom (11'-0" x 10'-0", 110.0 sqft); Toilet (3'9" x 4'); Toilet (7'-7" x 4'-3", 32.2 sqft); Bedroom (10'-0" x 10'-0", 100.0 sqft); Toilet (4'-0" x 7'-0", 28.0 sqft)
+    - 2 BHK - Type 108 (APARTMENT) 1413.18 sqft super built-up
+      Description: Built-Up Area: 96.27 sqft
+      Rooms: Hall (10'-6" x 18'-0", 189.0 sqft); Kitchen (8' x 9'); Wash Area; Balcony; Bedroom (10'-9" x 12'-6", 134.4 sqft); Toilet (7'3" x 5'); Bedroom (11'-3" x 10'-0", 112.5 sqft); Toilet (4'-0" x 3'-6", 14.0 sqft); Passage
+    - 2 BHK - Type 109 (APARTMENT) 1427.58 sqft super built-up
+      Description: Built-Up Area: 96.38 sqft
+      Rooms: Hall (10'-6" x 18'-0", 189.0 sqft); Dining (8'-0" x 10'); Kitchen (8' x 9'); Wash Area; Balcony; Bedroom (10'-3" x 12'-0", 123.0 sqft); Toilet (5'-5" x 3'-6", 19.0 sqft); Bedroom (11'-3" x 10'-0", 112.5 sqft); Toilet (4' x 7')
+    - 2 BHK - Type 106 (APARTMENT) 1439.01 sqft super built-up
+      Description: Built-Up Area: 98.00 sqft
+      Rooms: Hall (10'-6" x 18'-0", 189.0 sqft); Kitchen (8' x 9'); Wash Area; Balcony; Bedroom (10'-9" x 12'-6", 134.4 sqft); Toilet (7'3" x 5'6", 39.9 sqft); Bedroom (11'-3" x 11'-0", 123.8 sqft); Toilet (6'-9" x 4'); Passage
+    - 2 BHK - Type 107 (APARTMENT) 1394.82 sqft super built-up
+      Description: Built-Up Area: 93.94 sqft
+      Rooms: Hall (10'-6" x 18'-0", 189.0 sqft); Kitchen (8' x 9'); Wash Area; Balcony; Bedroom (11'-3" x 10'-0", 112.5 sqft); Toilet (6'-6" x 5'-6", 35.8 sqft); Bedroom (11'-3" x 10'-0", 112.5 sqft); Toilet (5'-5" x 3'-6", 19.0 sqft); Passage
+    - 2 BHK - Type 103 (APARTMENT) 1428.03 sqft super built-up
+      Description: Built-Up Area: 97.60 sqft
+      Rooms: Hall (10'-6" x 18'-0", 189.0 sqft); Dining (12'-0" x 9'-0", 108.0 sqft); Kitchen (8'-8" x 8'-0", 69.3 sqft); Wash Area; Balcony; Bedroom (11' x 11'); Toilet (7'-3" x 4'-3", 30.8 sqft); Bedroom (8'-0" x 10'-0", 80.0 sqft); Toilet (5'-3" x 3'-6", 18.4 sqft); Toilet (6'-6" x 5'-3", 34.1 sqft)
+    - 2 BHK - Type 101 (APARTMENT) 1372.14 sqft super built-up
+      Description: Built-Up Area: 90.93 sqft
+      Rooms: Hall (9'-0" x 8'-0", 72.0 sqft); Dining (9'-6" x 9'); Kitchen; Wash Area; Balcony; Bedroom (11'-0" x 11'-0", 121.0 sqft); Toilet (7' x 4'); Bedroom (13'-0" x 10'-0", 130.0 sqft); Toilet (5'-6" x 5'-9", 31.6 sqft); Toilet (4' x 4'-6")
+    - 2 BHK - Type 104 (APARTMENT) 1463.4 sqft super built-up
+      Description: Built-Up Area: 100.79 sqft
+      Rooms: Hall (10'-6" x 18'-0", 189.0 sqft); Dining (12' x 10'); Kitchen (8'-8" x 8'-0", 69.3 sqft); Wash Area; Balcony; Bedroom (11' x 10'); Toilet (7'-0" x 4'-3", 29.8 sqft); Bedroom (10'-0" x 11'-0", 110.0 sqft); Toilet (4'-0" x 7'-0", 28.0 sqft); Toilet (4' x 4'-3")
+  Amenities: Garden, Parking Area, Park, Watchman Cabin
+  Nearby: Kadri Party Plot, GULZAR PARK, ARSHAD PARK, Juhapura-Sarkhej Road, 100 Feet Ring Road
+  Other Details: Building Names: ['Amber Tower'], Ingested At: 2026-03-12T17:27:46Z, Total Buildings: 2, Source File: Brochure6.json
+  [Source: both]
+
+[4] PROJECT: Sky Avenue
+  Developer: Sky High ORGANISER PVT. LTD.
+  Location: Sarkhej-Vasna Road, Ahmedabad
+  Address: 30.00 MT WIDE T.P.S. ROAD, 18.00 MT WIDE T.P.S. ROAD
+  Society Features: Park/Garden, Parking
+  Society Description: Well developed plot with a kid's play area and internal paved roads.
+  Units:
+    - 2 BHK TYPE-A (APARTMENT)
+      Description: 2 BHK apartment layout.
+      Rooms: Hall (13'0" x 10'0", 130.0 sqft); Bedroom (10'6" x 9'0", 94.5 sqft) with attached bath; Bedroom (10'0" x 12'0", 120.0 sqft) with attached bath; Kitchen (7'0" x 9'0", 63.0 sqft); Wash Area (6'1.5" x 3'6", 21.3 sqft); WC (4'0" x 3'0", 12.0 sqft); Toilet (5'6" x 4'4.5", 23.8 sqft); Toilet (6'0" x 4'0", 24.0 sqft)
+    - 2 BHK TYPE-B (APARTMENT)
+      Description: 2 BHK apartment layout.
+      Rooms: Hall (13'0" x 10'0", 130.0 sqft); Bedroom (9'0" x 11'3", 101.2 sqft) with attached bath; Bedroom (10'0" x 12'0", 120.0 sqft) with attached bath; Kitchen (7'0" x 9'0", 63.0 sqft); Wash Area (7'0" x 3'6", 24.5 sqft); WC (3'7.5" x 3'0", 10.8 sqft); Toilet (4'2" x 5'3", 21.9 sqft); Toilet (6'0" x 4'0", 24.0 sqft)
+  Amenities: Garden, 24-hour water supply, Parking, Attractive main entrance gate with security, Kid's play area, Internal paved roads, Street lights, Standard elevators, Common bore well with submersible pumps, Underground water tanks, Overhead water tanks
+  Nearby: Lokhandwala Park
+  Other Details: Building Names: ['BLOCK-A', 'BLOCK-B'], Road Widths: ['30.00 MT WIDE T.P.S. ROAD', '18.00 MT WIDE T.P.S. ROAD', '12.00 MT WIDE T.P.S. ROAD', '60.00 MT WIDE T.P.S. ROAD'], Ingested At: 2026-03-12T17:27:46Z, Total Buildings: 2, Source File: Brochure5.json
+  [Source: both]
+
+[5] PROJECT: Sitaram City
+  Developer: Tulsidham Developers
+  Location: Vastral Road, Mahadevnagar Tekra, Ahmedabad
+  Address: Near Hariom Duplex, Opposite Devi Krupa Society, Gopi Dairy Char Rasta, Mahadevnagar Tekra, Vastral Road, Ahmedabad
+  Society Features: Clubhouse, Park/Garden, Parking
+  Society Description: Sitaram City offers a modern residential experience with multiple apartment blocks arranged around a central common plot, featuring green spaces and well-defined internal roads. The architectural style appears contemporary with balconies, providing a vibrant community atmosphere.
+  Units:
+    - 2 BHK (APARTMENT)
+      Description: This 2 BHK apartment features a functional layout with two bedrooms, a spacious drawing room, a well-appointed kitchen, and two bathrooms, complemented by a dedicated wash area.
+      Rooms: Wash Area (7-4½ x 3-9); Kitchen (7-0 x 9-3, 64.8 sqft); Bedroom (10-0 x 10-6, 105.0 sqft); Bedroom (10-0 x 10-0, 100.0 sqft); WC (3-0 x 3-0, 9.0 sqft); Hall (10-0 x 14-0, 140.0 sqft); Bathroom (6-0 x 4-0, 24.0 sqft); Bathroom (6-0 x 4-0, 24.0 sqft)
+    - 2 BHK (APARTMENT)
+      Description: A comfortable 2 BHK apartment offering two bedrooms, a drawing room, a kitchen, two toilets, and a balcony, designed for practical living.
+      Rooms: Balcony (4-4 x 4-6, 19.5 sqft); Bedroom (10-0 x 10-6, 105.0 sqft); Toilet (4-0 x 6-0, 24.0 sqft); Bedroom (10-0 x 10-0, 100.0 sqft); Toilet (4-0 x 6-0, 24.0 sqft); Store Room (3-0 x 3-6, 10.5 sqft); Kitchen (9-0 x 7-0, 63.0 sqft); WC (3-0 x 3-3, 9.8 sqft); Hall (10-0 x 14-1½)
+    - 1 BHK (APARTMENT)
+      Description: This compact 1 BHK apartment provides essential living spaces including a bedroom, a drawing room, a kitchen, a toilet, and a wash area, ideal for individuals or small families.
+      Rooms: Wash Area (6-0 x 3-6, 21.0 sqft); Hall (13-4 x 10-0, 133.3 sqft); Kitchen (7-0 x 7-0, 49.0 sqft); Bedroom (10-0 x 10-0, 100.0 sqft); Toilet (4-0 x 6-0, 24.0 sqft)
+    - 1 BHK (APARTMENT)
+      Description: A well-designed 1 BHK apartment featuring a bedroom, a drawing room, a kitchen, a bathroom, and a generous wash area, offering a comfortable living experience.
+      Rooms: Wash Area (10-6 x 6-0, 63.0 sqft); Kitchen (10-0 x 7-0, 70.0 sqft); Hall (10-0 x 13-9, 137.5 sqft); Bedroom (10-0 x 10-0, 100.0 sqft); Bathroom (6-6 x 3-9, 24.4 sqft)
+    - 2 BHK (APARTMENT)
+      Description: This 2 BHK apartment offers a practical layout with two bedrooms, a drawing room, a kitchen, two bathrooms, and a separate WC, along with a dedicated wash area.
+      Rooms: Wash Area (7-4½ x 3-9); WC (3-0 x 3-0, 9.0 sqft); Kitchen (7-0 x 9-3, 64.8 sqft); Bedroom (10-0 x 10-0, 100.0 sqft); Bedroom (10-0 x 10-6, 105.0 sqft); Bathroom (6-0 x 4-0, 24.0 sqft); Bathroom (6-0 x 4-0, 24.0 sqft); Hall (10-0 x 14-0, 140.0 sqft)
+    - 2 BHK (APARTMENT)
+      Description: A spacious 2 BHK apartment featuring two bedrooms, a drawing room, a kitchen, a bathroom, a separate WC, and a wash area, designed for modern family living.
+      Rooms: Wash Area (4-4 x 7-4, 31.8 sqft); Kitchen (7-0 x 7-0, 49.0 sqft); Hall (10-0 x 14-1, 140.8 sqft); Bedroom (10-0 x 10-0, 100.0 sqft); Bedroom (10-0 x 10-6, 105.0 sqft); Bathroom (6-0 x 4-0, 24.0 sqft); WC (3-0 x 3-3, 9.8 sqft)
+  Amenities: Garden, Clubhouse, Jogging Track, Parking Area, Children's Park, Health Club, 24-hour Water Supply, Security
+  Nearby: Gopi Dairy Char Rasta, Mahadevnagar Tekra, Swaminarayan Mandir (Vadhvan), Ghanshyam Complex, Police Chowki, Nirant Chokdi, Kankubag Party Plot
+  Other Details: Building Names: ['BLOCK A', 'BLOCK B', 'BLOCK C', 'BLOCK D', 'BLOCK E', 'BLOCK F', 'BLOCK G', 'BLOCK H', 'BLOCK I', 'BLOCK J', 'BLOCK K', 'BLOCK L', 'BLOCK M', 'BLOCK N'], Road Widths: ['9.00 MT WIDE T.P.S. ROAD', '25-0" WIDE ROAD'], Total Buildings: 14, Source File: Brochure 8.json, Ingested At: 2026-03-12T17:27:39Z
+  [Source: both]
+
+[6] PROJECT: svasaar pravesh
+  Developer: Svasaar value builders
+  Location: Vatva, Ahmedabad
+  Address: Gamdi Gaam, Vatva - Chosar Road, Ring Road, Ahmedabad
+  Society Features: Park/Garden, Parking
+  Units:
+    - 2 BHK (APARTMENT)
+      Rooms: Balcony (3' 6" x 6'0", 21.0 sqft); Bedroom (10'9" x 8'4", 89.6 sqft); Toilet (3' 6" x 6'0", 21.0 sqft); Wash Area (3' 6" x 5'10", 20.4 sqft); Kitchen (6'3" x 6'3", 39.1 sqft); Bedroom (10'9" x 9'0", 96.8 sqft) with attached bath; Toilet (3'6" x 5'3", 18.4 sqft); Dining (5'3" x 4'6", 23.6 sqft); Hall (10'0" x 13'5", 134.2 sqft)
+    - 1 BHK (APARTMENT)
+      Rooms: Bedroom (9'6" x 10'0", 95.0 sqft); Kitchen (6'2" x 8'7", 52.9 sqft); Wash Area (3' 3" x 5'0", 16.2 sqft); WC (4' 0" x 3'0", 12.0 sqft); Toilet (5'7" x 3'3", 18.1 sqft); Hall (10'0" x 14'0", 140.0 sqft)
+    - 1 BHK (APARTMENT)
+      Rooms: Bedroom (9'4" x 10'0", 93.3 sqft); Kitchen (6'3" x 10'0", 62.5 sqft); Wash Area (3'5" x 5'0", 17.1 sqft); Toilet (3' 5" x 5'8", 19.4 sqft); Hall (16'0" x 9'0", 144.0 sqft); WC (4' 0" x 3'0", 12.0 sqft)
+  Amenities: Garden / Park, Parking
+  Nearby: Jetalpur School and College, Gayatri Vidyalaya - Narol, Rajaram Vidyalaya, Saraswati Vidyalaya Nava Vatva Ma. Shala, Riddhi Gujarati School, Rajshree English School - Vatva, Municipal Gujarati School, Kutir Vidyalaya, General Hospital - Rajaram, AMTS Bus Stop
+  Other Details: Building Names: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'J', 'K', 'L', 'M', 'N', 'O', 'P'], Ingested At: 2026-03-12T17:27:39Z, Pin Code: 380009, Total Buildings: 15, Source File: Brochure1.json
+  [Source: both]
+
+[7] PROJECT: Elysium at Shantigram
+  Developer: Adani Township & Real Estate Co. Pvt. Ltd.
+  Location: Shantigram, Ahmedabad
+  Address: CBD, Shantigram, Near Valahnadavi Circle, S.G. Highway, Ahmedabad, Gujarat, India
+  Society Features: Clubhouse, Swimming Pool, Park/Garden, Parking, Sports Courts
+  Society Description: Elysium at Shantigram is a tranquil, well-planned township in Ahmedabad, offering luxurious G+16/17 storey high-rise apartments with 3-side open homes for abundant light and air. Spread over 600 acres with over 80% open area and 50,000 trees, the integrated township features state-of-the-art commercial complexes, vast landscapes, pools, and a clubhouse with bountiful amenities and innovative architecture, fostering a good life environment.
+  Units:
+    - 2 BHK (APARTMENT) 1145.0 sqft super built-up / 660.15 sqft carpet | Balcony: 36.81 sqft
+      Description: This 2 BHK apartment features a combined living and dining area, a well-sized kitchen with an attached utility and store room, and two bedrooms. The master bedroom includes an attached toilet and direct access to a private balcony, offering a comfortable and functional living space.
+      Rooms: Hall (17' x 11'); Kitchen (8'6" x 7'9", 65.9 sqft); Wash Area (4'10" x 3'7", 17.3 sqft); Store Room (4'6" x 3'11", 17.6 sqft); Master Bedroom (13'6" x 11'2", 150.8 sqft) with attached bath; Balcony (6'1" x 3'8", 22.3 sqft); Toilet (6'10" x 5'3", 35.9 sqft); Bedroom (10'2" x 12'); Toilet (6'8" x 5'4", 35.6 sqft)
+    - 2.5 BHK (APARTMENT) 1427.0 sqft super built-up / 833.34 sqft carpet | Balcony: 40.79 sqft
+      Description: This spacious 2.5 BHK apartment offers a large living and dining area, a dedicated study room, and two comfortable bedrooms. The master bedroom features an attached toilet and a private balcony, while the kitchen includes a utility and store room, providing ample space and functionality.
+      Rooms: Hall (19' x 12'); Study Room (10'4" x 9'); Kitchen (8'8" x 7'9", 67.2 sqft); Wash Area (5' x 3'7"); Store Room (4'8" x 3'11", 18.3 sqft); Master Bedroom (14'2" x 11'2", 158.2 sqft) with attached bath; Balcony (6'9" x 3'10", 25.9 sqft); Toilet (6'10" x 5'3", 35.9 sqft); Bedroom (10'2" x 12'); Toilet (4'11" x 7')
+  Amenities: Swimming Pool, Gym, 3-side open homes, Gated community with multi-tier security system, Clubhouse, Commercial Shops, Dedicated Car Parking, Kids' Play Area, Jogging Track, Senior Citizens' Area, Indoor Sports Facilities, Outdoor Badminton Court, Shower And Changing Areas, Landscaped Gardens, Treated Water Supply, Piped Gas Facility, Perimeter Security, Smart Card Access For Residents, Communication Facility Connecting Each Flat With Entrance Lobby, Sports Courts, CCTV In Basement And Main Entrance Lobby For Surveillance
+  Nearby: Thaltej Cross Roads, S. G. Highway, Nirma University, Vaishno Devi Temple, Sardar Patel Ring Road, Gandhinagar, Jain Temple, Golf Course, Shoppers Plaza, Adani Institute of Infrastructure & Management
+  Other Details: Building Names: ['TOWER A', 'TOWER B', 'TOWER G', 'TOWER H', 'TOWER I'], Pin Code: 882421, Total Buildings: 5, Source File: Brochure 15.json, Has Commercial Shops: 1, Ingested At: 2026-03-12T17:27:21Z
+  [Source: both]
+
+[8] PROJECT: OUM ORBIT
+  Developer: Shanti Infrastructure
+  Location: Vinzol, Ahmedabad
+  Address: Towards 200 ft. S.P.Ring Road, Opp. Karnavati APMC Market, Behind MADHAV school, Ropda Cross Road, Vinzol, Ahmedabad.
+  Society Features: Clubhouse, Park/Garden, Parking
+  Society Description: Oum Orbit homes offers the best of the amenities with an affordable rates that is very rare to find in a 2 BHK contemporary apartments, in other words it's simply affordable. These apartments elevates your lifestyle and takes you one step further towards the idea of comfortable, spacious & luxurious living
+  Units:
+    - 2 BHK (108 Sq. Yard) (APARTMENT) / 972.0 sqft carpet
+      Rooms: Bedroom (10'0" x 10'0", 100.0 sqft); Toilet (3'9" x 5'6", 20.63 sqft); Bedroom (9'6" x 12'0", 114.0 sqft); Toilet (3'9" x 6'0", 22.5 sqft); Kitchen (6'0" x 7'7", 45.5 sqft); Wash Area (6'5" x 4'5", 28.54 sqft); Hall (13'0" x 11'0", 143.0 sqft); Balcony (3'0" x 5'6", 16.5 sqft)
+    - 2 BHK (109 Sq. Yard) (APARTMENT) / 981.0 sqft carpet
+      Rooms: Bedroom (10'0" x 12'0", 120.0 sqft); Toilet (3'9" x 6'0", 22.5 sqft); Bedroom (9'6" x 12'0", 114.0 sqft); Toilet (3'9" x 5'6", 20.63 sqft); Kitchen (6'0" x 7'7", 45.5 sqft); Wash Area (6'5" x 4'5", 28.54 sqft); Hall (13'0" x 10'0", 130.0 sqft); Balcony (3'0" x 5'6", 16.5 sqft)
+    - 2 BHK (110 Sq. Yard) (APARTMENT) / 990.0 sqft carpet
+      Rooms: Bedroom (10'6" x 12'0", 126.0 sqft); Toilet (3'9" x 5'6", 20.63 sqft); Bedroom (9'6" x 12'0", 114.0 sqft); Toilet (3'9" x 6'0", 22.5 sqft); Kitchen (6'0" x 7'7", 45.5 sqft); Wash Area (6'5" x 4'5", 28.54 sqft); Hall (13'0" x 10'0", 130.0 sqft); Balcony (3'0" x 5'6", 16.5 sqft)
+    - 2 BHK (113 Sq. Yard) (APARTMENT) / 1017.0 sqft carpet
+      Rooms: Bedroom (12'0" x 10'0", 120.0 sqft); Toilet (6'0" x 3'9", 22.5 sqft); Bedroom (12'0" x 10'6", 126.0 sqft); Toilet (5'6" x 3'9", 20.63 sqft); Kitchen (7'7" x 6'0", 45.5 sqft); Wash Area (4'5" x 6'5", 28.54 sqft); Hall (10'0" x 13'6", 135.0 sqft); Balcony (5'6" x 3'0", 16.5 sqft)
+    - 2 BHK (117 Sq. Yard) (APARTMENT) / 1053.0 sqft carpet
+      Rooms: Bedroom (10'9" x 11'9", 126.56 sqft) with attached bath; Toilet (6'0" x 5'0", 30.0 sqft); Bedroom (9'6" x 12'0", 114.0 sqft); Toilet (6'0" x 5'0", 30.0 sqft); Kitchen (6'0" x 7'7", 45.5 sqft); Wash Area (6'5" x 4'5", 28.54 sqft); Hall (14'5" x 10'0", 144.17 sqft); Balcony (3'0" x 5'6", 16.5 sqft)
+    - 2 BHK (119 Sq. Yard) (APARTMENT) / 1071.0 sqft carpet
+      Rooms: Bedroom (12'0" x 10'0", 120.0 sqft); Toilet (5'0" x 6'0", 30.0 sqft); Bedroom (12'0" x 10'6", 126.0 sqft); Toilet (5'0" x 6'0", 30.0 sqft); Kitchen (7'7" x 6'0", 45.5 sqft); Wash Area (4'5" x 6'5", 28.54 sqft); Hall (10'0" x 13'6", 135.0 sqft); Balcony (5'6" x 3'0", 16.5 sqft)
+    - 2 BHK (123 Sq. Yard) (APARTMENT) / 1107.0 sqft carpet
+      Rooms: Bedroom (13'0" x 10'0", 130.0 sqft); Toilet (6'0" x 3'9", 22.5 sqft); Bedroom (10'0" x 11'0", 110.0 sqft); Toilet (3'9" x 6'8", 25.0 sqft); Kitchen (7'0" x 9'0", 63.0 sqft); Wash Area (4'0" x 7'6", 30.0 sqft); Hall (14'9" x 10'0", 147.5 sqft); Balcony (3'10" x 5'0", 19.17 sqft)
+    - 2 BHK (124 Sq. Yard) (APARTMENT) / 1116.0 sqft carpet
+      Rooms: Bedroom (13'0" x 10'0", 130.0 sqft); Toilet (6'0" x 3'9", 22.5 sqft); Bedroom (10'0" x 12'0", 120.0 sqft); Toilet (3'9" x 6'7.5", 24.84 sqft); Kitchen (7'0" x 9'0", 63.0 sqft); Wash Area (4'0" x 7'6", 30.0 sqft); Hall (15'4" x 10'0", 153.33 sqft); Balcony (3'10" x 5'0", 19.17 sqft)
+    - 2 BHK (128 Sq. Yard) (APARTMENT) / 1152.0 sqft carpet
+      Rooms: Bedroom (13'0" x 10'0", 130.0 sqft); Toilet (5'4" x 6'0", 32.0 sqft); Bedroom (10'10.5" x 10'0", 108.75 sqft); Toilet (5'4" x 5'6", 29.33 sqft); Kitchen (7'0" x 9'0", 63.0 sqft); Wash Area (4'0" x 7'6", 30.0 sqft); Hall (16'0" x 10'0", 160.0 sqft); Balcony (3'10" x 5'0", 19.17 sqft)
+  Amenities: CHILDREN PLAY AREA, Clubhouse, Parking, GYM, LIBRARY, JOGGING TRACK, SENIOR CITIZEN PARK, GARDEN & FOUNTAIN, CHESS, CAROM BOARD, CARD TABLE, CLUB HOUSE
+  Nearby: Sardar Patel Ring Road, Hathijin Circle, Railway Over Bridge, Karnavati APMC Market, Madhav School, Ropda Cross Road, Gamdi Cross Road, Aslali Circle, Narol Circle
+  Other Details: Building Names: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K'], Road Widths: ["25' WIDE SOCIETY ROAD", "60' Road"], Total Buildings: 11, Source File: Brochure4.json, Ingested At: 2026-03-12T17:27:45Z
+  [Source: both]
+
+[9] PROJECT: Sunflower Enclave
+  Developer: CRYSTAL REALINFRA Pvt. Ltd.
+  Location: Sarkhej, Ahmedabad
+  Address: Near Emaad, T.P. 85, 100 Feet Road, Opp Amber Tower, Sarkhej, Ahmedabad-380055
+  Society Features: Park/Garden
+  Society Description: Sunflower Enclave offers a beautiful and impressive residential atmosphere, designed for a high-quality lifestyle. The society features multiple apartment blocks set amidst landscaped gardens and a dedicated senior citizen park, providing a serene and green environment. It includes essential amenities like a children's play area, 24-hour water supply, security cabin, and automatic lifts, ensuring comfort and convenience for its residents. The architectural style appears modern with a mix of light and dark facades, creating a distinct visual appeal.
+  Units:
+    - 2 BHK Type A (APARTMENT) | Balcony: 41.85 sqft
+      Description: This spacious 2 BHK apartment features an open-concept layout with a large drawing room that connects to two balconies, offering ample natural light and ventilation. It includes two comfortable bedrooms, a well-appointed kitchen with an attached wash area, a dedicated foyer, and two common bathrooms, providing a functional and inviting living space.
+      Rooms: Hall (12'6" x 10'); Kitchen (6'6" x 6'0", 39.0 sqft); Bedroom (10' x 8'8"); Bedroom (11'6" x 9'8", 111.2 sqft); Bathroom (6'8" x 3'); Bathroom (3'3" x 4'5", 14.4 sqft); Balcony (4'7" x 6'0", 27.5 sqft); Balcony (3'3" x 4'5", 14.4 sqft); Wash Area (6'8" x 3'); Lobby (10'8" x 10'); Toilet (5'0" x 4'6", 22.5 sqft)
+    - 2 BHK Type B (APARTMENT) | Balcony: 32.89 sqft
+      Description: This well-designed 2 BHK apartment provides a comfortable living experience with a generous drawing room that opens to two balconies, enhancing the sense of space. The unit comprises two cozy bedrooms, a practical kitchen with an attached wash area, and two common bathrooms, all laid out to maximize efficiency and comfort.
+      Rooms: Hall (12'6" x 10'); Kitchen (6'6" x 5'7", 36.3 sqft); Bedroom (11'8" x 8'8", 101.1 sqft); Bedroom (10' x 9'8"); Bathroom (5' x 4'7"); Bathroom (5' x 4'7"); Balcony (4' x 4'6"); Balcony (3'3" x 4'7", 14.9 sqft); Wash Area (6'0" x 3'); Toilet (5'0" x 4'6", 22.5 sqft)
+  Amenities: Children Play Area, 24 Hours Water Supply, Senior Citizen Park, Security Cabin, Landscape Garden, Automatic Lift, Madrasa or Office Space, Commercial Shops
+  Nearby: Amber Tower
+  Other Details: Road Widths: ['25 WIDE ROAD', '100 WIDE ROAD'], Pin Code: 380055, Total Buildings: 4, Source File: Brochure 11.json, Has Commercial Shops: 1, Ingested At: 2026-03-12T17:27:21Z
+  [Source: graph]
+
+---------------------------------
+

@@ -205,6 +205,96 @@ def classify_amenity(text: str) -> str:
     return "OTHER"
 
 
+# ── Amenity canonical tag mapping ─────────────────────────────────────────────
+# Each entry: lowercase substring → canonical tag string.
+# An amenity can get MULTIPLE canonical tags (e.g. "24hr security with CCTV"
+# gets both "security" and "cctv").
+_AMENITY_TAG_MAP: list[tuple[str, str]] = [
+    # Sports & Fitness
+    ("gym",          "Gym"),
+    ("gymnasium",    "Gym"),
+    ("fitness",      "Gym"),
+    ("swimming",     "Swimming Pool"),
+    ("pool",         "Swimming Pool"),
+    ("jogging",      "Jogging Track"),
+    ("running track","Jogging Track"),
+    ("cricket",      "Cricket"),
+    ("volleyball",   "Volleyball"),
+    ("basketball",   "Basketball"),
+    ("badminton",    "Badminton"),
+    ("tennis",       "Tennis"),
+    ("indoor sports","Indoor Sports"),
+    ("outdoor sports","Outdoor Sports"),
+    # Wellness
+    ("spa",          "Spa"),
+    ("yoga",         "Yoga"),
+    ("meditation",   "Meditation"),
+    ("health club",  "Health Club"),
+    # Social
+    ("clubhouse",    "Clubhouse"),
+    ("club house",   "Clubhouse"),
+    ("party plot",   "Party Area"),
+    ("party lawn",   "Party Area"),
+    ("banquet",      "Party Area"),
+    ("amphitheatre", "Amphitheatre"),
+    ("amphitheater", "Amphitheatre"),
+    ("children play","Children Play Area"),
+    ("kids play",    "Children Play Area"),
+    ("kids zone",    "Children Play Area"),
+    ("senior",       "Senior Citizen Area"),
+    ("library",      "Library"),
+    ("indoor games", "Indoor Games"),
+    ("chess",        "Indoor Games"),
+    ("carom",        "Indoor Games"),
+    ("mini theatre", "Mini Theatre"),
+    # Nature
+    ("garden",       "Garden"),
+    ("landscap",     "Garden"),
+    ("lawn",         "Lawn"),
+    ("park",         "Park"),
+    ("courtyard",    "Courtyard"),
+    ("fountain",     "Fountain"),
+    ("green",        "Green Space"),
+    ("common plot",  "Open Space"),
+    # Security
+    ("cctv",         "CCTV"),
+    ("surveillance", "CCTV"),
+    ("security",     "Security"),
+    ("gated",        "Gated Community"),
+    ("guard",        "Security"),
+    # Infrastructure
+    ("parking",      "Parking"),
+    ("car park",     "Parking"),
+    ("lift",         "Lifts"),
+    ("elevator",     "Lifts"),
+    ("power backup", "Power Backup"),
+    ("generator",    "Power Backup"),
+    ("wi-fi",        "WiFi"),
+    ("wifi",         "WiFi"),
+    ("water",        "Water Supply"),
+    ("bore",         "Borewell"),
+    ("pick and drop","Pick and Drop"),
+    ("commercial",   "Commercial Shops"),
+]
+
+
+def amenity_canonical_tags(text: str) -> list[str]:
+    """
+    Return a list of canonical searchable tags for an amenity string.
+    E.g. "Gymnasium & Swimming Pool" → ["Gym", "Swimming Pool"]
+    """
+    lower = text.lower()
+    seen: set[str] = set()
+    tags: list[str] = []
+    for fragment, tag in _AMENITY_TAG_MAP:
+        if fragment in lower and tag not in seen:
+            seen.add(tag)
+            tags.append(tag)
+    return tags or ["Other"]
+
+
+
+
 _LANDMARK_KEYWORDS: dict[str, list[str]] = {
     "EDUCATION":   ["school", "college", "vidyalaya", "university", "shala",
                     "institute", "academy"],
@@ -482,7 +572,8 @@ MERGE (p)-[:NEAR]->(lm)
 # Amenity
 _CYPHER_AMENITY = """
 MERGE (am:Amenity {name: $am_name})
-SET am.category = $am_category
+SET am.category       = $am_category,
+    am.canonical_tags = $am_canonical_tags
 MERGE (p:Project {project_id: $project_id})
 MERGE (p)-[:HAS_AMENITY]->(am)
 """
@@ -691,9 +782,10 @@ def ingest_one(
             if not am_clean:
                 continue
             session.run(_CYPHER_AMENITY, {
-                "am_name":     am_clean,
-                "am_category": classify_amenity(am_clean),
-                "project_id":  project_id,
+                "am_name":            am_clean,
+                "am_category":        classify_amenity(am_clean),
+                "am_canonical_tags":  amenity_canonical_tags(am_clean),
+                "project_id":         project_id,
             })
 
         # ── 5. Units + Rooms ─────────────────────────────────────────────────

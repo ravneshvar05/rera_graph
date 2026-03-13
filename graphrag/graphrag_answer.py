@@ -106,6 +106,20 @@ def generate_answer(
         logger.info("Bypassing LLM generation for genuine filter-free global query to save time.")
         return _fallback_answer(user_query, project_results)
 
+    # Prevent rate limit errors by hard-capping the context size
+    max_chars = 35000
+    if len(context_text) > max_chars:
+        logger.warning(f"Context too long ({len(context_text)} chars). Truncating to {max_chars} chars.")
+        context_text = context_text[:max_chars] + "\n\n...[Context truncated due to size limits]..."
+
+    # ────────── TEMPORARILY DISABLED LLM FOR GRAPH DEBUGGING ──────────
+    # Bypass LLM generation entirely and just return the structured fallback answer
+    # so we can see exactly what the Graph DB retrieved without hitting rate limits.
+    logger.info("TEMPORARY: Bypassing LLM generation to debug Graph Retrieval.")
+    return _fallback_answer(user_query, project_results)
+    # ──────────────────────────────────────────────────────────────────
+    
+    # ... (Original code commented out or bypassed)
     prompt = f"""{_ANSWER_SYSTEM_PROMPT}
 
 ---

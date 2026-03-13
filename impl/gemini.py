@@ -91,7 +91,7 @@ class StandardRoomSchema(BaseRoomSchema):
     ] = RoomType.OTHER
 
 class SocietyLayoutSchema(BaseModel):
-    description: Optional[str] = None
+    description: Optional[str] = Field(default=None, description="A rich, informative paragraph describing the overall vibe, environment, lifestyle, layout, and architectural style of the society. This is critical for overarching context and semantic search matching. Consider surroundings and amenities instead of leaving mostly null.")
     total_apartment_blocks: Optional[int] = Field(default=None, description="Total number of towers/blocks. ONLY FOR APARTMENTS. For Villas/Row Houses, leave this as null.")
     total_independent_villas_or_tenements: Optional[int] = Field(default=None, description="Total number of independent ground-level houses. ONLY FOR VILLAS/TENEMENTS/ROW_HOUSES. For Apartments, leave this as null.")
     building_names: list[str] = Field(default_factory=list, description="For apartments, list tower/block names (e.g. 'Tower A'). For Villas/Row Houses, leave this empty, do NOT list individual house numbers.")
@@ -116,7 +116,7 @@ class UnitSchema(BaseModel):
     property_type: PropertyType = Field(default=PropertyType.OTHER, description="The architectural type of the property")
     applicable_buildings: list[str] = Field(default_factory=list, description="Which towers/blocks this applies to. If the property type is VILLA or ROW_HOUSE, leave this completely empty.")
     entrance_Facing: Optional[str] = Field(default=None, description="Vastu direction the main door faces, e.g., East, North-East. If you cannot find it explicitly, set to null. DO NOT hallucinate, as this will be reviewed by a human.")
-    description: Optional[str] = Field(default=None, description="Descriptive text capturing the vibe, architecture, special features, or layout unique to this unit. Extremely useful for Vector Search.")
+    description: Optional[str] = Field(default=None, description="A comprehensive 1-2 sentence description capturing the vibe, unique architectural aspects, layout (e.g. open-concept, courtyard, spacious), or special features of this unit. This is highly utilized for vector search fuzzy matching.")
     
     bhk: Optional[int] = None
     carpet_area_sqft: Optional[float] = None
@@ -177,43 +177,61 @@ CRITICAL INSTRUCTIONS:
 Output strictly as a JSON object matching the requested schema.
 """
 
-def process_pdf(client: genai.Client, pdf_path: Path) -> str | None:
+def process_pdf(api_keys: list[str], max_retries: int, pdf_path: Path) -> str | None:
     logging.info(f"  Uploading PDF: {pdf_path.name}")
     
-    try:
-        pdf_file = client.files.upload(file=str(pdf_path), config={'mime_type': 'application/pdf'})
-        
-        logging.info("  Processing PDF on server...")
-        while pdf_file.state.name == 'PROCESSING':
-            print(".", end="", flush=True)
-            time.sleep(2)
-            pdf_file = client.files.get(name=pdf_file.name)
-        print() 
+    # Simple retry logic utilizing list of keys
+    for attempt in range(max_retries):
+        try:
+            key_idx = attempt % len(api_keys)
+            logging.info(f"  Attempt {attempt + 1}: Using API Key #{key_idx + 1}")
+            client = genai.Client(api_key=api_keys[key_idx])
+            
+            pdf_file = client.files.upload(file=str(pdf_path), config={'mime_type': 'application/pdf'})
+            
+            logging.info("  Processing PDF on server...")
+            while pdf_file.state.name == 'PROCESSING':
+                print(".", end="", flush=True)
+                time.sleep(2)
+                pdf_file = client.files.get(name=pdf_file.name)
+            print() 
 
-        if pdf_file.state.name == 'FAILED':
-            logging.error("  File processing failed on the server.")
-            return None
+            if pdf_file.state.name == 'FAILED':
+                logging.error("  File processing failed on the server.")
+                return None
 
-        logging.info(f"  Calling {MODEL}...")
-        
-        response = client.models.generate_content(
-            model=MODEL,
-            contents=[pdf_file, PROMPT],
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                response_schema=BrochureData, # Using the finalized comprehensive schema
-                temperature=0.0, 
+            logging.info(f"  Calling {MODEL}...")
+            
+            response = client.models.generate_content(
+                model=MODEL,
+                contents=[pdf_file, PROMPT],
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    response_schema=BrochureData, # Using the finalized comprehensive schema
+                    temperature=0.0, 
+                )
             )
-        )
-        
-        client.files.delete(name=pdf_file.name)
-        return response.text
-        
-    except Exception as e:
-        logging.error(f"  API call failed: {str(e)[:300]}")
-        return None
+            
+            client.files.delete(name=pdf_file.name)
+            return response.text
+            
+        except Exception as e:
+            err_msg = str(e)
+            if "429" in err_msg or "Resource Exhausted" in err_msg or "quota" in err_msg.lower():
+                logging.warning(f"  Rate limit hit (429) on attempt {attempt + 1}. Error: {str(e)[:150]}")
+                if attempt < max_retries - 1:
+                    logging.info("  Retrying with next API key...")
+                    time.sleep(2)
+                    continue
+                else:
+                    logging.error("  Max retries reached on rate limit.")
+            else:
+                logging.error(f"  API call failed: {str(e)[:300]}")
+                return None
 
-def _process_one(api_key: str, pdf_path: Path, output_dir: Path, idx: int, total: int) -> bool:
+    return None
+
+def _process_one(api_keys: list[str], pdf_path: Path, output_dir: Path, idx: int, total: int) -> bool:
     """
     Worker function called by each thread.
     Creates its own Gemini client (thread-safe — each thread has its own HTTP session).
@@ -221,8 +239,8 @@ def _process_one(api_key: str, pdf_path: Path, output_dir: Path, idx: int, total
     """
     logging.info(f"--- [{idx}/{total}] Processing: {pdf_path.name} ---")
     try:
-        client = genai.Client(api_key=api_key)
-        result = process_pdf(client, pdf_path)
+        max_retries = max(3, len(api_keys) * 2) # ensure multiple attempts per key
+        result = process_pdf(api_keys, max_retries, pdf_path)
         if result:
             out_file = output_dir / f"{pdf_path.stem}.json"
             out_file.write_text(result, encoding="utf-8")
@@ -237,9 +255,12 @@ def _process_one(api_key: str, pdf_path: Path, output_dir: Path, idx: int, total
 
 
 def main():
-    api_key = os.getenv("GEMINI_API_KEY")
-    if not api_key:
-        logging.error("GEMINI_API_KEY not found in .env file.")
+    api_key_1 = os.getenv("GEMINI_API_KEY")
+    api_key_2 = os.getenv("GEMINI_API_KEY_2")
+    api_keys = [k for k in [api_key_1, api_key_2] if k]
+
+    if not api_keys:
+        logging.error("No valid GEMINI_API_KEY found in .env file.")
         return
 
     input_dir = Path("data")
@@ -265,7 +286,7 @@ def main():
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
         # Submit all PDFs; track future → pdf_path for error reporting
         future_to_pdf = {
-            executor.submit(_process_one, api_key, pdf_path, output_dir, idx + 1, total): pdf_path
+            executor.submit(_process_one, api_keys, pdf_path, output_dir, idx + 1, total): pdf_path
             for idx, pdf_path in enumerate(pdf_files)
         }
 

@@ -132,7 +132,7 @@ Given a user's natural language query about real estate, return a JSON object wi
    OPTIONAL MATCH (p)-[:HAS_AMENITY]->(am:Amenity)
    OPTIONAL MATCH (p)-[:NEAR]->(lm:Landmark)
    WITH p, n, c, dev,
-        collect(DISTINCT properties(u)) AS units,
+        collect(DISTINCT CASE WHEN u IS NOT NULL THEN u {{ .*, rooms: [(u)-[:HAS_ROOM]->(r:Room) | properties(r)] }} ELSE null END) AS units,
         collect(DISTINCT am.name) AS amenities,
         collect(DISTINCT lm.name) AS landmarks
 
@@ -171,7 +171,7 @@ Given a user's natural language query about real estate, return a JSON object wi
     OPTIONAL MATCH (p)-[:HAS_UNIT]->(u:Unit)
     OPTIONAL MATCH (p)-[:HAS_AMENITY]->(am:Amenity)
     OPTIONAL MATCH (p)-[:NEAR]->(lm:Landmark)
-    WITH p, n, c, dev, collect(DISTINCT properties(u)) AS units, collect(DISTINCT am.name) AS amenities, collect(DISTINCT lm.name) AS landmarks
+    WITH p, n, c, dev, collect(DISTINCT CASE WHEN u IS NOT NULL THEN u {{ .*, rooms: [(u)-[:HAS_ROOM]->(r:Room) | properties(r)] }} ELSE null END) AS units, collect(DISTINCT am.name) AS amenities, collect(DISTINCT lm.name) AS landmarks
     RETURN p, n.name AS neighbourhood, c.name AS city, dev.name AS developer, units, amenities, landmarks
     LIMIT $limit
 
@@ -196,7 +196,7 @@ OPTIONAL MATCH (p)-[:HAS_UNIT]->(u:Unit)
 OPTIONAL MATCH (p)-[:HAS_AMENITY]->(am:Amenity)
 OPTIONAL MATCH (p)-[:NEAR]->(lm:Landmark)
 WITH p, n, c, dev,
-     collect(DISTINCT properties(u)) AS units,
+     collect(DISTINCT CASE WHEN u IS NOT NULL THEN u { .*, rooms: [(u)-[:HAS_ROOM]->(r:Room) | properties(r)] } ELSE null END) AS units,
      collect(DISTINCT am.name) AS amenities,
      collect(DISTINCT lm.name) AS landmarks"""
 
