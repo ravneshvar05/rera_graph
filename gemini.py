@@ -185,6 +185,9 @@ RULES:
    - Extract EVERY unit/variant (1A, 1B, 1C...) as a SEPARATE unit with its OWN rooms and dimensions.
    - Never copy dimensions from one variant to another. Read each floor plan independently.
    - Scan every page — do NOT stop early.
+   - ONLY extract rooms that are explicitly drawn or described for that specific unit. DO NOT hallucinate standard rooms (like a Bedroom or Balcony) if they do not exist in the floor plan.
+   - IMPORTANT: If a room (e.g. "Bedroom") does NOT exist in the unit (e.g. it is a "1 HK"), omit it entirely from the `rooms` list. DO NOT output a room object with null values just to satisfy perceived schema requirements.
+   - If a room IS genuinely present in the unit but lacks printed dimensions, you MUST extract its name and set its length, width, and area to null.
 
 2. ROOM NAMES — use these canonical names in the `name` field:
    - Drawing Room / Living Room / Lounge / Family Room / L-D / Drg Room → "Hall"
