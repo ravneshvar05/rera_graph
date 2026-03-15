@@ -69,25 +69,31 @@ def generate_answer(
     context_text: str,
     project_results: list[ProjectResult],
     intent: QueryIntent,
+    direct_answer_text: str = "",
 ) -> dict:
     """
-    Generate a JSON-structured recommendation answer using Gemini.
+    Generate a JSON-structured recommendation answer.
 
     Args:
         user_query: The original user query string.
         context_text: The assembled context from DualRetriever.
         project_results: Structured project results (for fallback display).
         intent: The structured parser intent.
+        direct_answer_text: Pre-formatted direct answer for LOOKUP/AGGREGATE queries.
 
     Returns:
         A formatted dictionary answer suitable for display in the chat UI.
+        Includes 'direct_answer' key if direct_answer_text is provided.
     """
     if not project_results:
-        return {
+        ans = {
             "general_summary": "I couldn't find any projects matching your criteria in our current database. Try broadening your search.",
             "projects": [],
             "conclusion": ""
         }
+        if direct_answer_text:
+            ans["direct_answer"] = direct_answer_text
+        return ans
 
     # Optimization: bypass LLM to prevent long inference times ONLY for genuine global/overview queries.
     # We check if there are ANY specific filters applied in the intent.
@@ -116,7 +122,10 @@ def generate_answer(
     # Bypass LLM generation entirely and just return the structured fallback answer
     # so we can see exactly what the Graph DB retrieved without hitting rate limits.
     logger.info("TEMPORARY: Bypassing LLM generation to debug Graph Retrieval.")
-    return _fallback_answer(user_query, project_results)
+    ans = _fallback_answer(user_query, project_results)
+    if direct_answer_text:
+        ans["direct_answer"] = direct_answer_text
+    return ans
     # ──────────────────────────────────────────────────────────────────
     
     # ... (Original code commented out or bypassed)
@@ -170,7 +179,7 @@ User Query: {user_query}
 
 
 def _fallback_answer(user_query: str, results: list[ProjectResult]) -> dict:
-    """Simple structured answer if LLM call fails."""
+    """Simple structured answer if LLM call fails — includes rich detail."""
     projects = []
     for proj in results:
         reasoning_lines = []
@@ -180,9 +189,54 @@ def _fallback_answer(user_query: str, results: list[ProjectResult]) -> dict:
         reasoning_lines.append(f"- Location: {location_str}")
         
         reasoning_lines.append(f"- Developer: {proj.developer}")
+        
+        # Project status
+        status_val = proj.extra_props.get("project_status")
+        if status_val and status_val.upper() not in ("UNKNOWN", "NONE"):
+            reasoning_lines.append(f"- Status: {status_val.replace('_', ' ').title()}")
+        
+        # Possession date
+        poss_date = proj.extra_props.get("possession_date")
+        if poss_date:
+            reasoning_lines.append(f"- Possession: {poss_date}")
+        
+        # RERA
+        rera = proj.extra_props.get("rera_number")
+        if rera:
+            reasoning_lines.append(f"- RERA: {rera}")
+        
+        # Buildings
+        bldgs = proj.extra_props.get("total_buildings")
+        if bldgs:
+            reasoning_lines.append(f"- Buildings: {bldgs}")
+        
         if proj.units:
             unit_types = list({u.get("unit_type", "?") for u in proj.units})
             reasoning_lines.append(f"- Units: {', '.join(unit_types)}")
+            
+            # Show rooms from first unit
+            for u in proj.units[:1]:
+                rooms = u.get("rooms") or []
+                room_strs = []
+                for r in rooms[:6]:
+                    rname = r.get("name", "")
+                    rarea = r.get("area_sqft")
+                    rlen = r.get("length")
+                    rwid = r.get("width")
+                    parts = []
+                    if rlen and rwid:
+                        parts.append(f"{rlen} x {rwid}")
+                    if rarea:
+                        try:
+                            parts.append(f"{float(rarea):.1f} sqft")
+                        except (ValueError, TypeError):
+                            parts.append(f"{rarea} sqft")
+                    if rname:
+                        dim_str = f" ({', '.join(parts)})" if parts else ""
+                        room_strs.append(f"{rname}{dim_str}")
+                if room_strs:
+                    reasoning_lines.append(f"- Rooms ({u.get('unit_type', '?')}): {'; '.join(room_strs)}")
+        
         if getattr(proj, "floor_layouts", None):
             layout_details = []
             for f in proj.floor_layouts:
@@ -190,7 +244,12 @@ def _fallback_answer(user_query: str, results: list[ProjectResult]) -> dict:
                 units = f.get('total_units_on_floor', '?')
                 layout_details.append(f"{name} ({units} units/floor)")
             reasoning_lines.append(f"- Floor Layouts: {', '.join(layout_details)}")
-            reasoning_lines.append(f"- Amenities: {', '.join(proj.amenities[:5])}")
+        
+        if proj.amenities:
+            reasoning_lines.append(f"- Amenities: {', '.join(proj.amenities[:8])}")
+        
+        if proj.landmarks:
+            reasoning_lines.append(f"- Nearby: {', '.join(proj.landmarks[:5])}")
             
         projects.append({
             "project_name": proj.project_name,
@@ -202,3 +261,4 @@ def _fallback_answer(user_query: str, results: list[ProjectResult]) -> dict:
         "projects": projects,
         "conclusion": "Hope this helps!"
     }
+

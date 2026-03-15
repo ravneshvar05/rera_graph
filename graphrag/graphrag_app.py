@@ -98,20 +98,31 @@ st.markdown("""
 
     /* ── CHAT INTERFACE ── */
     /* Chat Input Pill */
+    [data-testid="stBottom"], [data-testid="stBottomBlockContainer"] {
+        background: transparent !important;
+        padding-bottom: 2rem !important; /* Add some breathing room at the bottom */
+    }
+    
     [data-testid="stChatInput"] {
         background-color: #1e2230 !important;
         border: 1px solid rgba(255, 255, 255, 0.1) !important;
         border-radius: 36px !important;
-        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15) !important;
+        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5) !important;
         padding: 6px 16px !important;
         transition: border-color 0.3s ease, box-shadow 0.3s ease !important;
     }
+    [data-testid="stChatInput"] > div,
+    [data-testid="stChatInput"] div[data-baseweb="base-input"] {
+        background-color: transparent !important;
+        border: none !important;
+    }
     [data-testid="stChatInput"]:focus-within {
         border-color: rgba(99, 179, 237, 0.6) !important;
-        box-shadow: 0 8px 30px rgba(99, 179, 237, 0.15) !important;
+        box-shadow: 0 8px 30px rgba(99, 179, 237, 0.3) !important;
     }
     [data-testid="stChatInput"] textarea {
         color: #f7fafc !important;
+        background-color: transparent !important;
     }
 
     /* Chat Messages Base */
@@ -309,6 +320,10 @@ for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         content = msg["content"]
         if isinstance(content, dict):
+            # Direct answer block (for LOOKUP/AGGREGATE queries)
+            if content.get("direct_answer"):
+                st.info(content["direct_answer"])
+
             st.markdown(content.get("general_summary", ""))
             
             projects_data = content.get("projects", [])
@@ -358,8 +373,15 @@ if query:
             status.write("🧠 Understanding your query…")
             intent = parse_intent(query)
 
-            # Mandatory Slot Check: City
-            if not intent.city:
+            # Mandatory Slot Check: City — only needed for broad filter queries
+            # Skip city requirement when user mentions a project name, neighbourhood, or area
+            needs_city = (
+                not intent.city
+                and not intent.neighbourhood
+                and not intent.zone
+                and not intent.project_names
+            )
+            if needs_city:
                 status.update(
                     label="Need more information", state="complete", expanded=False
                 )
@@ -370,11 +392,11 @@ if query:
                 # Step 2: Retrieve
                 status.write("🔍 Searching knowledge graph and vector index…")
                 retriever: DualRetriever = st.session_state.retriever
-                context_text, results = retriever.retrieve_and_assemble(intent, query)
+                context_text, results, direct_answer_text = retriever.retrieve_and_assemble(intent, query)
 
                 # Step 3: Generate answer
                 status.write("✍️ Generating recommendations…")
-                answer = generate_answer(query, context_text, results, intent)
+                answer = generate_answer(query, context_text, results, intent, direct_answer_text)
 
                 final_count = len(answer.get("projects", [])) if isinstance(answer, dict) else len(results)
                 status.update(
@@ -383,6 +405,10 @@ if query:
 
         # ── Display answer ─────────────────────────────────────────────────────
         if isinstance(answer, dict):
+            # Direct answer block (LOOKUP / AGGREGATE queries)
+            if answer.get("direct_answer"):
+                st.info(answer["direct_answer"])
+
             st.markdown(answer.get("general_summary", ""))
             
             projects_data = answer.get("projects", [])
@@ -390,9 +416,55 @@ if query:
             
             def get_project_card(proj, tag_c, tag_l):
                 u_types = list({u.get("unit_type", "?") for u in proj.units}) if proj.units else []
-                amen_str = ", ".join(proj.amenities[:4]) or "—"
+                amen_str = ", ".join(proj.amenities[:6]) or "—"
                 address = proj.extra_props.get("address")
                 location_str = address if address else f"{proj.neighbourhood}, {proj.city}"
+                
+                # Build extra info lines
+                extra_lines = []
+                status_val = proj.extra_props.get("project_status")
+                if status_val and status_val.upper() not in ("UNKNOWN", "NONE"):
+                    status_display = status_val.replace("_", " ").title()
+                    extra_lines.append(f'📋 Status: {status_display}')
+                poss_date = proj.extra_props.get("possession_date")
+                if poss_date:
+                    extra_lines.append(f'📅 Possession: {poss_date}')
+                rera = proj.extra_props.get("rera_number")
+                if rera:
+                    extra_lines.append(f'🔖 RERA: {rera}')
+                bldgs = proj.extra_props.get("total_buildings")
+                if bldgs:
+                    extra_lines.append(f'🏢 Buildings: {bldgs}')
+                
+                # Show key rooms from first unit
+                room_snippets = []
+                if proj.units:
+                    for u in proj.units[:2]:  # first 2 unit types
+                        rooms = u.get("rooms") or []
+                        for r in rooms[:4]:  # first 4 rooms per unit
+                            rname = r.get("name", "")
+                            rarea = r.get("area_sqft")
+                            if rname and rarea:
+                                try:
+                                    room_snippets.append(f"{rname}: {float(rarea):.0f} sqft")
+                                except (ValueError, TypeError):
+                                    room_snippets.append(f"{rname}: {rarea} sqft")
+                        if room_snippets:
+                            break  # only show rooms from one unit type
+                
+                room_line = ""
+                if room_snippets:
+                    room_line = f'<br>📐 {" · ".join(room_snippets[:4])}'
+                
+                soc_desc = proj.extra_props.get("society_description", "")
+                soc_snippet = ""
+                if soc_desc and len(soc_desc) > 10:
+                    truncated = soc_desc[:120] + ("…" if len(soc_desc) > 120 else "")
+                    soc_snippet = f'<br><span style="color:#718096;font-size:0.85rem">{truncated}</span>'
+                
+                extra_html = ""
+                if extra_lines:
+                    extra_html = '<br>' + ' &nbsp;|&nbsp; '.join(extra_lines)
                 
                 return (
                     f'<div class="project-card">'
@@ -401,6 +473,9 @@ if query:
                     f'🏗️ {proj.developer}<br>'
                     f'🏠 {", ".join(u_types) if u_types else "—"}<br>'
                     f'✨ {amen_str}'
+                    f'{room_line}'
+                    f'{extra_html}'
+                    f'{soc_snippet}'
                     f"</div>"
                 )
 

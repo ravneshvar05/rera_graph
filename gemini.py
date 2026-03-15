@@ -96,8 +96,8 @@ class PropertyType(str, Enum):
 
 class BaseRoomSchema(BaseModel):
     name: str = Field(description="Normalized common room label (e.g., 'Hall' instead of 'Drawing Room', 'Balcony' instead of 'Balc'). Use original name if not a common room type.")
-    length: Optional[str] = Field(default=None, description="Raw length ONLY. Must be part of a length x width pair explicitly written on the plan. DO NOT guess from single numbers, sequence IDs, or areas. DO NOT include 'x' or 'X' (e.g., \"10'-6\\\"\"). Avoid partial extractions like \"12'x\". Set to null if missing.")
-    width:  Optional[str] = Field(default=None, description="Raw width ONLY. Must be part of a length x width pair explicitly written on the plan. DO NOT guess from single numbers, sequence IDs, or areas. DO NOT include 'x' or 'X' (e.g., \"11'-0\\\"\"). Set to null if missing.")
+    length: Optional[str] = Field(default=None, description="Raw length string exactly as written anywhere on the page (floor plan drawing OR side legend/table). DO NOT include 'x' or 'X'. DO NOT guess from single numbers, sequence IDs, or areas. Set to null if no length x width pair exists for this room.")
+    width:  Optional[str] = Field(default=None, description="Raw width string exactly as written anywhere on the page (floor plan drawing OR side legend/table). DO NOT include 'x' or 'X'. DO NOT guess from single numbers, sequence IDs, or areas. Set to null if no length x width pair exists for this room.")
     area_sqft: Optional[float] = Field(default=None, description="Area in sqft — fill if printed, or will be computed from length x width")
     floor_level: Optional[str] = Field(default=None, description="Ground / First / Second / Terrace")
 
@@ -188,6 +188,7 @@ RULES:
    - ONLY extract rooms that are explicitly drawn or described for that specific unit. DO NOT hallucinate standard rooms (like a Bedroom or Balcony) if they do not exist in the floor plan.
    - IMPORTANT: If a room (e.g. "Bedroom") does NOT exist in the unit (e.g. it is a "1 HK"), omit it entirely from the `rooms` list. DO NOT output a room object with null values just to satisfy perceived schema requirements.
    - If a room IS genuinely present in the unit but lacks printed dimensions, you MUST extract its name and set its length, width, and area to null.
+   - CRITICAL: While dimensions are usually drawn directly inside the room, SOMETIMES they are listed in a legend/table ON THE SIDE instead (e.g. the plan shows 'A' or '1' inside the room, and the side text says 'A. LIVING (17\\' X 11\\')'). If you see letters or numbers instead of dimensions in the rooms, you MUST actively scan the entire page, including all side texts and legends, to find and match the corresponding room names and dimensions. DO NOT STOP SEARCHING.
 
 2. ROOM NAMES — use these canonical names in the `name` field:
    - Drawing Room / Living Room / Lounge / Family Room / L-D / Drg Room → "Hall"
@@ -209,11 +210,16 @@ RULES:
 
 3. DIMENSIONS (STRICTLY PAIRED ONLY):
    - ONLY extract dimensions if explicitly printed as a length and width pair (e.g., "10'0\" x 11'4\"" or "3.05 x 3.45").
+   - ALWAYS split the pair at the 'x' or 'X'. Extract the first part into `length` and the second part into `width`.
+   - NEVER put the entire "10'2\" x 12'0\"" string into a single field.
    - Extract length and width into their SEPARATE fields. NEVER include 'x' or 'X' in the value.
    - Example printed text "12' x 10'1\"" → length="12'", width="10'1\"" (NOT "12'x").
+   - Example printed text "10'2\"X12\"" → length="10'2\"", width="12\"".
    - NEVER hallucinate dimensions from single numbers (e.g., room counts, sequence numbers, or total sqft areas).
-   - If a room does NOT have an explicitly printed Length x Width pair on the floor plan, you MUST leave both `length` and `width` as `null`. NEVER GUESS.
+   - If a room does NOT have an explicitly printed Length x Width pair on the floor plan or legend, you MUST leave both `length` and `width` as `null`. NEVER GUESS.
    - Sanity check: Master Bedroom > Bedroom > Kitchen ≈ Dining > Toilet (toilet width ≤ 5').
+   - CRITICAL: If a room's name and dimensions are listed in a side legend (like "A. LIVING & DINING (17' X 11')"), you MUST extract "17'" as length and "11'" as width for that specific room object. NEVER output null dimensions when a legend exists.
+   - CRITICAL PENTHOUSE RULE: For large units like "5 BHK Penthouse" or "4 BHK", the dimensions are ALMOST ALWAYS in a side table or list, and NOT DRAWN on the room. You MUST NOT LEAVE DIMENSIONS NULL for large units just because the drawing is complex. Search the entire page for the legend/table containing the dimensions.
 
 4. ROOM AREA: Use printed value if available. Otherwise compute area_sqft = length_ft × width_ft (1m = 3.281ft).
 
@@ -293,14 +299,36 @@ def parse_ft(raw: str) -> Optional[float]:
     if not raw:
         return None
     raw = raw.strip()
-    # 10'-6" or 10'6" or 10'
-    m = re.match(r"(\d+)['\u2019](?:[\s\-]?(\d+)[\"\u201d]?)?", raw)
+    # Remove any stray "x" or "X" at the end if LLM messed up
+    raw = re.sub(r'[\sxX]+$', '', raw)
+    
+    # 13.6' or 10.5'-6" or 10'6" or 10'
+    m = re.match(r"(\d+(?:\.\d+)?)['\u2019](?:[\s\-]?(\d+(?:\.\d+)?)[\"\u201d]?)?", raw)
     if m:
-        return int(m.group(1)) + (int(m.group(2)) / 12 if m.group(2) else 0)
+        ft = float(m.group(1))
+        inch = float(m.group(2)) if m.group(2) else 0.0
+        return ft + (inch / 12.0)
+        
+    # Standalone inches: 150"
+    m = re.match(r"^(\d+(?:\.\d+)?)[\"\u201d]$", raw)
+    if m:
+        return float(m.group(1)) / 12.0
+
     # 10-6 (feet-inches with dash)
     m = re.match(r"^(\d+)-(\d+)$", raw)
     if m:
-        return int(m.group(1)) + int(m.group(2)) / 12
+        return int(m.group(1)) + int(m.group(2)) / 12.0
+        
+    # Plain decimal with m, mt, mtr, or meters
+    m = re.match(r"^(\d+(?:\.\d+)?)\s*(?:m|mtr|mt|meters?)$", raw, re.IGNORECASE)
+    if m:
+        return float(m.group(1)) * 3.281
+        
+    # Plain decimal with ft or feet
+    m = re.match(r"^(\d+(?:\.\d+)?)\s*(?:ft|feet)$", raw, re.IGNORECASE)
+    if m:
+        return float(m.group(1))
+
     # Plain decimal — metres if < 15, else feet
     m = re.match(r"^(\d+\.?\d*)$", raw)
     if m:
@@ -321,46 +349,6 @@ def compute_room_areas(data: dict) -> dict:
                 room["area_sqft"] = round(l * w, 1)
     return data
 
-
-
-# FIX 2: actively DELETE hallucinated copy-pasted dimensions across variants
-def fix_hallucinated_dimensions(data: dict) -> dict:
-    """
-    If two or more unit variants share the exact same room dimension signature,
-    it means the LLM copy-pasted. We null out the dimensions on the duplicates
-    (keeping only the first occurrence as likely correct).
-    """
-    units = data.get("units", [])
-
-    def dim_signature(unit):
-        return "|".join(
-            f"{r.get('name')}:{r.get('length')}x{r.get('width')}"
-            for r in unit.get("rooms", [])
-            if r.get("length") or r.get("width")
-        )
-
-    seen: dict[str, str] = {}   # signature → first unit_type that had it
-
-    for unit in units:
-        sig = dim_signature(unit)
-        if not sig:
-            continue
-        utype = unit.get("unit_type", "?")
-
-        if sig in seen:
-            # This is a duplicate — null out all dimensions in this unit
-            logging.warning(
-                f"  [HALLUCINATION] '{utype}' has identical room dimensions as "
-                f"'{seen[sig]}' — clearing copied dimensions."
-            )
-            for room in unit.get("rooms", []):
-                room["length"] = None
-                room["width"]  = None
-                room["area_sqft"] = None
-        else:
-            seen[sig] = utype
-
-    return data
 
 
 # ── Room name normalisation (deterministic, runs AFTER LLM extraction) ────────
@@ -464,14 +452,11 @@ def postprocess(data: dict, filename: str) -> dict:
     # FIX 1: clean "null" strings everywhere
     data = clean_null_strings(data)
 
-    # FIX 3: inject project_id ourselves (never trust LLM for this)
+    # FIX 2: inject project_id ourselves (never trust LLM for this)
     data["project_id"] = str(uuid.uuid4())
 
     # Always stamp correct filename
     data["brochure_file"] = filename
-
-    # FIX 2: remove hallucinated copy-pasted dimensions
-    data = fix_hallucinated_dimensions(data)
 
     # Compute room areas from dimensions
     data = compute_room_areas(data)

@@ -25,6 +25,7 @@ from graphrag_intent import QueryIntent
 from graphrag_cypher import generate_cypher, CypherQuery
 
 
+
 # ── Data structures ────────────────────────────────────────────────────────────
 
 @dataclass
@@ -200,48 +201,65 @@ class GraphRetriever:
     def close(self):
         self._driver.close()
 
-    def retrieve(self, cypher_result: CypherQuery) -> list[ProjectResult]:
+    def retrieve(self, cypher_result: CypherQuery) -> tuple[list[ProjectResult], list[dict]]:
         """
         Execute a Text-to-Cypher generated query against Neo4j.
         Falls back to _get_all_projects() for GLOBAL queries or on error.
+
+        Returns:
+            (project_results, answer_data)
+            - answer_data is non-empty only for LOOKUP / AGGREGATE queries
         """
         if cypher_result.query_type == "GLOBAL":
             results = self._get_all_projects()
+            answer_data: list[dict] = []
         else:
-            results = self._execute_cypher(cypher_result)
+            results, answer_data = self._execute_cypher(cypher_result)
 
         logger.info(f"Graph retrieval → {len(results)} project(s)")
-        return results
+        return results, answer_data
 
-    def _execute_cypher(self, cq: CypherQuery) -> list[ProjectResult]:
-        """Execute the LLM-generated Cypher and return project results."""
+    def _execute_cypher(self, cq: CypherQuery) -> tuple[list[ProjectResult], list[dict]]:
+        """Execute the LLM-generated Cypher and return (project_results, answer_data)."""
         try:
             with self._driver.session() as session:
-                records = session.run(cq.cypher, **cq.params)
-                return [self._record_to_result(r) for r in records]
+                records = list(session.run(cq.cypher, **cq.params))
+                results = [self._record_to_result(r) for r in records]
+
+                # Extract answer_data from LOOKUP / AGGREGATE queries
+                answer_data: list[dict] = []
+                if cq.answer_columns:
+                    for record in records:
+                        for col in cq.answer_columns:
+                            val = record.get(col)
+                            if val:
+                                # val is a list of dicts (one per unit)
+                                if isinstance(val, list):
+                                    answer_data.extend([dict(v) for v in val if v])
+                                elif isinstance(val, dict):
+                                    answer_data.append(dict(val))
+
+                return results, answer_data
         except Exception as e:
             logger.warning(f"Text-to-Cypher execution failed: {e}")
             logger.warning(f"Failed Cypher:\n{cq.cypher}")
             logger.warning(f"Params: {cq.params}")
-            # Fallback: return empty so vector search handles it
-            return []
+            return [], []
 
     def _get_all_projects(self) -> list[ProjectResult]:
-        """Return all projects with their core data."""
+        """Return all projects with their core data, including rooms embedded in units."""
         cypher = """
         MATCH (p:Project)-[:LOCATED_IN]->(n:Neighbourhood)-[:IN_CITY]->(c:City)
         OPTIONAL MATCH (p)-[:BUILT_BY]->(dev:Developer)
         OPTIONAL MATCH (p)-[:HAS_UNIT]->(u:Unit)
         OPTIONAL MATCH (p)-[:HAS_AMENITY]->(am:Amenity)
         OPTIONAL MATCH (p)-[:NEAR]->(lm:Landmark)
-        RETURN
-            p,
-            n.name AS neighbourhood,
-            c.name AS city,
-            dev.name AS developer,
-            collect(DISTINCT properties(u)) AS units,
-            collect(DISTINCT am.name) AS amenities,
-            collect(DISTINCT lm.name) AS landmarks
+        WITH p, n, c, dev,
+             collect(DISTINCT CASE WHEN u IS NOT NULL THEN u { .*, rooms: [(u)-[:HAS_ROOM]->(r:Room) | properties(r)] } ELSE null END) AS units,
+             collect(DISTINCT am.name) AS amenities,
+             collect(DISTINCT lm.name) AS landmarks
+        RETURN p, n.name AS neighbourhood, c.name AS city, dev.name AS developer,
+               units, amenities, landmarks
         LIMIT $limit
         """
         with self._driver.session() as session:
@@ -440,7 +458,17 @@ class GraphRetriever:
     def _record_to_result(record) -> ProjectResult:
         p = dict(record["p"])
         units_raw = record.get("units") or []
-        units = [dict(u) for u in units_raw if u]
+        # Units may contain embedded rooms (from list comprehension in Cypher)
+        units = []
+        for u in units_raw:
+            if u is None:
+                continue
+            u_dict = dict(u)
+            # Ensure rooms list is a plain list of dicts
+            if "rooms" in u_dict and u_dict["rooms"] is not None:
+                u_dict["rooms"] = [dict(r) for r in u_dict["rooms"] if r]
+            units.append(u_dict)
+
         floor_layouts_raw = record.get("floor_layouts") or []
         floor_layouts = [dict(f) for f in floor_layouts_raw if f]
         amenities = [a for a in (record.get("amenities") or []) if a]
@@ -608,6 +636,177 @@ class VectorRetriever:
         return sorted_results
 
 
+# ── Answer data formatter ──────────────────────────────────────────────────────
+
+def _format_answer_data(
+    answer_data: list[dict],
+    query_type: str,
+    raw_query: str,
+    params: dict,
+) -> str:
+    """
+    Convert raw answer_data from LOOKUP / AGGREGATE Cypher into a
+    human-readable direct answer string.
+
+    Handles multiple answer formats:
+    - Room-specific LOOKUP (rooms per unit variant)
+    - Full project detail LOOKUP (all units + all rooms)
+    - Project info LOOKUP (address, RERA, status, etc.)
+    - AGGREGATE with size filter or existence filter
+    - Count/statistics AGGREGATE
+    """
+    if not answer_data:
+        return ""
+
+    lines: list[str] = []
+    room_name_param = params.get("room_name", "")
+
+    # ── Detect answer format ──
+    first = answer_data[0] if answer_data else {}
+
+    # Case: Project info dict (has 'project_name' + 'address' or similar top-level keys)
+    if isinstance(first, dict) and "project_name" in first and ("address" in first or "rera_number" in first or "project_status" in first):
+        lines.append("📋 **Project Information:**")
+        for entry in answer_data:
+            if not isinstance(entry, dict):
+                continue
+            for key, val in entry.items():
+                if val is None or val == "" or val == []:
+                    continue
+                readable_key = key.replace("_", " ").title()
+                if isinstance(val, list):
+                    val_str = ", ".join(str(v) for v in val)
+                else:
+                    val_str = str(val)
+                lines.append(f"  - **{readable_key}**: {val_str}")
+        return "\n".join(lines) if lines else ""
+
+    # Case: Count/statistics dict (has 'count' key)
+    if isinstance(first, dict) and "count" in first:
+        count = first.get("count", 0)
+        projects = first.get("projects", [])
+        lines.append(f"📊 **Count: {count}**")
+        if projects and len(projects) <= 20:
+            lines.append("Projects: " + ", ".join(str(p) for p in projects))
+        return "\n".join(lines)
+
+    # Case: Room-level results (LOOKUP or AGGREGATE)
+    if query_type == "LOOKUP":
+        lines.append("📐 **Direct Answer:**")
+        for entry in answer_data:
+            if not isinstance(entry, dict):
+                continue
+            unit_type = entry.get("unit_type") or entry.get("bhk", "")
+            if unit_type:
+                lines.append(f"\n**{unit_type}:**")
+
+            # Show unit-level details if present
+            carpet = entry.get("carpet_sqft")
+            sba = entry.get("super_builtup_sqft")
+            facing = entry.get("entrance_facing")
+            desc = entry.get("description")
+            prop_type = entry.get("property_type")
+            
+            detail_parts = []
+            if prop_type:
+                detail_parts.append(f"Type: {prop_type}")
+            if carpet:
+                try:
+                    detail_parts.append(f"Carpet: {float(carpet):.1f} sqft")
+                except (ValueError, TypeError):
+                    detail_parts.append(f"Carpet: {carpet} sqft")
+            if sba:
+                try:
+                    detail_parts.append(f"Super Built-up: {float(sba):.1f} sqft")
+                except (ValueError, TypeError):
+                    detail_parts.append(f"Super Built-up: {sba} sqft")
+            if facing:
+                detail_parts.append(f"Facing: {facing}")
+            if detail_parts:
+                lines.append(f"  {' | '.join(detail_parts)}")
+            if desc:
+                truncated = desc[:150] + ("…" if len(desc) > 150 else "")
+                lines.append(f"  _{truncated}_")
+
+            rooms = entry.get("rooms") or []
+            if not rooms:
+                rooms = entry.get("matching_rooms") or []
+
+            if not rooms:
+                if room_name_param:
+                    lines.append(f"  - {room_name_param}: dimensions not available for this unit")
+                continue
+
+            for r in rooms:
+                if not r:
+                    continue
+                rname = r.get("room_name") or r.get("name") or room_name_param or "Room"
+                length = r.get("length")
+                width  = r.get("width")
+                area   = r.get("area_sqft")
+                parts  = []
+                if length and width:
+                    parts.append(f"{length} x {width}")
+                if area:
+                    try:
+                        parts.append(f"{float(area):.1f} sqft")
+                    except (ValueError, TypeError):
+                        parts.append(f"{area} sqft")
+                dim_str = " = " + ", ".join(parts) if parts else " (dimensions not provided)"
+                lines.append(f"  - {rname}{dim_str}")
+
+    elif query_type == "AGGREGATE":
+        has_results = any(
+            (entry.get("matching_rooms") or []) for entry in answer_data
+            if isinstance(entry, dict)
+        )
+        if not has_results:
+            return ""
+
+        min_area = params.get("min_area")
+        max_area = params.get("max_area")
+        if min_area is not None:
+            filter_desc = f"> {min_area} sqft"
+        elif max_area is not None:
+            filter_desc = f"< {max_area} sqft"
+        else:
+            filter_desc = "available"
+
+        room_display = room_name_param or "Room"
+        lines.append(f"📐 **{room_display} sizes ({filter_desc}) — per unit type:**")
+
+        seen: set[str] = set()
+        for entry in answer_data:
+            if not isinstance(entry, dict):
+                continue
+            unit_type = str(entry.get("unit_type") or entry.get("bhk") or "")
+            matching = entry.get("matching_rooms") or []
+            for r in matching:
+                if not r:
+                    continue
+                rname  = r.get("room_name") or r.get("name") or room_display
+                length = r.get("length")
+                width  = r.get("width")
+                area   = r.get("area_sqft")
+                parts  = []
+                if length and width:
+                    parts.append(f"{length} x {width}")
+                if area:
+                    try:
+                        parts.append(f"{float(area):.1f} sqft")
+                    except (ValueError, TypeError):
+                        parts.append(f"{area} sqft")
+                key = f"{unit_type}|{rname}|{'|'.join(parts)}"
+                if key in seen:
+                    continue
+                seen.add(key)
+                dim_str    = ": " + ", ".join(parts) if parts else ""
+                unit_prefix = f"[{unit_type}] " if unit_type else ""
+                lines.append(f"  - {unit_prefix}{rname}{dim_str}")
+
+    return "\n".join(lines) if lines else ""
+
+
 # ── Dual Retriever (main entry point) ─────────────────────────────────────────
 
 class DualRetriever:
@@ -623,18 +822,22 @@ class DualRetriever:
     def close(self):
         self._graph.close()
 
-    def retrieve_and_assemble(self, intent: QueryIntent, raw_query: str) -> tuple[str, list[ProjectResult]]:
+    def retrieve_and_assemble(
+        self, intent: QueryIntent, raw_query: str
+    ) -> tuple[str, list[ProjectResult], str]:
         """
         Main retrieval method.
 
         Returns:
-            (context_text, merged_project_results)
+            (context_text, merged_project_results, direct_answer_text)
+            - direct_answer_text is non-empty for LOOKUP / AGGREGATE queries
+              and contains a human-readable answer to the user's specific question.
         """
         # 1. Generate precise Cypher + vector query string from the raw user query
         cypher_result = generate_cypher(raw_query)
 
         # 2. Graph retrieval — precise structural filtering via LLM-generated Cypher
-        graph_results = self._graph.retrieve(cypher_result)
+        graph_results, answer_data = self._graph.retrieve(cypher_result)
         graph_ids = {r.project_id for r in graph_results}
 
         # 3. Vector retrieval — semantic/fuzzy matching using LLM's vector_query
@@ -654,23 +857,20 @@ class DualRetriever:
 
         for r in vector_results:
             if r.project_id not in merged:
-                # New project found via vector — add it but mark as vector-only
                 merged[r.project_id] = r
             else:
-                # Already in graph results — mark as found in both
                 merged[r.project_id].source = "both"
-                # Blend score (lower is better for vector)
                 merged[r.project_id].score = r.score
 
-        # 4. Sort and filter
+        # 5. Sort and filter
         def sort_key(r: ProjectResult):
             source_prio = 0 if r.source == "both" else (1 if r.source == "graph" else 2)
             return (source_prio, r.score)
 
         final_candidates = sorted(merged.values(), key=sort_key)
-        
-        # If user asked for specific projects by name, heavily filter down to just those
-        if intent.project_names:
+
+        # For LOOKUP queries don't apply name filter (Cypher already filtered by project name)
+        if intent.project_names and cypher_result.query_type not in ("LOOKUP", "AGGREGATE"):
             filtered_final = []
             for candidate in final_candidates:
                 candidate_name = candidate.project_name.lower()
@@ -679,15 +879,22 @@ class DualRetriever:
                         filtered_final.append(candidate)
                         break
             final = filtered_final[: settings.FINAL_TOP_N]
-            
-            # If our strict name filter wiped everything out (which shouldn't happen if the graph found it, but just in case),
-            # fallback to the standard list to avoid an empty answer
             if not final:
                 final = final_candidates[: settings.FINAL_TOP_N]
         else:
             final = final_candidates[: settings.FINAL_TOP_N]
 
-        # 5. Assemble context text
+        # 6. Build direct answer text for LOOKUP / AGGREGATE
+        direct_answer_text = ""
+        if answer_data and cypher_result.query_type in ("LOOKUP", "AGGREGATE"):
+            direct_answer_text = _format_answer_data(
+                answer_data,
+                query_type=cypher_result.query_type,
+                raw_query=raw_query,
+                params=cypher_result.params,
+            )
+
+        # 7. Assemble context text
         context_blocks = []
         for i, proj in enumerate(final, 1):
             context_blocks.append(f"[{i}] {proj.to_context_text()}")
@@ -698,6 +905,8 @@ class DualRetriever:
             + "\n\n".join(context_blocks)
         )
 
-        logger.success(f"Context assembled: {len(final)} projects, "
-                       f"{len(context_text)} chars")
-        return context_text, final
+        logger.success(
+            f"Context assembled: {len(final)} projects, {len(context_text)} chars, "
+            f"direct_answer={'yes' if direct_answer_text else 'no'}"
+        )
+        return context_text, final, direct_answer_text

@@ -1,0 +1,17 @@
+D:\Rerachatbot\graphrag\test_e2e_queries.py:1: SyntaxWarning: invalid escape sequence '\R'
+  """
+2026-03-13 20:59:39.347 | DEBUG    | graphrag_retriever:__init__:199 - GraphRetriever connected to Neo4j.
+2026-03-13 20:59:40.367 | INFO     | graphrag_cypher:generate_cypher:399 - [Text-to-Cypher] type=LOOKUP | params=['project_name', 'limit'] | answer_cols=['answer_data'] | vector_query='OUM Orbit Ahmedabad details'
+2026-03-13 20:59:40.367 | DEBUG    | graphrag_cypher:generate_cypher:403 - [Text-to-Cypher] Cypher:
+MATCH (p:Project)-[:LOCATED_IN]->(n:Neighbourhood)-[:IN_CITY]->(c:City) WHERE toLower(p.project_name) CONTAINS toLower($project_name) OPTIONAL MATCH (p)-[:BUILT_BY]->(dev:Developer) OPTIONAL MATCH (p)-[:HAS_UNIT]->(u:Unit) OPTIONAL MATCH (p)-[:HAS_AMENITY]->(am:Amenity) OPTIONAL MATCH (p)-[:NEAR]->(lm:Landmark) WITH p, n, c, dev, u, collect(DISTINCT CASE WHEN u IS NOT NULL THEN u { .*, rooms: [(u)-[:HAS_ROOM]->(r:Room) | properties(r)] } ELSE null END) AS units, collect(DISTINCT am.name) AS amenities, collect(DISTINCT lm.name) AS landmarks WITH p, n, c, dev, units, amenities, landmarks, [u IN units WHERE u IS NOT NULL | { unit_type: u.unit_type, bhk: u.bhk, rooms: u.rooms }] AS answer_data RETURN p, n.name AS neighbourhood, c.name AS city, dev.name AS developer, units, amenities, landmarks, answer_data LIMIT $limit
+Traceback (most recent call last):
+
+=================================================================
+TEST: LOOKUP: Details of OUM Orbit Ahmedabad
+Query: 'find me the details of OUM Orbit Ahmedabad'
+  File "D:\Rerachatbot\graphrag\test_e2e_queries.py", line 52, in <module>
+    print(f"  Type:         {cq.query_type}  {'\u2713' if cq.query_type == expected_type else '\u2717 WRONG (expected ' + expected_type + ')'}")
+  File "C:\Users\USER\AppData\Local\Programs\Python\Python312\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode character '\u2713' in position 24: character maps to <undefined>
