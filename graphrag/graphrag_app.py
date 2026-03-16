@@ -11,6 +11,8 @@ The app connects to:
 """
 
 import time
+import json
+from pathlib import Path
 import streamlit as st
 from loguru import logger
 
@@ -334,6 +336,18 @@ with st.sidebar:
     show_context = st.toggle("Show Retrieved Context", value=False)
 
 # ── Session state ──────────────────────────────────────────────────────────────
+SETTINGS_PATH = Path("user_settings.json")
+
+if "user_settings" not in st.session_state:
+    if SETTINGS_PATH.exists():
+        try:
+            with open(SETTINGS_PATH, "r") as f:
+                st.session_state.user_settings = json.load(f)
+        except Exception:
+            st.session_state.user_settings = {}
+    else:
+        st.session_state.user_settings = {}
+
 if "messages" not in st.session_state:
     st.session_state.messages = []
 if "retriever" not in st.session_state:
@@ -344,6 +358,26 @@ if "retriever" not in st.session_state:
         except Exception as e:
             st.session_state.retriever_ok = False
             st.session_state.retriever_error = str(e)
+
+# ── Sidebar Bottom Settings ────────────────────────────────────────────────────
+with st.sidebar:
+    st.markdown("---")
+    st.markdown("**⚙️ API Settings**")
+    st.markdown("<div style='font-size: 0.8rem; color: #a0aec0; margin-bottom: 10px;'>Keys are stored locally.</div>", unsafe_allow_html=True)
+    
+    def save_settings():
+        with open(SETTINGS_PATH, "w") as f:
+            json.dump(st.session_state.user_settings, f)
+            
+    gemini_key = st.text_input("Gemini API Key (Primary)", value=st.session_state.user_settings.get("GEMINI_API_KEY", ""), type="password")
+    if gemini_key != st.session_state.user_settings.get("GEMINI_API_KEY", ""):
+        st.session_state.user_settings["GEMINI_API_KEY"] = gemini_key
+        save_settings()
+        
+    groq_key = st.text_input("Groq API Key (Fallback)", value=st.session_state.user_settings.get("GROQ_API_KEY", ""), type="password")
+    if groq_key != st.session_state.user_settings.get("GROQ_API_KEY", ""):
+        st.session_state.user_settings["GROQ_API_KEY"] = groq_key
+        save_settings()
 
 # ── Header ─────────────────────────────────────────────────────────────────────
 st.markdown("## 🏘️ RERA Property Recommendation System")
@@ -414,7 +448,7 @@ if query:
         with st.status("Searching properties…", expanded=True) as status:
             # Step 1: Generate Cypher + Intent in a SINGLE LLM call
             status.write("🧠 Understanding your query & generating graph query…")
-            cypher_result = generate_cypher(query)
+            cypher_result = generate_cypher(query, api_keys=st.session_state.user_settings)
             intent = cypher_result.intent
 
             # Mandatory Slot Check: City — only needed for broad filter queries
@@ -442,7 +476,7 @@ if query:
 
                 # Step 3: Generate answer
                 status.write("✍️ Generating recommendations…")
-                answer = generate_answer(query, context_text, results, intent, direct_answer_text)
+                answer = generate_answer(query, context_text, results, intent, direct_answer_text, api_keys=st.session_state.user_settings)
 
                 final_count = len(answer.get("projects", [])) if isinstance(answer, dict) else len(results)
                 status.update(
@@ -650,10 +684,10 @@ if query:
                 st.markdown(answer.get("conclusion"))
 
             # Display token usage for the active model
-            st.markdown(f"<div style='font-size: 0.8rem; color: #718096; margin-top: 10px; text-align: right;'>🤖 Cypher Engine tokens used: <strong>{cypher_result.tokens_used}</strong></div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='font-size: 0.8rem; color: #718096; margin-top: 10px; text-align: right;'>🤖 Cypher Engine tokens used: <strong>{cypher_result.tokens_used}</strong> | Engine: <strong>{cypher_result.engine_used}</strong></div>", unsafe_allow_html=True)
         else:
             st.markdown(answer)
-            st.markdown(f"<div style='font-size: 0.8rem; color: #718096; margin-top: 10px; text-align: right;'>🤖 Cypher Engine tokens used: <strong>{cypher_result.tokens_used}</strong></div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='font-size: 0.8rem; color: #718096; margin-top: 10px; text-align: right;'>🤖 Cypher Engine tokens used: <strong>{cypher_result.tokens_used}</strong> | Engine: <strong>{cypher_result.engine_used}</strong></div>", unsafe_allow_html=True)
 
         # ── Debug / context expanders ──────────────────────────────────────────
         if show_debug:

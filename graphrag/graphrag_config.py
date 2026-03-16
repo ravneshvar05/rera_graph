@@ -19,8 +19,8 @@ class GraphRAGSettings(BaseSettings):
 
     # ── LLM ───────────────────────────────────────────────────────────────────
     GEMINI_API_KEY: str = Field(...,  description="Gemini API key")
-    GEMINI_MODEL:   str = Field("gemini-2.0-flash", description="Gemini model for answers")
-    GEMINI_INTENT_MODEL: str = Field("gemini-2.0-flash", description="Gemini model for intent parsing")
+    GEMINI_MODEL:   str = Field("gemini-2.5-flash", description="Gemini model for answers")
+    GEMINI_INTENT_MODEL: str = Field("gemini-2.5-flash", description="Gemini model for intent parsing")
     GROQ_API_KEY:   str = Field("",  description="Groq API key (optional fallback)")
     GROQ_MODEL:     str = Field("llama-3.3-70b-versatile", description="Groq fallback model")
 

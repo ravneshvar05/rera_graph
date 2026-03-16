@@ -18,14 +18,12 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
+import google.generativeai as genai
 from groq import Groq
 from loguru import logger
 
 from graphrag_config import settings
 from graphrag_intent import QueryIntent
-
-# ── Groq client ────────────────────────────────────────────────────────────────
-_groq = Groq(api_key=settings.GROQ_API_KEY)
 
 
 # ── Generalized room synonym system ───────────────────────────────────────────
@@ -331,6 +329,7 @@ class CypherQuery:
     answer_columns: list[str]  # Which RETURN columns hold the direct answer (e.g. ["answer_data"])
     intent:         QueryIntent = field(default_factory=QueryIntent)  # Parsed intent (merged into single LLM call)
     tokens_used:    int = 0    # Total tokens used for this LLM call
+    engine_used:    str = "Unknown"  # Which engine generated this (Gemini/Groq)
 
 
 # ── Schema context given to the LLM ───────────────────────────────────────────
@@ -466,12 +465,18 @@ Just use BASE MATCH + RETURN. No WHERE clause.
 
 
 ── TEMPLATE 2: SPECIFIC (filtered search) ──
-Use BASE MATCH, then add WHERE clause with filters. Common filters:
+Use BASE MATCH entirely (including the WITH clause), then add a WHERE clause AFTER the WITH clause to filter.
+Example:
+... BASE MATCH WITH ...
+WHERE ANY(u IN units WHERE u.bhk = $bhk) AND toLower(c.name) = toLower($city)
+... RETURN ...
+
+Common filters:
 
   BHK:           ANY(u IN units WHERE u.bhk = $bhk)
   City:          toLower(c.name) = toLower($city)
-  Neighbourhood: (toLower(n.name) CONTAINS toLower($neighbourhood) OR toLower(p.address) CONTAINS toLower($neighbourhood))
-  Multi-neighbourhood: ANY(x IN $neighbourhoods WHERE toLower(n.name) CONTAINS toLower(x) OR toLower(p.address) CONTAINS toLower(x))
+  Neighbourhood: (toLower(n.name) CONTAINS toLower($neighbourhood) OR REPLACE(toLower(n.name), ' - ', '-') CONTAINS toLower($neighbourhood) OR toLower(p.address) CONTAINS toLower($neighbourhood))
+  Multi-neighbourhood: ANY(x IN $neighbourhoods WHERE toLower(n.name) CONTAINS toLower(x) OR REPLACE(toLower(n.name), ' - ', '-') CONTAINS toLower(x) OR toLower(p.address) CONTAINS toLower(x))
   Status:        toLower(p.project_status) CONTAINS toLower($status)
   Room existence: EXISTS {{ MATCH (p)-[:HAS_UNIT]->(u2)-[:HAS_ROOM]->(r) WHERE r.name = $room_name }}
   Amenity tag:   EXISTS {{ MATCH (p)-[:HAS_AMENITY]->(am2) WHERE $tag IN am2.canonical_tags }}
@@ -551,9 +556,10 @@ Use > for "greater/larger/bigger", < for "less/smaller/under". Always toFloat() 
 9. Fence area comparisons: IS NOT NULL AND toFloat() > ...
 10. Handle >/</>=/<=/ between. "at least" → >=, "under" → <.
 11. Multiple rooms → OR in filter. Prefer MORE data over empty results when ambiguous.
-12. ADDRESS SEARCH: For ANY location filter, ALWAYS also search p.address:
-    (toLower(n.name) CONTAINS toLower($loc) OR toLower(p.address) CONTAINS toLower($loc))
+12. ADDRESS + HYPHEN NORM: For ANY location filter, ALWAYS also search p.address AND normalize hyphens:
+    (toLower(n.name) CONTAINS toLower($loc) OR REPLACE(toLower(n.name), ' - ', '-') CONTAINS toLower($loc) OR toLower(p.address) CONTAINS toLower($loc))
 13. Specific landmark queries: also search p.address.
+14. MULTI-LOCATION: When user asks about multiple locations, use SEPARATE params ($nbh_0, $nbh_1 ...) joined with OR. NEVER put them in one comma-joined string.
 
 === INTENT EXTRACTION ===
 - "all projects"/"show all" → query_type="GLOBAL". Filtered → "SPECIFIC".
@@ -611,12 +617,13 @@ WITH p, n, c, dev,
         vector_query=f"{bhk} BHK {city or ''}".strip(),
         answer_columns=[],
         intent=intent,
+        engine_used="Fallback Rule-based",
     )
 
 
 # ── Main generation function ───────────────────────────────────────────────────
 
-def generate_cypher(user_query: str) -> CypherQuery:
+def generate_cypher(user_query: str, api_keys: dict = None) -> CypherQuery:
     """
     Generate a precise Cypher query AND extract structured intent from the
     user's natural language query in a **single** LLM call.
@@ -628,11 +635,87 @@ def generate_cypher(user_query: str) -> CypherQuery:
     - vector_query: text string for ChromaDB semantic search
     - answer_columns: which RETURN columns hold the direct answer
     - intent: QueryIntent parsed from the same LLM response
+    - engine_used: String specifying which LLM ran the query
 
     Falls back to a simple city/BHK filter query if LLM generation fails.
     """
+    api_keys = api_keys or {}
+    gemini_key = api_keys.get("GEMINI_API_KEY") or settings.GEMINI_API_KEY
+    groq_key = api_keys.get("GROQ_API_KEY") or settings.GROQ_API_KEY
+
+    # ── Try Gemini First ──
+    if gemini_key:
+        try:
+            genai.configure(api_key=gemini_key)
+            model = genai.GenerativeModel(
+                model_name=settings.GEMINI_MODEL,
+                system_instruction=_SYSTEM_PROMPT,
+                generation_config=genai.GenerationConfig(
+                    temperature=0.0,
+                    response_mime_type="application/json",
+                )
+            )
+            response = model.generate_content(user_query)
+            raw = response.text
+            tokens_used = response.usage_metadata.total_token_count if hasattr(response, "usage_metadata") and response.usage_metadata else 0
+            engine_used = f"Gemini ({settings.GEMINI_MODEL})"
+
+            # Strip accidental markdown fences
+            raw = re.sub(r"^```(?:json)?\s*", "", raw)
+            raw = re.sub(r"\s*```$", "", raw)
+
+            data = json.loads(raw)
+
+            cypher = data.get("cypher", "").strip()
+            params = data.get("params", {})
+            query_type = data.get("query_type", "SPECIFIC")
+            vector_query = data.get("vector_query", user_query)
+            answer_columns = data.get("answer_columns", [])
+
+            # Parse intent
+            intent_data = data.get("intent", {})
+            if intent_data and isinstance(intent_data, dict):
+                intent_data["query_type"] = query_type
+                try:
+                    intent = QueryIntent(**intent_data)
+                except Exception as ie:
+                    logger.warning(f"[Text-to-Cypher] Intent parsing from Gemini failed ({ie}). Using minimal intent.")
+                    intent = _extract_fallback_intent(user_query, query_type)
+            else:
+                intent = _extract_fallback_intent(user_query, query_type)
+
+            logger.info(
+                f"Intent parsed ({engine_used}): bhk={intent.bhk}, location={intent.neighbourhood or intent.city}, "
+                f"amenities={intent.amenities}, type={intent.query_type}"
+            )
+
+            if "limit" not in params:
+                params["limit"] = 50
+            if query_type in ("LOOKUP", "AGGREGATE") and not answer_columns:
+                answer_columns = ["answer_data"]
+            if not cypher:
+                raise ValueError("Gemini returned empty cypher")
+
+            cypher = _post_process_cypher(cypher, params)
+
+            return CypherQuery(
+                cypher=cypher,
+                params=params,
+                query_type=query_type,
+                vector_query=vector_query,
+                answer_columns=answer_columns,
+                intent=intent,
+                tokens_used=tokens_used,
+                engine_used=engine_used
+            )
+
+        except Exception as e:
+            logger.warning(f"[Text-to-Cypher] Gemini generation failed ({e}). Falling back to Groq.")
+
+    # ── Fallback to Groq ──
     try:
-        response = _groq.chat.completions.create(
+        groq_client = Groq(api_key=groq_key)
+        response = groq_client.chat.completions.create(
             model=settings.GROQ_MODEL,
             response_format={"type": "json_object"},
             messages=[
@@ -644,6 +727,7 @@ def generate_cypher(user_query: str) -> CypherQuery:
         )
         raw = response.choices[0].message.content.strip()
         tokens_used = response.usage.total_tokens if hasattr(response, "usage") and response.usage else 0
+        engine_used = f"Groq ({settings.GROQ_MODEL})"
 
         # Strip accidental markdown fences
         raw = re.sub(r"^```(?:json)?\s*", "", raw)
@@ -665,13 +749,13 @@ def generate_cypher(user_query: str) -> CypherQuery:
             try:
                 intent = QueryIntent(**intent_data)
             except Exception as ie:
-                logger.warning(f"[Text-to-Cypher] Intent parsing from unified response failed ({ie}). Using minimal intent.")
+                logger.warning(f"[Text-to-Cypher] Intent parsing from Groq failed ({ie}). Using minimal intent.")
                 intent = _extract_fallback_intent(user_query, query_type)
         else:
             intent = _extract_fallback_intent(user_query, query_type)
 
         logger.info(
-            f"Intent parsed (unified): bhk={intent.bhk}, location={intent.neighbourhood or intent.city}, "
+            f"Intent parsed ({engine_used}): bhk={intent.bhk}, location={intent.neighbourhood or intent.city}, "
             f"amenities={intent.amenities}, type={intent.query_type}"
         )
 
@@ -684,13 +768,13 @@ def generate_cypher(user_query: str) -> CypherQuery:
             answer_columns = ["answer_data"]
 
         if not cypher:
-            raise ValueError("LLM returned empty cypher")
+            raise ValueError("Groq returned empty cypher")
 
         # ── Post-process: fix common LLM Cypher mistakes ──
         cypher = _post_process_cypher(cypher, params)
 
         logger.info(
-            f"[Text-to-Cypher] type={query_type} | params={list(params.keys())} | "
+            f"[Text-to-Cypher] Engine: {engine_used} | type={query_type} | params={list(params.keys())} | "
             f"answer_cols={answer_columns} | vector_query={vector_query!r}"
         )
         logger.debug(f"[Text-to-Cypher] Cypher:\n{cypher}")
@@ -703,26 +787,109 @@ def generate_cypher(user_query: str) -> CypherQuery:
             answer_columns=answer_columns,
             intent=intent,
             tokens_used=tokens_used,
+            engine_used=engine_used
         )
 
     except Exception as e:
-        logger.warning(f"[Text-to-Cypher] LLM generation failed ({e}). Using fallback.")
+        logger.warning(f"[Text-to-Cypher] Groq generation failed ({e}). Using minimal fallback.")
         return _fallback_cypher(user_query=user_query)
 
 
+# ── Known neighbourhood names for fallback extraction ──────────────────────────
+_KNOWN_NEIGHBOURHOODS = [
+    "Shantigram", "Satellite", "Nikol", "Naroda", "Vinzol", "Bopal", "Vatva",
+    "Gamdi", "Gamdi Gaam", "Chandkheda", "Thaltej", "Vastrapur", "Hanspura",
+    "Paldi", "Sarkhej", "Isanpur", "Ghodasar", "Kotarpur", "Chiloda",
+    "Naranpura", "Kubernagar", "Gokuldham", "Jodhpur",
+    "Iscon-Ambli Road", "Science City Road", "New Nikol-Naroda Road",
+    "New Nikol - Naroda Road", "Vastral Road", "Naroda, Hanspura Road",
+]
+
+# ── Known amenity keywords for fallback extraction ─────────────────────────────
+_KNOWN_AMENITY_KEYWORDS = {
+    "gym": "gym", "gymnasium": "gym", "fitness": "gym",
+    "pool": "swimming pool", "swimming": "swimming pool",
+    "clubhouse": "clubhouse", "club house": "clubhouse", "club": "clubhouse",
+    "park": "park", "garden": "garden", "lawn": "garden",
+    "parking": "parking",
+    "jogging": "jogging track", "jogging track": "jogging track",
+    "play area": "play area", "playground": "play area",
+    "security": "security", "cctv": "cctv", "gated": "gated community",
+    "yoga": "yoga", "spa": "spa",
+    "library": "library", "theatre": "mini theatre", "theater": "mini theatre",
+    "sports": "sports", "cricket": "cricket", "badminton": "badminton",
+    "tennis": "tennis", "basketball": "basketball",
+    "water supply": "water supply", "power backup": "power backup",
+    "lift": "lifts", "elevator": "lifts",
+    "piped gas": "piped gas", "smart card": "smart card",
+    "commercial": "commercial shops",
+}
+
+
 def _extract_fallback_intent(user_query: str, query_type: str = "SPECIFIC") -> QueryIntent:
-    """Extract a minimal intent from the raw query when LLM intent parsing fails."""
-    fallback_city = None
+    """Extract a robust intent from the raw query when LLM intent parsing fails.
+
+    Scans the query for known neighbourhood names, amenity keywords, BHK numbers,
+    and city names so the intent-driven fallback retriever has real filters.
+    """
     lower_query = user_query.lower()
+
+    # ── City ──
+    fallback_city = None
     for c in ("ahmedabad", "surat", "vadodara", "rajkot", "gandhinagar"):
         if c in lower_query:
             fallback_city = c.title()
             break
+
+    # ── Neighbourhoods — match known names (longest first to avoid partial) ──
+    found_nbhs: list[str] = []
+    sorted_nbhs = sorted(_KNOWN_NEIGHBOURHOODS, key=len, reverse=True)
+    remaining = lower_query
+    for nbh in sorted_nbhs:
+        if nbh.lower() in remaining:
+            found_nbhs.append(nbh)
+            # Remove matched text to avoid double-matching substrings
+            remaining = remaining.replace(nbh.lower(), " ", 1)
+    neighbourhood = found_nbhs if len(found_nbhs) > 1 else (found_nbhs[0] if found_nbhs else None)
+
+    # ── BHK ──
+    bhk = None
+    bhk_match = re.search(r'(\d)\s*(?:bhk|bed(?:room)?|bedder)', lower_query)
+    if bhk_match:
+        bhk = int(bhk_match.group(1))
+
+    # ── Property type ──
+    property_type = None
+    for pt_keyword, pt_value in [("villa", "VILLA"), ("apartment", "APARTMENT"),
+                                  ("flat", "APARTMENT"), ("tenement", "TENEMENT"),
+                                  ("bungalow", "BUNGALOW"), ("penthouse", "PENTHOUSE")]:
+        if pt_keyword in lower_query:
+            property_type = pt_value
+            break
+
+    # ── Amenities ──
+    found_amenities: list[str] = []
+    for keyword, canonical in _KNOWN_AMENITY_KEYWORDS.items():
+        if keyword in lower_query and canonical not in found_amenities:
+            found_amenities.append(canonical)
+
+    # ── Semantic keywords (leftover descriptive words) ──
+    semantic = []
+    for word in ("spacious", "luxury", "luxurious", "affordable", "big",
+                 "lavish", "modern", "premium", "family", "ample"):
+        if word in lower_query:
+            semantic.append(word)
+
     return QueryIntent(
         query_type=query_type,
         city=fallback_city,
-        semantic_keywords=user_query.split() if not fallback_city else [],
+        neighbourhood=neighbourhood,
+        bhk=bhk,
+        property_type=property_type,
+        amenities=found_amenities if found_amenities else [],
+        semantic_keywords=semantic if semantic else [],
     )
+
 
 
 def _post_process_cypher(cypher: str, params: dict) -> str:
@@ -828,6 +995,80 @@ def _post_process_cypher(cypher: str, params: dict) -> str:
             if all_tags != pval:
                 params[pname] = all_tags
                 logger.debug(f"[Post-process] Expanded amenity tags -> {all_tags}")
+
+    # ── 5. Split comma-delimited location/neighbourhood params ────────────────
+    # LLM sometimes puts multiple locations into one string: "Shantigram, Satellite, Nikol"
+    # Detect this pattern and rewrite into separate OR-based clauses.
+    _LOCATION_PARAM_HINTS = ('neighbourhood', 'nbh', 'location', 'loc', 'area', 'road')
+    for pname in list(params.keys()):
+        pval = params[pname]
+        if not isinstance(pval, str):
+            continue
+        # Only target location-related params
+        if not any(hint in pname.lower() for hint in _LOCATION_PARAM_HINTS):
+            continue
+        # Check if it looks like comma-separated locations (2+ parts)
+        parts = [p.strip() for p in pval.split(',') if p.strip()]
+        if len(parts) < 2:
+            continue
+
+        logger.debug(f"[Post-process] Splitting comma-delimited param ${pname}: {pval!r} -> {parts}")
+
+        # Build OR-based replacement clauses
+        new_conds = []
+        for i, part in enumerate(parts):
+            new_key = f"{pname}_{i}"
+            params[new_key] = part
+            new_conds.append(
+                f"(toLower(n.name) CONTAINS toLower(${new_key}) "
+                f"OR toLower(p.address) CONTAINS toLower(${new_key}))"
+            )
+        or_clause = f"({' OR '.join(new_conds)})"
+
+        # Replace the original CONTAINS clause(s) referencing $pname
+        # Pattern 1: (toLower(n.name) CONTAINS toLower($pname) OR toLower(p.address) CONTAINS toLower($pname))
+        pattern_full = (
+            r'\(\s*toLower\(n\.name\)\s+CONTAINS\s+toLower\(\$' + re.escape(pname) + r'\)'
+            r'\s+OR\s+toLower\(p\.address\)\s+CONTAINS\s+toLower\(\$' + re.escape(pname) + r'\)\s*\)'
+        )
+        if re.search(pattern_full, cypher):
+            cypher = re.sub(pattern_full, or_clause, cypher)
+        else:
+            # Pattern 2: just toLower(n.name) CONTAINS toLower($pname)
+            pattern_simple = r'toLower\(n\.name\)\s+CONTAINS\s+toLower\(\$' + re.escape(pname) + r'\)'
+            if re.search(pattern_simple, cypher):
+                cypher = re.sub(pattern_simple, or_clause, cypher)
+            else:
+                # Pattern 3: any generic CONTAINS $pname on address or neighbourhood
+                pattern_generic = (
+                    r'toLower\([a-z]+\.[a-z_]+\)\s+CONTAINS\s+toLower\(\$' + re.escape(pname) + r'\)'
+                )
+                if re.search(pattern_generic, cypher):
+                    cypher = re.sub(pattern_generic, or_clause, cypher)
+
+        # Remove original param
+        del params[pname]
+
+    # ── 6. Hyphen-space normalization for n.name CONTAINS ────────────────────
+    # Neo4j may store neighbourhoods with spaces around hyphens (e.g. 'New Nikol - Naroda Road')
+    # while LLM or user may query without spaces ('New Nikol-Naroda Road').
+    # CONTAINS fails in this case. We inject REPLACE(toLower(n.name), ' - ', '-') CONTAINS
+    # as an additional OR for every n.name CONTAINS clause that doesn't already have it.
+    _nbh_plain = re.compile(
+        r'toLower\(n\.name\)\s+CONTAINS\s+toLower\(\$(\w+)\)'
+    )
+    def _inject_hyphen_norm(m: re.Match) -> str:
+        pname = m.group(1)
+        original = m.group(0)
+        # Only inject if not already wrapped by a REPLACE normalization nearby
+        return (
+            f"{original} OR REPLACE(toLower(n.name), ' - ', '-') CONTAINS toLower(${pname})"
+        )
+    # Only apply if REPLACE normalization isn't already present in the cypher
+    if "REPLACE(toLower(n.name)" not in cypher:
+        cypher = _nbh_plain.sub(_inject_hyphen_norm, cypher)
+        if "REPLACE(toLower(n.name)" in cypher:
+            logger.debug("[Post-process] Injected hyphen-space normalization for n.name CONTAINS")
 
     return cypher
 

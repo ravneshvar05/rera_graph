@@ -1,17 +1,150 @@
-D:\Rerachatbot\graphrag\test_e2e_queries.py:1: SyntaxWarning: invalid escape sequence '\R'
-  """
-2026-03-13 20:59:39.347 | DEBUG    | graphrag_retriever:__init__:199 - GraphRetriever connected to Neo4j.
-2026-03-13 20:59:40.367 | INFO     | graphrag_cypher:generate_cypher:399 - [Text-to-Cypher] type=LOOKUP | params=['project_name', 'limit'] | answer_cols=['answer_data'] | vector_query='OUM Orbit Ahmedabad details'
-2026-03-13 20:59:40.367 | DEBUG    | graphrag_cypher:generate_cypher:403 - [Text-to-Cypher] Cypher:
-MATCH (p:Project)-[:LOCATED_IN]->(n:Neighbourhood)-[:IN_CITY]->(c:City) WHERE toLower(p.project_name) CONTAINS toLower($project_name) OPTIONAL MATCH (p)-[:BUILT_BY]->(dev:Developer) OPTIONAL MATCH (p)-[:HAS_UNIT]->(u:Unit) OPTIONAL MATCH (p)-[:HAS_AMENITY]->(am:Amenity) OPTIONAL MATCH (p)-[:NEAR]->(lm:Landmark) WITH p, n, c, dev, u, collect(DISTINCT CASE WHEN u IS NOT NULL THEN u { .*, rooms: [(u)-[:HAS_ROOM]->(r:Room) | properties(r)] } ELSE null END) AS units, collect(DISTINCT am.name) AS amenities, collect(DISTINCT lm.name) AS landmarks WITH p, n, c, dev, units, amenities, landmarks, [u IN units WHERE u IS NOT NULL | { unit_type: u.unit_type, bhk: u.bhk, rooms: u.rooms }] AS answer_data RETURN p, n.name AS neighbourhood, c.name AS city, dev.name AS developer, units, amenities, landmarks, answer_data LIMIT $limit
-Traceback (most recent call last):
+D:\Rerachatbot\graphrag\graphrag_cypher.py:21: FutureWarning: 
 
-=================================================================
-TEST: LOOKUP: Details of OUM Orbit Ahmedabad
-Query: 'find me the details of OUM Orbit Ahmedabad'
-  File "D:\Rerachatbot\graphrag\test_e2e_queries.py", line 52, in <module>
-    print(f"  Type:         {cq.query_type}  {'\u2713' if cq.query_type == expected_type else '\u2717 WRONG (expected ' + expected_type + ')'}")
-  File "C:\Users\USER\AppData\Local\Programs\Python\Python312\Lib\encodings\cp1252.py", line 19, in encode
-    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-UnicodeEncodeError: 'charmap' codec can't encode character '\u2713' in position 24: character maps to <undefined>
+All support for the `google.generativeai` package has ended. It will no longer be receiving 
+updates or bug fixes. Please switch to the `google.genai` package as soon as possible.
+See README for more details:
+
+https://github.com/google-gemini/deprecated-generative-ai-python/blob/main/README.md
+
+  import google.generativeai as genai
+2026-03-16 20:16:56.781 | INFO     | graphrag_cypher:generate_cypher:687 - Intent parsed (Gemini (gemini-2.5-flash)): bhk=2, location=['Sarkhej', 'Vinzol', 'Gamdi Gaam'], amenities=[], type=SPECIFIC
+2026-03-16 20:17:07.501 | INFO     | graphrag_cypher:generate_cypher:687 - Intent parsed (Gemini (gemini-2.5-flash)): bhk=None, location=['Shantigram', 'Satellite', 'New Nikol-Naroda Road'], amenities=['Gym'], type=SPECIFIC
+2026-03-16 20:17:07.502 | DEBUG    | graphrag_cypher:_post_process_cypher:984 - [Post-process] Expanded amenity 'Gym' -> ['Gym', 'Health Club']
+2026-03-16 20:17:15.180 | INFO     | graphrag_cypher:generate_cypher:687 - Intent parsed (Gemini (gemini-2.5-flash)): bhk=4, location=None, amenities=[], type=SPECIFIC
+2026-03-16 20:17:22.229 | INFO     | graphrag_cypher:generate_cypher:687 - Intent parsed (Gemini (gemini-2.5-flash)): bhk=2, location=None, amenities=[], type=SPECIFIC
+2026-03-16 20:17:29.582 | INFO     | graphrag_cypher:generate_cypher:687 - Intent parsed (Gemini (gemini-2.5-flash)): bhk=None, location=Paldi, amenities=[], type=SPECIFIC
+2026-03-16 20:17:35.980 | INFO     | graphrag_cypher:generate_cypher:687 - Intent parsed (Gemini (gemini-2.5-flash)): bhk=None, location=Hanspura, amenities=[], type=SPECIFIC
+======================================================================
+GRAPH RETRIEVAL FIX VERIFICATION
+======================================================================
+
+======================================================================
+TEST: Q1: Multi-location including Gamdi Gaam (only in address)
+QUERY: Can you suggest some 2 BHK apartments in Sarkhej, Vinzol, or Gamdi Gaam?
+  Type:    SPECIFIC
+  Params:  {'bhk': 2, 'property_type': 'APARTMENT', 'neighbourhoods': ['sarkhej', 'vinzol', 'gamdi gaam'], 'limit': 50}
+  Vector:  2 BHK apartments in Sarkhej, Vinzol, or Gamdi Gaam
+  Has p.address search: YES
+  Intent neighbourhood: ['Sarkhej', 'Vinzol', 'Gamdi Gaam']
+  Intent landmarks: []
+  Results: 4 projects -> ['svasaar pravesh', 'OUM ORBIT', 'AMBER 2 BHK RESIDENCY', 'Sunflower Enclave']
+  PASS: Found expected project(s): ['svasaar pravesh', 'Sunflower Enclave', 'AMBER 2 BHK RESIDENCY', 'OUM ORBIT']
+
+======================================================================
+TEST: Q4: New Nikol (compound neighbourhood name) + gym amenity
+QUERY: Are there any apartments with a gym in Shantigram, Satellite, or New Nikol-Naroda Road?
+  Type:    SPECIFIC
+  Params:  {'property_type': 'APARTMENT', 'amenity_tag': ['Gym', 'Health Club'], 'neighbourhood_0': 'Shantigram', 'neighbourhood_1': 'Satellite', 'neighbourhood_2': 'New Nikol-Naroda Road', 'limit': 50}
+  Vector:  apartments with a gym in Shantigram, Satellite, or New Nikol-Naroda Road
+  Has p.address search: YES
+  Intent neighbourhood: ['Shantigram', 'Satellite', 'New Nikol-Naroda Road']
+  Intent landmarks: []
+  Results: 2 projects -> ['Swastik Harmony', 'Elysium at Shantigram']
+  PASS: Found expected project(s): ['Swastik Harmony', 'Elysium at Shantigram']
+
+======================================================================
+TEST: Q7: Landmark-based search (Kotarpur Water Works)
+QUERY: Show me properties near Kotarpur Water Works that offer 4 BHK villas.
+  Type:    SPECIFIC
+  Params:  {'bhk': 4, 'property_type': 'VILLA', 'landmark_name': 'kotarpur water works', 'limit': 50}
+  Vector:  properties near Kotarpur Water Works that offer 4 BHK villas
+  Has p.address search: YES
+  Intent neighbourhood: None
+  Intent landmarks: ['Kotarpur Water Works']
+  Results: 0 projects -> []
+  FAIL: None of ['Sudama Homes'] found in []
+  Cypher:
+MATCH (p:Project)-[:LOCATED_IN]->(n:Neighbourhood)-[:IN_CITY]->(c:City)
+OPTIONAL MATCH (p)-[:BUILT_BY]->(dev:Developer)
+OPTIONAL MATCH (p)-[:HAS_UNIT]->(u:Unit)
+OPTIONAL MATCH (p)-[:HAS_AMENITY]->(am:Amenity)
+OPTIONAL MATCH (p)-[:NEAR]->(lm:Landmark)
+WITH p, n, c, dev,
+     collect(DISTINCT CASE WHEN u IS NOT NULL THEN u { .*, rooms: [(u)-[:HAS_ROOM]->(r:Room) | properties(r)] } ELSE null END) AS units,
+     collect(DISTINCT am.name) AS amenities,
+     collect(DISTINCT lm.name) AS landmarks
+WHERE ANY(u_item IN units WHERE u_item.bhk = $bhk AND toLower(u_item.property_type) = toLower($property_type))
+  AND (EXISTS { MATCH (p)-[:NEAR]->(lm2:Landmark) WHERE toLower(lm2.name) CONTAINS toLower($landmark_name) } OR toLower(p.address) CONTAINS toLower($landmark_name))
+RETURN p, n.name AS neighbourhood, c.name AS city, dev.name AS developer,
+       units, amenities, landmarks
+LIMIT $limit
+
+======================================================================
+TEST: Q8: Landmark-based search (Karnavati APMC Market)
+QUERY: Is there a 2 BHK project located opposite the Karnavati APMC Market?
+  Type:    SPECIFIC
+  Params:  {'bhk': 2, 'landmark_name': 'karnavati apmc market', 'limit': 50}
+  Vector:  2 BHK project near Karnavati APMC Market
+  Has p.address search: YES
+  Intent neighbourhood: None
+  Intent landmarks: ['Karnavati APMC Market']
+  Results: 1 projects -> ['OUM ORBIT']
+  PASS: Found expected project(s): ['OUM ORBIT']
+
+======================================================================
+TEST: Q10: Road name only in address, Paldi in neighbourhood
+QUERY: Can you find me an apartment situated on Shaikh Adam Abuvala Road in Paldi?
+  Type:    SPECIFIC
+  Params:  {'property_type': 'APARTMENT', 'neighbourhood': 'Paldi', 'road_name': 'Shaikh Adam Abuvala Road', 'limit': 50}
+  Vector:  apartment on Shaikh Adam Abuvala Road in Paldi
+  Has p.address search: YES
+  Intent neighbourhood: Paldi
+  Intent landmarks: []
+  Results: 0 projects -> []
+  FAIL: None of ['Gandhi Galaxy'] found in []
+  Cypher:
+MATCH (p:Project)-[:LOCATED_IN]->(n:Neighbourhood)-[:IN_CITY]->(c:City)
+OPTIONAL MATCH (p)-[:BUILT_BY]->(dev:Developer)
+OPTIONAL MATCH (p)-[:HAS_UNIT]->(u:Unit)
+OPTIONAL MATCH (p)-[:HAS_AMENITY]->(am:Amenity)
+OPTIONAL MATCH (p)-[:NEAR]->(lm:Landmark)
+WITH p, n, c, dev,
+     collect(DISTINCT CASE WHEN u IS NOT NULL THEN u { .*, rooms: [(u)-[:HAS_ROOM]->(r:Room) | properties(r)] } ELSE null END) AS units,
+     collect(DISTINCT am.name) AS amenities,
+     collect(DISTINCT lm.name) AS landmarks
+WHERE ANY(unit IN units WHERE toLower(unit.property_type) = toLower($property_type))
+  AND (toLower(n.name) CONTAINS toLower($neighbourhood) OR REPLACE(toLower(n.name), ' - ', '-') CONTAINS toLower($neighbourhood) OR toLower(p.address) CONTAINS toLower($neighbourhood))
+  AND toLower(p.address) CONTAINS toLower($road_name)
+RETURN p, n.name AS neighbourhood, c.name AS city, dev.name AS developer,
+       units, amenities, landmarks
+LIMIT $limit
+
+======================================================================
+TEST: Q11: 200 FT Ring Road (landmark) + Hanspura (in neighbourhood name)
+QUERY: I'm searching for a property near the 200 FT. Ring Road in the Hanspura area.
+  Type:    SPECIFIC
+  Params:  {'neighbourhood_0': 'hanspura', 'landmark_0': '200 ft. ring road', 'limit': 50}
+  Vector:  property near 200 FT. Ring Road in Hanspura area
+  Has p.address search: YES
+  Intent neighbourhood: Hanspura
+  Intent landmarks: ['200 FT. Ring Road']
+  Results: 0 projects -> []
+  FAIL: None of ['Devnandan Sankalp'] found in []
+  Cypher:
+MATCH (p:Project)-[:LOCATED_IN]->(n:Neighbourhood)-[:IN_CITY]->(c:City)
+OPTIONAL MATCH (p)-[:BUILT_BY]->(dev:Developer)
+OPTIONAL MATCH (p)-[:HAS_UNIT]->(u:Unit)
+OPTIONAL MATCH (p)-[:HAS_AMENITY]->(am:Amenity)
+OPTIONAL MATCH (p)-[:NEAR]->(lm:Landmark)
+WITH p, n, c, dev,
+     collect(DISTINCT CASE WHEN u IS NOT NULL THEN u { .*, rooms: [(u)-[:HAS_ROOM]->(r:Room) | properties(r)] } ELSE null END) AS units,
+     collect(DISTINCT am.name) AS amenities,
+     collect(DISTINCT lm.name) AS landmarks
+WHERE (toLower(n.name) CONTAINS toLower($neighbourhood_0) OR REPLACE(toLower(n.name), ' - ', '-') CONTAINS toLower($neighbourhood_0) OR toLower(p.address) CONTAINS toLower($neighbourhood_0))
+AND (toLower(n.name) CONTAINS toLower($landmark_0) OR REPLACE(toLower(n.name), ' - ', '-') CONTAINS toLower($landmark_0) OR toLower(p.address) CONTAINS toLower($landmark_0))
+RETURN p, n.name AS neighbourhood, c.name AS city, dev.name AS developer,
+       units, amenities, landmarks
+LIMIT $limit
+
+
+======================================================================
+SUMMARY
+======================================================================
+  [PASS] Q1: Multi-location including Gamdi Gaam (only in address)
+  [PASS] Q4: New Nikol (compound neighbourhood name) + gym amenity
+  [FAIL] Q7: Landmark-based search (Kotarpur Water Works)
+  [PASS] Q8: Landmark-based search (Karnavati APMC Market)
+  [FAIL] Q10: Road name only in address, Paldi in neighbourhood
+  [FAIL] Q11: 200 FT Ring Road (landmark) + Hanspura (in neighbourhood name)
+
+3/6 tests passed

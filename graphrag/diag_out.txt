@@ -1,0 +1,44 @@
+=== Swastik Harmony in Neo4j ===
+  Project: Swastik Harmony
+  Neighbourhood: 'New Nikol - Naroda Road'
+  City: Ahmedabad
+  Amenity Names: ['Swimming Pool', 'Clubhouse', 'Garden / Park', 'Jogging Track', 'Gym', 'Parking', 'Club House', 'Party Lawn', 'Senior Citizen Area', 'Children Play Area']
+  Canonical Tags: [['Swimming Pool'], ['Clubhouse'], ['Garden', 'Park'], ['Jogging Track'], ['Gym'], ['Park', 'Parking'], ['Party Area', 'Lawn'], ['Senior Citizen Area'], ['Children Play Area']]
+
+=== Test multi-location + gym query ===
+  Projects with gym in those 3 areas:
+  - Swastik Harmony (New Nikol - Naroda Road) | amenities: ['Swimming Pool', 'Clubhouse', 'Garden / Park', 'Jogging Track', 'Gym', 'Parking', 'Club House', 'Party Lawn', 'Senior Citizen Area', 'Children Play Area']
+  - Elysium at Shantigram (Shantigram) | amenities: ['3-side open homes for more light and air', 'Landscaped Gardens', 'Gated community with multi-tier security system', 'Clubhouse with Swimming Pool', 'Sports Courts', 'Dedicated Car Parking', "Kids' Play Area", 'Jogging Track', 'Commercial Shops', "Senior Citizens' Area", 'Gym', 'Indoor Sports Facilities', 'Outdoor Badminton Court', 'Shower And Changing Areas', 'Treated Water Supply', 'Piped Gas Facility', 'Perimeter Security', 'Smart Card Access For Residents', 'Communication Facility Connecting Each Flat With Entrance Lobby', 'CCTV In Basement And Main Entrance Lobby For Surveillance']
+
+=== Check canonical_tags for Gym in Swastik Harmony ===
+  Amenity: 'Swimming Pool' | Tags: ['Swimming Pool']
+  Amenity: 'Clubhouse' | Tags: ['Clubhouse']
+  Amenity: 'Garden / Park' | Tags: ['Garden', 'Park']
+  Amenity: 'Jogging Track' | Tags: ['Jogging Track']
+  Amenity: 'Gym' | Tags: ['Gym']
+  Amenity: 'Parking' | Tags: ['Park', 'Parking']
+  Amenity: 'Club House' | Tags: ['Clubhouse']
+  Amenity: 'Party Lawn' | Tags: ['Party Area', 'Lawn']
+  Amenity: 'Senior Citizen Area' | Tags: ['Senior Citizen Area']
+  Amenity: 'Children Play Area' | Tags: ['Children Play Area']
+
+=== All neighbourhood names in DB ===
+  'Ahmedabad'
+  'Chiloda-Kotarpur'
+  'Gokuldham'
+  'Isanpur, Ghodasar'
+  'Iscon-Ambli Road'
+  'Jodhpur, Satellite'
+  'Kubernagar'
+  'NARANPURA'
+  'Naroda, Hanspura Road'
+  'New Nikol - Naroda Road'
+  'Paldi'
+  'Sarkhej'
+  'Science City Road'
+  'Shantigram'
+  'Shantipura Cross Roads, Bopal, Iscon-Ambli Road, Sardar Patel Ring Road'
+  'Thaltej'
+  'Vastral Road'
+  'Vatva'
+  'Vinzol'

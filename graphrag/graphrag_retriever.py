@@ -207,7 +207,13 @@ class GraphRetriever:
     def retrieve(self, cypher_result: CypherQuery) -> tuple[list[ProjectResult], list[dict]]:
         """
         Execute a Text-to-Cypher generated query against Neo4j.
-        Falls back to _get_all_projects() for GLOBAL queries or on error.
+
+        Strategy:
+          - GLOBAL → return all projects.
+          - SPECIFIC → run LLM Cypher, then ALWAYS supplement with intent-driven
+            results for multi-location queries (LLM often drops locations).
+            Also fallback to intent-driven on 0 results.
+          - LOOKUP/AGGREGATE → run LLM Cypher only (project name based).
 
         Returns:
             (project_results, answer_data)
@@ -218,6 +224,42 @@ class GraphRetriever:
             answer_data: list[dict] = []
         else:
             results, answer_data = self._execute_cypher(cypher_result)
+
+            # ── Intent-driven supplement / fallback for SPECIFIC queries ──
+            if cypher_result.query_type == "SPECIFIC" and cypher_result.intent:
+                intent = cypher_result.intent
+                need_supplement = False
+
+                # Case 1: LLM Cypher returned 0 results — full fallback
+                if not results:
+                    need_supplement = True
+                    logger.info(
+                        "LLM Cypher returned 0 graph results. "
+                        "Using intent-driven fallback."
+                    )
+
+                # Case 2: Multi-location query — LLM often drops some
+                # locations from Cypher params, so supplement to catch them
+                elif isinstance(intent.neighbourhood, list) and len(intent.neighbourhood) > 1:
+                    need_supplement = True
+                    logger.info(
+                        f"Multi-location query ({len(intent.neighbourhood)} locations). "
+                        "Supplementing LLM Cypher with intent-driven results."
+                    )
+
+                if need_supplement:
+                    fallback_results = self._get_filtered_projects(intent)
+                    if fallback_results:
+                        # Merge by project_id — avoid duplicates
+                        existing_ids = {r.project_id for r in results}
+                        added = 0
+                        for fr in fallback_results:
+                            if fr.project_id not in existing_ids:
+                                results.append(fr)
+                                existing_ids.add(fr.project_id)
+                                added += 1
+                        if added:
+                            logger.info(f"Intent-driven supplement added {added} new project(s)")
 
         logger.info(f"Graph retrieval → {len(results)} project(s)")
         return results, answer_data
@@ -281,8 +323,11 @@ class GraphRetriever:
                 conds = []
                 for i, nbh in enumerate(intent.neighbourhood):
                     key = f"nbh_{i}"
+                    # Normalize hyphen variants: 'New Nikol-Naroda Road' ↔ 'New Nikol - Naroda Road'
+                    # REPLACE(n.name, ' - ', '-') normalizes spaces-around-dash both ways
                     conds.append(
                         f"(toLower(n.name) CONTAINS toLower(${key}) "
+                        f"OR REPLACE(toLower(n.name), ' - ', '-') CONTAINS toLower(${key}) "
                         f"OR toLower(p.address) CONTAINS toLower(${key}) "
                         f"OR EXISTS {{ MATCH (n)-[:ALIAS_OF*1..2]->(canonical) WHERE toLower(canonical.name) CONTAINS toLower(${key}) }})"
                     )
@@ -291,6 +336,7 @@ class GraphRetriever:
             else:
                 where_clauses.append(
                     "(toLower(n.name) CONTAINS toLower($neighbourhood) "
+                    "OR REPLACE(toLower(n.name), ' - ', '-') CONTAINS toLower($neighbourhood) "
                     "OR toLower(p.address) CONTAINS toLower($neighbourhood) "
                     "OR EXISTS { MATCH (n)-[:ALIAS_OF*1..2]->(canonical) WHERE toLower(canonical.name) CONTAINS toLower($neighbourhood) })"
                 )

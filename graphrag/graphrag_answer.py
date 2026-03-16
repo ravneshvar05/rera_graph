@@ -70,6 +70,7 @@ def generate_answer(
     project_results: list[ProjectResult],
     intent: QueryIntent,
     direct_answer_text: str = "",
+    api_keys: dict = None,
 ) -> dict:
     """
     Generate a JSON-structured recommendation answer.
