@@ -36,9 +36,13 @@ class GraphRAGSettings(BaseSettings):
     )
 
     # ── Retrieval tuning ──────────────────────────────────────────────────────
-    VECTOR_TOP_K:      int  = Field(25,  description="How many ChromaDB results to retrieve")
+    VECTOR_TOP_K:      int  = Field(25,  description="How many ChromaDB results to retrieve per doc type")
     GRAPH_MAX_RESULTS: int  = Field(25,  description="Max projects from Neo4j Cypher queries")
     FINAL_TOP_N:       int  = Field(25,  description="Max projects to include in final answer")
+    RERANK_MODEL:      str  = Field("cross-encoder/ms-marco-MiniLM-L-6-v2", description="Cross-encoder model for re-ranking vector results")
+    RERANK_TOP_K:      int  = Field(15,  description="How many results to keep after re-ranking")
+    VECTOR_DISTANCE_THRESHOLD: float = Field(1.5,  description="Max L2 distance from ChromaDB; discard results beyond this")
+    RERANK_SCORE_THRESHOLD:    float = Field(-3.0, description="Min cross-encoder score; discard re-ranked results below this")
 
     model_config = {
         "env_file": ".env",

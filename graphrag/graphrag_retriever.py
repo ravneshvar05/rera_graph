@@ -7,11 +7,14 @@ Given a QueryIntent, this module:
   3. Merges and deduplicates results into a unified context string for the LLM
 
 The merged context is the "retrieved knowledge" passed to graphrag_answer.py.
+
+Performance: Graph and Vector retrieval run in PARALLEL via ThreadPoolExecutor.
 """
 
 from __future__ import annotations
 
 import json
+from concurrent.futures import ThreadPoolExecutor, Future
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -274,16 +277,21 @@ class GraphRetriever:
         # Location filtering
         if intent.neighbourhood:
             if isinstance(intent.neighbourhood, list):
-                # Multiple neighbourhoods
+                # Multiple neighbourhoods — also search p.address for sub-localities
                 conds = []
                 for i, nbh in enumerate(intent.neighbourhood):
                     key = f"nbh_{i}"
-                    conds.append(f"(toLower(n.name) CONTAINS toLower(${key}) OR EXISTS {{ MATCH (n)-[:ALIAS_OF*1..2]->(canonical) WHERE toLower(canonical.name) CONTAINS toLower(${key}) }})")
+                    conds.append(
+                        f"(toLower(n.name) CONTAINS toLower(${key}) "
+                        f"OR toLower(p.address) CONTAINS toLower(${key}) "
+                        f"OR EXISTS {{ MATCH (n)-[:ALIAS_OF*1..2]->(canonical) WHERE toLower(canonical.name) CONTAINS toLower(${key}) }})"
+                    )
                     params[key] = nbh
                 where_clauses.append(f"({' OR '.join(conds)})")
             else:
                 where_clauses.append(
                     "(toLower(n.name) CONTAINS toLower($neighbourhood) "
+                    "OR toLower(p.address) CONTAINS toLower($neighbourhood) "
                     "OR EXISTS { MATCH (n)-[:ALIAS_OF*1..2]->(canonical) WHERE toLower(canonical.name) CONTAINS toLower($neighbourhood) })"
                 )
                 params["neighbourhood"] = intent.neighbourhood
@@ -413,13 +421,13 @@ class GraphRetriever:
             )
             landmark_match = f"AND ({landmark_conditions})"
 
-        # Specific landmark filtering
+        # Specific landmark filtering — also search p.address
         specific_lm_clause = ""
         if intent.specific_landmarks:
             for i, lm in enumerate(intent.specific_landmarks):
                 key = f"slm_{i}"
                 params[key] = lm
-                specific_lm_clause += f" OR toLower(lm.name) CONTAINS toLower(${key})"
+                specific_lm_clause += f" OR toLower(lm.name) CONTAINS toLower(${key}) OR toLower(p.address) CONTAINS toLower(${key})"
 
         cypher = f"""
         MATCH (p:Project)-[:LOCATED_IN]->(n:Neighbourhood)-[:IN_CITY]->(c:City)
@@ -496,7 +504,7 @@ class GraphRetriever:
 # ── Vector / ChromaDB Retriever ────────────────────────────────────────────────
 
 class VectorRetriever:
-    """Retrieves units using ChromaDB semantic similarity search."""
+    """Retrieves projects using ChromaDB semantic similarity search + cross-encoder re-ranking."""
 
     def __init__(self):
         client = chromadb.PersistentClient(path=str(settings.CHROMA_PATH))
@@ -509,94 +517,211 @@ class VectorRetriever:
         )
         logger.debug(f"VectorRetriever: ChromaDB collection has {self._col.count()} docs.")
 
-    def retrieve(self, intent: QueryIntent, query_override: Optional[str] = None) -> list[ProjectResult]:
-        """
-        Build a natural language query string from the intent (or use query_override)
-        and run vector search. Also applies metadata filters where possible (bhk, city).
-        """
-        # Build a rich query text from intent components
-        query_parts = []
+        # Eagerly load cross-encoder re-ranker at startup (avoids first-query latency)
+        self._reranker = None
+        try:
+            from sentence_transformers import CrossEncoder
+            self._reranker = CrossEncoder(settings.RERANK_MODEL)
+            logger.info(f"Cross-encoder re-ranker loaded at startup: {settings.RERANK_MODEL}")
+        except Exception as e:
+            logger.warning(f"Could not load cross-encoder ({e}). Re-ranking disabled.")
+            self._reranker = False  # sentinel => skip re-ranking
+
+    def _build_query_text(self, intent: QueryIntent, query_override: Optional[str] = None) -> str:
+        """Build a natural-language query sentence from intent for semantic search."""
+        if query_override:
+            return query_override
+
+        parts: list[str] = []
+
+        # Lead with the unit type
         if intent.bhk is not None:
             if isinstance(intent.bhk, list):
-                query_parts.extend([f"{b} BHK" for b in intent.bhk])
+                parts.append(" or ".join(f"{b} BHK" for b in intent.bhk))
             else:
-                query_parts.append(f"{intent.bhk} BHK")
+                parts.append(f"{intent.bhk} BHK")
+
         if intent.property_type:
             if isinstance(intent.property_type, list):
-                query_parts.extend([pt.lower() for pt in intent.property_type])
+                parts.append(" or ".join(pt.lower() for pt in intent.property_type))
             else:
-                query_parts.append(intent.property_type.lower())
+                parts.append(intent.property_type.lower())
+        elif parts:
+            parts.append("residential property")
+
+        # Location
+        loc_parts: list[str] = []
         if intent.neighbourhood:
             if isinstance(intent.neighbourhood, list):
-                query_parts.extend(intent.neighbourhood)
+                loc_parts.extend(intent.neighbourhood)
             else:
-                query_parts.append(intent.neighbourhood)
+                loc_parts.append(intent.neighbourhood)
         if intent.city:
             if isinstance(intent.city, list):
-                query_parts.extend(intent.city)
+                loc_parts.extend(intent.city)
             else:
-                query_parts.append(intent.city)
+                loc_parts.append(intent.city)
+        if loc_parts:
+            parts.append(f"in {', '.join(loc_parts)}")
+
+        # Amenities
         if intent.amenities:
-            query_parts.extend(intent.amenities)
-        if intent.semantic_keywords:
-            query_parts.extend(intent.semantic_keywords)
+            parts.append(f"with {', '.join(intent.amenities)}")
+
+        # Landmarks
         if intent.specific_landmarks:
-            query_parts.extend(intent.specific_landmarks)
+            parts.append(f"near {', '.join(intent.specific_landmarks)}")
+
+        # Project names
         if intent.project_names:
-            query_parts.extend(intent.project_names)
+            parts.append(f"project {', '.join(intent.project_names)}")
 
-        # Use query_override from Text-to-Cypher if provided, otherwise build from intent
-        if query_override:
-            query_text = query_override
-        else:
-            query_text = " ".join(query_parts) if query_parts else "residential apartment"
+        # Semantic/fuzzy keywords
+        if intent.semantic_keywords:
+            parts.append(", ".join(intent.semantic_keywords))
 
-        # Metadata filters for ChromaDB (exact match only)
-        where_filter = None
-        conditions = []
-        if intent.bhk is not None:
+        # Facing
+        if intent.entrance_facing:
+            parts.append(f"{intent.entrance_facing} facing")
+
+        return " ".join(parts) if parts else "residential apartment project"
+
+    def _build_where_filter(self, intent: QueryIntent, doc_type: Optional[str] = None) -> Optional[dict]:
+        """Build ChromaDB metadata filter from intent fields."""
+        conditions: list[dict] = []
+
+        if doc_type:
+            conditions.append({"doc_type": {"$eq": doc_type}})
+
+        if intent.bhk is not None and doc_type != "project":
             if isinstance(intent.bhk, list):
                 conditions.append({"bhk": {"$in": intent.bhk}})
             else:
                 conditions.append({"bhk": {"$eq": intent.bhk}})
+
         if intent.city:
             if isinstance(intent.city, list):
                 conditions.append({"city": {"$in": intent.city}})
             else:
                 conditions.append({"city": {"$eq": intent.city}})
-        if len(conditions) == 1:
-            where_filter = conditions[0]
-        elif len(conditions) > 1:
-            where_filter = {"$and": conditions}
 
-        try:
-            kwargs = {
-                "query_texts": [query_text],
-                "n_results": min(settings.VECTOR_TOP_K, self._col.count()),
-                "include": ["documents", "metadatas", "distances"],
-            }
-            if where_filter:
-                kwargs["where"] = where_filter
+        # Amenity boolean flags — only for well-known amenities
+        if intent.amenities:
+            for am in intent.amenities:
+                am_lower = am.lower().strip()
+                if any(kw in am_lower for kw in ("pool", "swimming")):
+                    conditions.append({"has_pool": {"$eq": 1}})
+                elif any(kw in am_lower for kw in ("clubhouse", "club house", "club")):
+                    conditions.append({"has_clubhouse": {"$eq": 1}})
+                elif any(kw in am_lower for kw in ("park", "garden")):
+                    conditions.append({"has_park": {"$eq": 1}})
+                elif any(kw in am_lower for kw in ("parking", "car park")):
+                    conditions.append({"has_parking": {"$eq": 1}})
 
-            results = self._col.query(**kwargs)
-            
-            # If a strict metadata filter returned 0 results (e.g. city="Surat"),
-            # do NOT fall back to unfiltered search. Return empty straight away.
-            if where_filter and (not results["ids"] or len(results["ids"][0]) == 0):
-                logger.info("Vector query with strict filter returned 0 results. Respecting filter.")
-                return []
-                
-        except Exception as e:
-            logger.warning(f"Vector query with filter failed ({e}). Returning empty results instead of ignoring filter.")
+        if len(conditions) == 0:
+            return None
+        elif len(conditions) == 1:
+            return conditions[0]
+        else:
+            return {"$and": conditions}
+
+    def retrieve(self, intent: QueryIntent, query_override: Optional[str] = None) -> list[ProjectResult]:
+        """
+        Two-phase vector retrieval:
+          Phase 1: ChromaDB semantic search (project + unit docs, metadata filtered)
+          Phase 2: Cross-encoder re-ranking for precision
+
+        Strategy:
+          - For queries with BHK/area/room specifics → search unit docs primarily
+          - For broad/amenity/fuzzy queries → search project docs primarily
+          - Always search both for comprehensive coverage
+        """
+        query_text = self._build_query_text(intent, query_override)
+        logger.info(f"Vector query text: {query_text!r}")
+
+        # Determine if this is a unit-specific or broad query
+        is_unit_specific = (intent.bhk is not None or intent.min_sqft or intent.max_sqft
+                           or intent.entrance_facing)
+
+        # ── Phase 1: Retrieve candidates from both doc types ──
+        all_hits: list[tuple[dict, float, str]] = []  # (metadata, distance, document)
+
+        # Search unit docs (always, but prioritize for unit-specific queries)
+        unit_k = settings.VECTOR_TOP_K if is_unit_specific else max(10, settings.VECTOR_TOP_K // 2)
+        unit_filter = self._build_where_filter(intent, doc_type="unit")
+        unit_hits = self._query_chroma(query_text, unit_k, unit_filter)
+        if not unit_hits and unit_filter:
+            # Fallback: try with just doc_type filter
+            unit_hits = self._query_chroma(query_text, unit_k, {"doc_type": {"$eq": "unit"}})
+        all_hits.extend(unit_hits)
+
+        # Search project docs (always, but prioritize for broad queries)
+        proj_k = max(10, settings.VECTOR_TOP_K // 2) if is_unit_specific else settings.VECTOR_TOP_K
+        proj_filter = self._build_where_filter(intent, doc_type="project")
+        proj_hits = self._query_chroma(query_text, proj_k, proj_filter)
+        if not proj_hits and proj_filter:
+            proj_hits = self._query_chroma(query_text, proj_k, {"doc_type": {"$eq": "project"}})
+        all_hits.extend(proj_hits)
+
+        if not all_hits:
+            logger.info("Vector retrieval → 0 results")
             return []
 
-        # Group hits by project_id (multiple units per project)
-        project_map: dict[str, ProjectResult] = {}
-        metadatas = results["metadatas"][0]
-        distances = results["distances"][0]
-        documents = results["documents"][0]
+        # ── Phase 1.5: Distance threshold filtering ──
+        pre_threshold_count = len(all_hits)
+        all_hits = [
+            (meta, dist, doc) for meta, dist, doc in all_hits
+            if dist <= settings.VECTOR_DISTANCE_THRESHOLD
+        ]
+        if len(all_hits) < pre_threshold_count:
+            logger.info(
+                f"Distance threshold ({settings.VECTOR_DISTANCE_THRESHOLD}): "
+                f"filtered {pre_threshold_count} → {len(all_hits)} hits"
+            )
+        if not all_hits:
+            logger.info("Vector retrieval → 0 results after distance threshold")
+            return []
 
-        for meta, dist, doc in zip(metadatas, distances, documents):
+        # ── Phase 2: Cross-encoder re-ranking ──
+        reranker = self._reranker if self._reranker is not False else None
+        if reranker and len(all_hits) > 3:
+            # Cap candidates sent to cross-encoder for speed (sort by distance first)
+            MAX_RERANK_CANDIDATES = 20
+            if len(all_hits) > MAX_RERANK_CANDIDATES:
+                all_hits.sort(key=lambda x: x[1])  # sort by distance (lower=better)
+                all_hits = all_hits[:MAX_RERANK_CANDIDATES]
+                logger.info(f"Capped re-rank candidates to {MAX_RERANK_CANDIDATES} (from {pre_threshold_count})")
+            try:
+                pairs = [(query_text, doc) for _, _, doc in all_hits]
+                scores = reranker.predict(pairs, batch_size=32)
+                # Combine: sort by cross-encoder score (higher = more relevant)
+                ranked = sorted(
+                    zip(scores, all_hits),
+                    key=lambda x: x[0],
+                    reverse=True,
+                )
+                # Apply re-rank score threshold
+                ranked = [
+                    (score, hit) for score, hit in ranked
+                    if score >= settings.RERANK_SCORE_THRESHOLD
+                ]
+                if not ranked:
+                    logger.info("All results filtered by re-rank score threshold")
+                    return []
+                all_hits = [hit for _, hit in ranked[:settings.RERANK_TOP_K]]
+                logger.info(f"Re-ranked {len(pairs)} → kept top {len(all_hits)} (score threshold: {settings.RERANK_SCORE_THRESHOLD})")
+            except Exception as e:
+                logger.warning(f"Re-ranking failed ({e}), using raw distances")
+                # Fallback: sort by distance
+                all_hits.sort(key=lambda x: x[1])
+                all_hits = all_hits[:settings.RERANK_TOP_K]
+        else:
+            all_hits.sort(key=lambda x: x[1])
+            all_hits = all_hits[:settings.RERANK_TOP_K]
+
+        # ── Assemble ProjectResults, grouped by project_id ──
+        project_map: dict[str, ProjectResult] = {}
+        for meta, dist, doc in all_hits:
             pid = meta.get("project_id", "")
             if pid not in project_map:
                 amenities_str = meta.get("amenities", "")
@@ -610,30 +735,73 @@ class VectorRetriever:
                     units=[],
                     score=dist,
                     source="vector",
-                    amenities=amenities_list
+                    amenities=amenities_list,
+                    extra_props={
+                        "project_status": meta.get("project_status", ""),
+                        "has_clubhouse": meta.get("has_clubhouse", 0),
+                        "has_pool": meta.get("has_pool", 0),
+                        "has_park": meta.get("has_park", 0),
+                        "has_parking": meta.get("has_parking", 0),
+                    },
                 )
-            
-            # Reconstruct dummy unit layout from vector metadata for UI presentation
-            bhk = meta.get("bhk", 0)
-            ptype = meta.get("property_type", "")
-            area = meta.get("area_sqft", 0.0)
-            if bhk > 0 or ptype:
-                utyp = f"{bhk} BHK" if bhk > 0 else "Unit"
-                udict = {"unit_type": utyp, "property_type": ptype}
-                if area > 0.0:
-                    udict["super_builtup_sqft"] = area
-                
-                # Deduplicate units for rendering
-                if udict not in project_map[pid].units:
-                    project_map[pid].units.append(udict)
 
-            # Keep updating with best score
+            # Add unit info from unit-type docs
+            if meta.get("doc_type") == "unit":
+                bhk = meta.get("bhk", 0)
+                ptype = meta.get("property_type", "")
+                area = meta.get("area_sqft", 0.0)
+                ut = meta.get("unit_type", "")
+                if bhk > 0 or ptype:
+                    utyp = ut if ut else (f"{bhk} BHK" if bhk > 0 else "Unit")
+                    udict: dict = {"unit_type": utyp, "property_type": ptype}
+                    if area > 0.0:
+                        udict["super_builtup_sqft"] = area
+                    facing = meta.get("entrance_facing", "")
+                    if facing:
+                        udict["entrance_facing"] = facing
+                    # Deduplicate
+                    if udict not in project_map[pid].units:
+                        project_map[pid].units.append(udict)
+
+            # Track best score
             if dist < project_map[pid].score:
                 project_map[pid].score = dist
 
         sorted_results = sorted(project_map.values(), key=lambda r: r.score)
         logger.info(f"Vector retrieval → {len(sorted_results)} project(s)")
         return sorted_results
+
+    def _query_chroma(
+        self, query_text: str, n_results: int, where_filter: Optional[dict]
+    ) -> list[tuple[dict, float, str]]:
+        """Execute a ChromaDB query and return (metadata, distance, document) tuples."""
+        try:
+            actual_n = min(n_results, self._col.count())
+            if actual_n <= 0:
+                return []
+            kwargs = {
+                "query_texts": [query_text],
+                "n_results": actual_n,
+                "include": ["documents", "metadatas", "distances"],
+            }
+            if where_filter:
+                kwargs["where"] = where_filter
+
+            results = self._col.query(**kwargs)
+
+            if not results["ids"] or len(results["ids"][0]) == 0:
+                return []
+
+            hits: list[tuple[dict, float, str]] = []
+            for meta, dist, doc in zip(
+                results["metadatas"][0], results["distances"][0], results["documents"][0]
+            ):
+                hits.append((meta, dist, doc))
+            return hits
+
+        except Exception as e:
+            logger.warning(f"ChromaDB query failed ({e})")
+            return []
 
 
 # ── Answer data formatter ──────────────────────────────────────────────────────
@@ -822,11 +990,96 @@ class DualRetriever:
     def close(self):
         self._graph.close()
 
+    # ── Neo4j enrichment for vector-only results ───────────────────────────
+    def _enrich_from_graph(self, vector_only: list[ProjectResult]) -> None:
+        """Batch-fetch full project data from Neo4j for vector-only results.
+
+        Runs a single Cypher query for ALL vector-only project IDs,
+        then fills in the missing fields (address, rooms, amenities,
+        landmarks, society_description, etc.) in-place.
+        """
+        if not vector_only:
+            return
+
+        pids = [r.project_id for r in vector_only]
+        cypher = """
+        MATCH (p:Project)-[:LOCATED_IN]->(n:Neighbourhood)-[:IN_CITY]->(c:City)
+        WHERE p.project_id IN $pids
+        OPTIONAL MATCH (p)-[:BUILT_BY]->(dev:Developer)
+        OPTIONAL MATCH (p)-[:HAS_UNIT]->(u:Unit)
+        OPTIONAL MATCH (p)-[:HAS_AMENITY]->(am:Amenity)
+        OPTIONAL MATCH (p)-[:NEAR]->(lm:Landmark)
+        WITH p, n, c, dev,
+             collect(DISTINCT CASE WHEN u IS NOT NULL
+                     THEN u { .*, rooms: [(u)-[:HAS_ROOM]->(r:Room) | properties(r)] }
+                     ELSE null END) AS units,
+             collect(DISTINCT am.name) AS amenities,
+             collect(DISTINCT lm.name) AS landmarks
+        RETURN p, n.name AS neighbourhood, c.name AS city,
+               dev.name AS developer, units, amenities, landmarks
+        """
+        try:
+            with self._graph._driver.session() as session:
+                records = list(session.run(cypher, pids=pids))
+        except Exception as e:
+            logger.warning(f"Vector enrichment query failed ({e}). Cards may be sparse.")
+            return
+
+        # Build a lookup by project_id
+        enriched: dict[str, dict] = {}
+        for rec in records:
+            p = dict(rec["p"])
+            pid = p.get("project_id", "")
+            units_raw = rec.get("units") or []
+            units_clean = []
+            for u in units_raw:
+                if u is None:
+                    continue
+                u_dict = dict(u)
+                if "rooms" in u_dict and u_dict["rooms"] is not None:
+                    u_dict["rooms"] = [dict(r) for r in u_dict["rooms"] if r]
+                units_clean.append(u_dict)
+            enriched[pid] = {
+                "neighbourhood": rec.get("neighbourhood") or "",
+                "city": rec.get("city") or "",
+                "developer": rec.get("developer") or p.get("developer_name", ""),
+                "units": units_clean,
+                "amenities": [a for a in (rec.get("amenities") or []) if a],
+                "landmarks": [lm for lm in (rec.get("landmarks") or []) if lm],
+                "extra_props": {k: v for k, v in p.items()
+                                if k not in ("project_id", "project_name", "developer_name")},
+            }
+
+        # Patch each vector-only result in-place
+        for r in vector_only:
+            data = enriched.get(r.project_id)
+            if not data:
+                continue
+            r.neighbourhood = data["neighbourhood"] or r.neighbourhood
+            r.city = data["city"] or r.city
+            r.developer = data["developer"] or r.developer
+            if data["units"]:
+                r.units = data["units"]
+            if data["amenities"]:
+                r.amenities = data["amenities"]
+            if data["landmarks"]:
+                r.landmarks = data["landmarks"]
+            # Merge extra_props (Neo4j data wins for any key present)
+            r.extra_props = {**r.extra_props, **data["extra_props"]}
+
+        logger.info(f"Enriched {len(enriched)}/{len(vector_only)} vector-only result(s) from Neo4j")
+
     def retrieve_and_assemble(
-        self, intent: QueryIntent, raw_query: str
+        self, intent: QueryIntent, raw_query: str,
+        cypher_result: CypherQuery | None = None,
     ) -> tuple[str, list[ProjectResult], str]:
         """
         Main retrieval method.
+
+        Args:
+            intent: The structured QueryIntent (from cypher_result.intent or standalone).
+            raw_query: The raw user query string.
+            cypher_result: Pre-generated CypherQuery (if None, will be generated here).
 
         Returns:
             (context_text, merged_project_results, direct_answer_text)
@@ -834,35 +1087,61 @@ class DualRetriever:
               and contains a human-readable answer to the user's specific question.
         """
         # 1. Generate precise Cypher + vector query string from the raw user query
-        cypher_result = generate_cypher(raw_query)
+        if cypher_result is None:
+            cypher_result = generate_cypher(raw_query)
 
-        # 2. Graph retrieval — precise structural filtering via LLM-generated Cypher
-        graph_results, answer_data = self._graph.retrieve(cypher_result)
-        graph_ids = {r.project_id for r in graph_results}
+        # 2. Launch Graph + Vector retrieval in PARALLEL
+        def _do_graph():
+            return self._graph.retrieve(cypher_result)
 
-        # 3. Vector retrieval — semantic/fuzzy matching using LLM's vector_query
-        # ────────── TEMPORARILY DISABLED VECTOR SEARCH ──────────
-        # vector_results = self._vector.retrieve(
-        #     intent,
-        #     query_override=cypher_result.vector_query,
-        # )
-        vector_results = []
-        # ────────────────────────────────────────────────────────
+        def _do_vector():
+            try:
+                return self._vector.retrieve(
+                    intent,
+                    query_override=cypher_result.vector_query,
+                )
+            except Exception as e:
+                logger.warning(f"Vector retrieval failed ({e}). Proceeding with graph only.")
+                return []
 
-        # 4. Merge: graph results are canonical; vector fills in semantic gaps
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            graph_future: Future = executor.submit(_do_graph)
+            vector_future: Future = executor.submit(_do_vector)
+
+            graph_results, answer_data = graph_future.result()
+            vector_results = vector_future.result()
+
+        # 3. Score-based merge
+        #    Graph results are canonical (score = 0.0 baseline)
+        #    Vector results carry their semantic similarity score
+        #    Projects found in BOTH sources get a boost
         merged: dict[str, ProjectResult] = {}
 
         for r in graph_results:
+            r.score = 0.0  # graph matches are structurally perfect
             merged[r.project_id] = r
 
         for r in vector_results:
             if r.project_id not in merged:
+                # Vector-only result — keep as-is
                 merged[r.project_id] = r
             else:
+                # Found in BOTH graph and vector — boost!
                 merged[r.project_id].source = "both"
-                merged[r.project_id].score = r.score
+                # Keep the graph result's richer data, but note the vector score
+                merged[r.project_id].score = -0.5  # boost: "both" scores better than "graph"
+                # Merge any extra unit types that vector found but graph didn't
+                existing_types = {u.get("unit_type") for u in merged[r.project_id].units}
+                for vu in r.units:
+                    if vu.get("unit_type") not in existing_types:
+                        merged[r.project_id].units.append(vu)
 
-        # 5. Sort and filter
+        # Enrich vector-only results with full Neo4j data (single batch query)
+        vector_only = [r for r in merged.values() if r.source == "vector"]
+        if vector_only:
+            self._enrich_from_graph(vector_only)
+
+        # 4. Sort: "both" first (lowest score), then "graph", then "vector"
         def sort_key(r: ProjectResult):
             source_prio = 0 if r.source == "both" else (1 if r.source == "graph" else 2)
             return (source_prio, r.score)
@@ -884,7 +1163,7 @@ class DualRetriever:
         else:
             final = final_candidates[: settings.FINAL_TOP_N]
 
-        # 6. Build direct answer text for LOOKUP / AGGREGATE
+        # 5. Build direct answer text for LOOKUP / AGGREGATE
         direct_answer_text = ""
         if answer_data and cypher_result.query_type in ("LOOKUP", "AGGREGATE"):
             direct_answer_text = _format_answer_data(
@@ -894,7 +1173,7 @@ class DualRetriever:
                 params=cypher_result.params,
             )
 
-        # 7. Assemble context text
+        # 6. Assemble context text
         context_blocks = []
         for i, proj in enumerate(final, 1):
             context_blocks.append(f"[{i}] {proj.to_context_text()}")

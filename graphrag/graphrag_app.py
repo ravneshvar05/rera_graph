@@ -14,7 +14,7 @@ import time
 import streamlit as st
 from loguru import logger
 
-from graphrag_intent import parse_intent
+from graphrag_cypher import generate_cypher
 from graphrag_retriever import DualRetriever
 from graphrag_answer import generate_answer
 
@@ -210,29 +210,72 @@ st.markdown("""
         line-height: 1.7;
     }
 
-    /* Minimalist Directory Row (>10 results) */
-    .project-list-row {
+    /* Expandable Compact Card (>10 results) */
+    .project-compact {
+        margin: 6px 0;
+        border-radius: 14px;
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        background: rgba(30, 34, 45, 0.6);
+        transition: all 0.3s ease;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+    .project-compact:hover {
+        border-color: rgba(99, 179, 237, 0.25);
+        box-shadow: 0 4px 14px rgba(99, 179, 237, 0.08);
+    }
+    .project-compact summary {
         display: flex;
         justify-content: space-between;
         align-items: center;
         padding: 14px 18px;
-        margin: 6px 0;
-        background: rgba(30, 34, 45, 0.6);
-        border: 1px solid rgba(255, 255, 255, 0.05);
-        border-radius: 12px;
-        transition: all 0.3s ease;
-        font-size: 0.95rem;
+        cursor: pointer;
+        list-style: none;
         color: #e2e8f0;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        font-size: 0.95rem;
+        transition: background 0.2s ease;
     }
-    .project-list-row:hover {
+    .project-compact summary::-webkit-details-marker { display: none; }
+    .project-compact summary::after {
+        content: '▸ Details';
+        font-size: 0.75rem;
+        color: #63b3ed;
+        margin-left: 12px;
+        white-space: nowrap;
+        transition: transform 0.2s ease;
+    }
+    .project-compact[open] summary::after {
+        content: '▾ Less';
+    }
+    .project-compact summary:hover {
         background: rgba(36, 41, 56, 0.8);
-        border-color: rgba(99, 179, 237, 0.3);
-        transform: translateX(3px);
     }
-    .project-list-row .pl-title { font-weight: 500; color: #bee3f8; flex: 1.5; }
-    .project-list-row .pl-loc { flex: 2; color: #a0aec0; font-size: 0.9rem; }
-    .project-list-row .pl-dev { flex: 1; text-align: right; color: #718096; font-size: 0.85rem; }
+    .project-compact .pc-name { font-weight: 600; color: #bee3f8; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .project-compact .pc-loc { flex: 1.5; color: #a0aec0; font-size: 0.88rem; padding: 0 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .project-compact .pc-tag { flex-shrink: 0; }
+    .project-compact .pc-detail {
+        padding: 0 18px 16px 18px;
+        border-top: 1px solid rgba(255, 255, 255, 0.04);
+        color: #cbd5e1;
+        font-size: 0.9rem;
+        line-height: 1.7;
+        animation: slideDown 0.2s ease-out;
+    }
+    @keyframes slideDown {
+        from { opacity: 0; transform: translateY(-6px); }
+        to   { opacity: 1; transform: translateY(0); }
+    }
+    .project-compact .pc-detail .pc-row {
+        padding: 3px 0;
+    }
+    .project-compact .pc-detail .pc-rooms {
+        margin-top: 6px;
+        padding: 8px 12px;
+        background: rgba(20, 24, 35, 0.5);
+        border-radius: 8px;
+        font-size: 0.85rem;
+        color: #a0aec0;
+    }
 
     /* Source tags */
     .tag-both   { background: rgba(72, 187, 120, 0.15); color: #9ae6b4; padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; border: 1px solid rgba(72, 187, 120, 0.2); }
@@ -369,9 +412,10 @@ if query:
     # ── Pipeline ──────────────────────────────────────────────────────────────
     with st.chat_message("assistant"):
         with st.status("Searching properties…", expanded=True) as status:
-            # Step 1: Parse intent
-            status.write("🧠 Understanding your query…")
-            intent = parse_intent(query)
+            # Step 1: Generate Cypher + Intent in a SINGLE LLM call
+            status.write("🧠 Understanding your query & generating graph query…")
+            cypher_result = generate_cypher(query)
+            intent = cypher_result.intent
 
             # Mandatory Slot Check: City — only needed for broad filter queries
             # Skip city requirement when user mentions a project name, neighbourhood, or area
@@ -389,10 +433,12 @@ if query:
                 results = []
                 context_text = ""
             else:
-                # Step 2: Retrieve
+                # Step 2: Retrieve (Graph + Vector run in PARALLEL internally)
                 status.write("🔍 Searching knowledge graph and vector index…")
                 retriever: DualRetriever = st.session_state.retriever
-                context_text, results, direct_answer_text = retriever.retrieve_and_assemble(intent, query)
+                context_text, results, direct_answer_text = retriever.retrieve_and_assemble(
+                    intent, query, cypher_result=cypher_result
+                )
 
                 # Step 3: Generate answer
                 status.write("✍️ Generating recommendations…")
@@ -479,15 +525,76 @@ if query:
                     f"</div>"
                 )
 
-            def get_minimal_row(proj, tag_c, tag_l):
+            def get_expandable_card(proj, tag_c, tag_l):
+                """Compact expandable card for large result sets (>10 projects)."""
                 address = proj.extra_props.get("address")
                 location_str = address if address else f"{proj.neighbourhood}, {proj.city}"
+
+                # Build detail lines for the expandable section
+                detail_lines = []
+                detail_lines.append(f'<div class="pc-row">🏗️ <strong>Developer:</strong> {proj.developer}</div>')
+
+                u_types = list({u.get("unit_type", "?") for u in proj.units}) if proj.units else []
+                if u_types:
+                    detail_lines.append(f'<div class="pc-row">🏠 <strong>Units:</strong> {", ".join(u_types)}</div>')
+
+                if proj.amenities:
+                    amen_str = ", ".join(proj.amenities[:8])
+                    detail_lines.append(f'<div class="pc-row">✨ <strong>Amenities:</strong> {amen_str}</div>')
+
+                # Status / Possession / RERA
+                status_val = proj.extra_props.get("project_status")
+                if status_val and status_val.upper() not in ("UNKNOWN", "NONE", ""):
+                    detail_lines.append(f'<div class="pc-row">📋 <strong>Status:</strong> {status_val.replace("_", " ").title()}</div>')
+                poss_date = proj.extra_props.get("possession_date")
+                if poss_date:
+                    detail_lines.append(f'<div class="pc-row">📅 <strong>Possession:</strong> {poss_date}</div>')
+                rera = proj.extra_props.get("rera_number")
+                if rera:
+                    detail_lines.append(f'<div class="pc-row">🔖 <strong>RERA:</strong> {rera}</div>')
+                bldgs = proj.extra_props.get("total_buildings")
+                if bldgs:
+                    detail_lines.append(f'<div class="pc-row">🏢 <strong>Buildings:</strong> {bldgs}</div>')
+
+                # Room info from first unit
+                room_snippets = []
+                if proj.units:
+                    for u in proj.units[:2]:
+                        rooms = u.get("rooms") or []
+                        for r in rooms[:4]:
+                            rname = r.get("name", "")
+                            rarea = r.get("area_sqft")
+                            if rname and rarea:
+                                try:
+                                    room_snippets.append(f"{rname}: {float(rarea):.0f} sqft")
+                                except (ValueError, TypeError):
+                                    room_snippets.append(f"{rname}: {rarea} sqft")
+                        if room_snippets:
+                            break
+                if room_snippets:
+                    detail_lines.append(f'<div class="pc-rooms">📐 {" · ".join(room_snippets[:4])}</div>')
+
+                # Society snippet
+                soc_desc = proj.extra_props.get("society_description", "")
+                if soc_desc and len(soc_desc) > 10:
+                    truncated = soc_desc[:150] + ("…" if len(soc_desc) > 150 else "")
+                    detail_lines.append(f'<div class="pc-row" style="color:#718096;font-size:0.85rem;margin-top:4px">{truncated}</div>')
+
+                if proj.landmarks:
+                    lm_str = ", ".join(proj.landmarks[:5])
+                    detail_lines.append(f'<div class="pc-row">🗺️ <strong>Nearby:</strong> {lm_str}</div>')
+
+                detail_html = "\n".join(detail_lines)
+
                 return (
-                    f'<div class="project-list-row">'
-                    f'<div class="pl-title">{proj.project_name}</div>'
-                    f'<div class="pl-loc">📍 {location_str}</div>'
-                    f'<div class="pl-dev">🏗️ {proj.developer}</div>'
-                    f"</div>"
+                    f'<details class="project-compact">'
+                    f'<summary>'
+                    f'<span class="pc-name">{proj.project_name}</span>'
+                    f'<span class="pc-loc">📍 {location_str}</span>'
+                    f'<span class="pc-tag {tag_c}">{tag_l}</span>'
+                    f'</summary>'
+                    f'<div class="pc-detail">{detail_html}</div>'
+                    f'</details>'
                 )
 
             # Sequentially render matched projects and reasoning
@@ -524,18 +631,16 @@ if query:
                     )
                     
                     if is_large_list:
-                        html_rendered = get_minimal_row(matched_proj, tag_cls, tag_label)
+                        html_rendered = get_expandable_card(matched_proj, tag_cls, tag_label)
                     else:
                         html_rendered = get_project_card(matched_proj, tag_cls, tag_label)
                     
                     st.markdown(html_rendered, unsafe_allow_html=True)
-                    time.sleep(0.02) # faster for lists
                 
                 if reasoning and not is_large_list:
                     # Render all within a single markdown call. Streamlit parses markdown inside HTML 
                     # if separated by blank lines
                     st.markdown(f'<div class="llm-explanation" markdown="1">\n\n{reasoning}\n\n</div>', unsafe_allow_html=True)
-                    time.sleep(0.04)
                 
                 # We store generic "html_content" to handle both the card or the row seamlessly on reload
                 p["html_content"] = html_rendered
@@ -544,11 +649,11 @@ if query:
             if answer.get("conclusion"):
                 st.markdown(answer.get("conclusion"))
 
-            if "llm_metadata" in answer:
-                meta = answer["llm_metadata"]
-                st.markdown(f"<div style='font-size: 0.8rem; color: #718096; margin-top: 10px; text-align: right;'>🤖 Engine: {meta.get('model_name', 'unknown')} &nbsp;|&nbsp; 🪙 Tokens: {meta.get('total_tokens', 0)} ({meta.get('prompt_tokens', 0)} prompt + {meta.get('completion_tokens', 0)} completion)</div>", unsafe_allow_html=True)
+            # Display token usage for the active model
+            st.markdown(f"<div style='font-size: 0.8rem; color: #718096; margin-top: 10px; text-align: right;'>🤖 Cypher Engine tokens used: <strong>{cypher_result.tokens_used}</strong></div>", unsafe_allow_html=True)
         else:
             st.markdown(answer)
+            st.markdown(f"<div style='font-size: 0.8rem; color: #718096; margin-top: 10px; text-align: right;'>🤖 Cypher Engine tokens used: <strong>{cypher_result.tokens_used}</strong></div>", unsafe_allow_html=True)
 
         # ── Debug / context expanders ──────────────────────────────────────────
         if show_debug:
