@@ -26,6 +26,14 @@ __pycache__/
 .DS_Store
 Thumbs.db
 
+# IDE and build
+.vscode/
+.idea/
+dist/
+build/
+*.egg-info/
+logs/
+
 # Logs and outputs
 *.log
 /output/
