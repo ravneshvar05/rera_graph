@@ -1,0 +1,21 @@
+# ── Neo4j ─────────────────────────────────────────────────────────────────────
+neo4j>=5.20.0
+
+# ── Vector DB ──────────────────────────────────────────────────────────────────
+chromadb>=0.5.15
+sentence-transformers>=3.0.1
+
+# ── LLM / Embeddings ──────────────────────────────────────────────────────────
+# Note: GraphRAG uses the older SDK, KG uses the newer SDK. Include both for safety.
+google-generativeai>=0.8.0
+google-genai>=1.0.0
+groq>=0.11.0
+
+# ── Config / Utilities ────────────────────────────────────────────────────────
+pydantic>=2.7.4
+pydantic-settings>=2.3.4
+python-dotenv>=1.0.1
+loguru>=0.7.2
+
+# ── Web UI (Streamlit Cloud) ──────────────────────────────────────────────────
+streamlit>=1.40.0
