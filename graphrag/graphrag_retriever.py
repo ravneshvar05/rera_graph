@@ -14,6 +14,7 @@ Performance: Graph and Vector retrieval run in PARALLEL via ThreadPoolExecutor.
 from __future__ import annotations
 
 import json
+import time
 from concurrent.futures import ThreadPoolExecutor, Future
 from dataclasses import dataclass, field
 from typing import Optional
@@ -26,6 +27,15 @@ from neo4j import GraphDatabase
 from graphrag_config import settings
 from graphrag_intent import QueryIntent
 from graphrag_cypher import generate_cypher, CypherQuery
+
+
+# ── In-process query result cache ─────────────────────────────────────────────
+# Stores (timestamp, result_tuple) keyed by normalised query string.
+# Avoids re-running the full pipeline (LLM + Neo4j + ChromaDB) for repeated
+# identical queries within the same Streamlit session (e.g. sidebar buttons).
+_QUERY_CACHE: dict[str, tuple[float, tuple]] = {}
+_CACHE_TTL_SECONDS: int = 300   # 5 minutes
+_CACHE_MAX_SIZE: int = 50       # max entries before oldest is evicted
 
 
 
@@ -212,7 +222,11 @@ class GraphRetriever:
           - GLOBAL → return all projects.
           - SPECIFIC → run LLM Cypher, then ALWAYS supplement with intent-driven
             results for multi-location queries (LLM often drops locations).
-            Also fallback to intent-driven on 0 results.
+            Also fallback to intent-driven on 0 results, BUT ONLY if the intent
+            has at least one actionable graph filter (location, BHK, amenity, etc.).
+            If intent has NO filters, the LLM Cypher 0-result means "nothing in db
+            matches this structural constraint" — skip fallback so vector search
+            can answer the semantic query instead.
           - LOOKUP/AGGREGATE → run LLM Cypher only (project name based).
 
         Returns:
@@ -230,13 +244,25 @@ class GraphRetriever:
                 intent = cypher_result.intent
                 need_supplement = False
 
-                # Case 1: LLM Cypher returned 0 results — full fallback
+                # Case 1: LLM Cypher returned 0 results — fallback ONLY if the
+                # intent has at least one graph-expressible filter.
+                # Example of "no graph filters": "ground floor villas for seniors"
+                # → property_type=VILLA but no location/BHK/amenity → LLM filter
+                # (floor_level=0) fails but intent-fallback would dump ALL villas,
+                # which is too broad. Let vector search handle it instead.
                 if not results:
-                    need_supplement = True
-                    logger.info(
-                        "LLM Cypher returned 0 graph results. "
-                        "Using intent-driven fallback."
-                    )
+                    if self._intent_has_graph_filters(intent):
+                        need_supplement = True
+                        logger.info(
+                            "LLM Cypher returned 0 graph results. "
+                            "Intent has graph filters — using intent-driven fallback."
+                        )
+                    else:
+                        logger.info(
+                            "LLM Cypher returned 0 graph results. "
+                            "Intent has no actionable graph filters — skipping fallback, "
+                            "relying on vector search."
+                        )
 
                 # Case 2: Multi-location query — LLM often drops some
                 # locations from Cypher params, so supplement to catch them
@@ -264,12 +290,65 @@ class GraphRetriever:
         logger.info(f"Graph retrieval → {len(results)} project(s)")
         return results, answer_data
 
+    @staticmethod
+    def _intent_has_graph_filters(intent: QueryIntent) -> bool:
+        """
+        Returns True if the intent has at least one filter that can be
+        expressed as a structural graph query (location, BHK, amenity, etc.).
+
+        Used to gate the intent-driven fallback: if the LLM Cypher returned
+        0 results but the intent has NO graph-expressible filters, we skip
+        the fallback so vector search can handle the semantic query instead
+        of flooding the context with all projects.
+
+        Filters that DON'T count (can't be expressed as simple graph filters):
+          - semantic_keywords only  (e.g. "spacious", "senior-friendly")
+          - property_type alone  (too broad — would return all villas/apartments)
+          - has_balcony / has_parking alone  (already covered by graph flags)
+        """
+        if intent.city:
+            return True
+        if intent.neighbourhood:
+            return True
+        if intent.zone:
+            return True
+        if intent.bhk is not None:
+            return True
+        if intent.amenities:
+            return True
+        if intent.landmark_types:
+            return True
+        if intent.specific_landmarks:
+            return True
+        if intent.developer:
+            return True
+        if intent.project_names:
+            return True
+        if intent.min_sqft is not None or intent.max_sqft is not None:
+            return True
+        if intent.min_units_per_floor is not None or intent.max_units_per_floor is not None:
+            return True
+        if intent.entrance_facing:
+            return True
+        # property_type alone is intentionally NOT listed — too broad to be useful
+        # as a sole fallback filter (would return all apartments or all villas)
+        return False
+
     def _execute_cypher(self, cq: CypherQuery) -> tuple[list[ProjectResult], list[dict]]:
         """Execute the LLM-generated Cypher and return (project_results, answer_data)."""
         try:
             with self._driver.session() as session:
                 records = list(session.run(cq.cypher, **cq.params))
-                results = [self._record_to_result(r) for r in records]
+
+                # AGGREGATE/LOOKUP queries may only return `answer_data` (no `p` node).
+                # Only call _record_to_result for rows that actually have a `p` key.
+                results: list[ProjectResult] = []
+                for r in records:
+                    try:
+                        if r.get("p") is not None:
+                            results.append(self._record_to_result(r))
+                    except (KeyError, TypeError):
+                        pass  # row has no `p` node — it's an answer_data-only row
 
                 # Extract answer_data from LOOKUP / AGGREGATE queries
                 answer_data: list[dict] = []
@@ -278,7 +357,7 @@ class GraphRetriever:
                         for col in cq.answer_columns:
                             val = record.get(col)
                             if val:
-                                # val is a list of dicts (one per unit)
+                                # val is a list of dicts (one per unit) or a single dict
                                 if isinstance(val, list):
                                     answer_data.extend([dict(v) for v in val if v])
                                 elif isinstance(val, dict):
@@ -563,15 +642,24 @@ class VectorRetriever:
         )
         logger.debug(f"VectorRetriever: ChromaDB collection has {self._col.count()} docs.")
 
-        # Eagerly load cross-encoder re-ranker at startup (avoids first-query latency)
+        # Load cross-encoder re-ranker at startup only when ENABLE_RERANKER=true.
+        # Set ENABLE_RERANKER=false in .env to skip model loading entirely (saves
+        # memory + startup time). Re-enable any time without code changes.
         self._reranker = None
-        try:
-            from sentence_transformers import CrossEncoder
-            self._reranker = CrossEncoder(settings.RERANK_MODEL)
-            logger.info(f"Cross-encoder re-ranker loaded at startup: {settings.RERANK_MODEL}")
-        except Exception as e:
-            logger.warning(f"Could not load cross-encoder ({e}). Re-ranking disabled.")
-            self._reranker = False  # sentinel => skip re-ranking
+        if settings.ENABLE_RERANKER:
+            try:
+                from sentence_transformers import CrossEncoder
+                self._reranker = CrossEncoder(settings.RERANK_MODEL)
+                logger.info(f"Cross-encoder re-ranker loaded at startup: {settings.RERANK_MODEL}")
+            except Exception as e:
+                logger.warning(f"Could not load cross-encoder ({e}). Re-ranking disabled.")
+                self._reranker = False  # sentinel => skip re-ranking
+        else:
+            self._reranker = False  # deliberately disabled via config
+            logger.info(
+                "Cross-encoder re-ranker DISABLED (ENABLE_RERANKER=false). "
+                "Using distance-sorted ChromaDB ranking + RERANK_TOP_K cap instead."
+            )
 
     def _build_query_text(self, intent: QueryIntent, query_override: Optional[str] = None) -> str:
         """Build a natural-language query sentence from intent for semantic search."""
@@ -728,10 +816,15 @@ class VectorRetriever:
             logger.info("Vector retrieval → 0 results after distance threshold")
             return []
 
-        # ── Phase 2: Cross-encoder re-ranking ──
+        # ── Phase 2: Re-ranking / candidate capping ────────────────────────────
+        # RERANK_TOP_K always caps how many unique projects reach the LLM judge.
+        # This is the primary control for judge token budget — whether or not the
+        # cross-encoder is enabled.
         reranker = self._reranker if self._reranker is not False else None
+
         if reranker and len(all_hits) > 3:
-            # Cap candidates sent to cross-encoder for speed (sort by distance first)
+            # ── Cross-encoder path (ENABLE_RERANKER=true) ──────────────────────
+            # Sort by distance first, cap candidates to avoid excessive CPU time.
             MAX_RERANK_CANDIDATES = 20
             if len(all_hits) > MAX_RERANK_CANDIDATES:
                 all_hits.sort(key=lambda x: x[1])  # sort by distance (lower=better)
@@ -755,15 +848,25 @@ class VectorRetriever:
                     logger.info("All results filtered by re-rank score threshold")
                     return []
                 all_hits = [hit for _, hit in ranked[:settings.RERANK_TOP_K]]
-                logger.info(f"Re-ranked {len(pairs)} → kept top {len(all_hits)} (score threshold: {settings.RERANK_SCORE_THRESHOLD})")
+                logger.info(
+                    f"Cross-encoder: re-ranked {len(pairs)} → kept top {len(all_hits)} "
+                    f"(score threshold: {settings.RERANK_SCORE_THRESHOLD})"
+                )
             except Exception as e:
                 logger.warning(f"Re-ranking failed ({e}), using raw distances")
-                # Fallback: sort by distance
                 all_hits.sort(key=lambda x: x[1])
                 all_hits = all_hits[:settings.RERANK_TOP_K]
         else:
-            all_hits.sort(key=lambda x: x[1])
+            # ── Distance-sorted path (ENABLE_RERANKER=false or too few hits) ────
+            # ChromaDB L2 distance is already a strong relevance signal:
+            # lower distance = more semantically similar to the query.
+            # Sort ascending (most relevant first) and cap at RERANK_TOP_K.
+            all_hits.sort(key=lambda x: x[1])   # ascending: closest = most relevant
             all_hits = all_hits[:settings.RERANK_TOP_K]
+            logger.info(
+                f"Distance-ranked: kept top {len(all_hits)} candidates "
+                f"(RERANK_TOP_K={settings.RERANK_TOP_K}, threshold={settings.VECTOR_DISTANCE_THRESHOLD})"
+            )
 
         # ── Assemble ProjectResults, grouped by project_id ──
         project_map: dict[str, ProjectResult] = {}
@@ -1052,15 +1155,25 @@ class DualRetriever:
         MATCH (p:Project)-[:LOCATED_IN]->(n:Neighbourhood)-[:IN_CITY]->(c:City)
         WHERE p.project_id IN $pids
         OPTIONAL MATCH (p)-[:BUILT_BY]->(dev:Developer)
-        OPTIONAL MATCH (p)-[:HAS_UNIT]->(u:Unit)
-        OPTIONAL MATCH (p)-[:HAS_AMENITY]->(am:Amenity)
-        OPTIONAL MATCH (p)-[:NEAR]->(lm:Landmark)
-        WITH p, n, c, dev,
-             collect(DISTINCT CASE WHEN u IS NOT NULL
-                     THEN u { .*, rooms: [(u)-[:HAS_ROOM]->(r:Room) | properties(r)] }
-                     ELSE null END) AS units,
-             collect(DISTINCT am.name) AS amenities,
-             collect(DISTINCT lm.name) AS landmarks
+        CALL {
+          WITH p
+          OPTIONAL MATCH (p)-[:HAS_UNIT]->(u:Unit)
+          WITH u WHERE u IS NOT NULL
+          RETURN collect(u { .*, rooms: [(u)-[:HAS_ROOM]->(r:Room) | properties(r)] }) AS units
+        }
+        CALL {
+          WITH p
+          OPTIONAL MATCH (p)-[:HAS_AMENITY]->(am:Amenity)
+          WITH am WHERE am IS NOT NULL
+          RETURN collect(am.name) AS amenities
+        }
+        CALL {
+          WITH p
+          OPTIONAL MATCH (p)-[:NEAR]->(lm:Landmark)
+          WITH lm WHERE lm IS NOT NULL
+          RETURN collect(lm.name) AS landmarks
+        }
+        WITH p, n, c, dev, units, amenities, landmarks
         RETURN p, n.name AS neighbourhood, c.name AS city,
                dev.name AS developer, units, amenities, landmarks
         """
@@ -1132,6 +1245,17 @@ class DualRetriever:
             - direct_answer_text is non-empty for LOOKUP / AGGREGATE queries
               and contains a human-readable answer to the user's specific question.
         """
+        # ── Cache check: return instantly for repeated identical queries ──────
+        cache_key = raw_query.lower().strip()
+        now = time.time()
+        if cache_key in _QUERY_CACHE:
+            cached_ts, cached_result = _QUERY_CACHE[cache_key]
+            if now - cached_ts < _CACHE_TTL_SECONDS:
+                logger.info(f"[Cache] HIT for query: {raw_query!r} (age: {int(now - cached_ts)}s)")
+                return cached_result
+            else:
+                del _QUERY_CACHE[cache_key]  # expired — remove and re-run
+
         # 1. Generate precise Cypher + vector query string from the raw user query
         if cypher_result is None:
             cypher_result = generate_cypher(raw_query)
@@ -1234,4 +1358,14 @@ class DualRetriever:
             f"Context assembled: {len(final)} projects, {len(context_text)} chars, "
             f"direct_answer={'yes' if direct_answer_text else 'no'}"
         )
+
+        # ── Cache store ───────────────────────────────────────────────────────
+        result_tuple = (context_text, final, direct_answer_text)
+        if len(_QUERY_CACHE) >= _CACHE_MAX_SIZE:
+            # Evict the oldest entry
+            oldest_key = min(_QUERY_CACHE, key=lambda k: _QUERY_CACHE[k][0])
+            del _QUERY_CACHE[oldest_key]
+        _QUERY_CACHE[cache_key] = (time.time(), result_tuple)
+        logger.info(f"[Cache] STORED query: {raw_query!r} (cache size: {len(_QUERY_CACHE)})")
+
         return context_text, final, direct_answer_text

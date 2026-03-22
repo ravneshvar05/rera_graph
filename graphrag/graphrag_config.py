@@ -40,9 +40,25 @@ class GraphRAGSettings(BaseSettings):
     GRAPH_MAX_RESULTS: int  = Field(25,  description="Max projects from Neo4j Cypher queries")
     FINAL_TOP_N:       int  = Field(25,  description="Max projects to include in final answer")
     RERANK_MODEL:      str  = Field("cross-encoder/ms-marco-MiniLM-L-6-v2", description="Cross-encoder model for re-ranking vector results")
-    RERANK_TOP_K:      int  = Field(15,  description="How many results to keep after re-ranking")
-    VECTOR_DISTANCE_THRESHOLD: float = Field(1.5,  description="Max L2 distance from ChromaDB; discard results beyond this")
-    RERANK_SCORE_THRESHOLD:    float = Field(-3.0, description="Min cross-encoder score; discard re-ranked results below this")
+    RERANK_TOP_K:      int  = Field(8,   description="Hard cap on projects sent to LLM judge (controls judge token budget)")
+    VECTOR_DISTANCE_THRESHOLD: float = Field(1.0,  description="Max L2 distance from ChromaDB; discard results beyond this (lower = stricter)")
+    RERANK_SCORE_THRESHOLD:    float = Field(-3.0, description="Min cross-encoder score; discard re-ranked results below this (only used when ENABLE_RERANKER=true)")
+
+    # ── Cross-encoder toggle ──────────────────────────────────────────────────
+    # Set ENABLE_RERANKER=false in .env to disable the cross-encoder entirely.
+    # When disabled: ChromaDB distance + VECTOR_DISTANCE_THRESHOLD + RERANK_TOP_K
+    # cap act as the pre-filter before the LLM relevance judge.
+    # When enabled: cross-encoder re-ranks candidates for higher precision
+    # at the cost of ~7-10s CPU inference per query.
+    # Re-enable any time without code changes — just set ENABLE_RERANKER=true.
+    ENABLE_RERANKER:   bool = Field(True, description="Enable cross-encoder re-ranking (slower but more precise for ambiguous queries)")
+
+    # ── Relevance judge toggle ──────────────────────────────────────────────
+    # Set SKIP_VECTOR_JUDGE=true to bypass the LLM relevance judge for vector-only
+    # results entirely. This saves judge tokens and shows any project that passed
+    # the VECTOR_DISTANCE_THRESHOLD (i.e. >=50-60% semantic similarity).
+    # Quality gating is handled purely by VECTOR_DISTANCE_THRESHOLD in this mode.
+    SKIP_VECTOR_JUDGE: bool = Field(False, description="Bypass LLM relevance judge for vector-only results; rely on distance threshold alone")
 
     model_config = {
         "env_file": ".env",

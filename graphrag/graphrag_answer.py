@@ -1,14 +1,26 @@
 """
-graphrag_answer.py — LLM-powered answer generator.
+graphrag_answer.py — Token-efficient LLM relevance judge for vector-only results.
 
-Takes the assembled context from graphrag_retriever.py and the original user
-query, and generates a natural language recommendation response.
-
-The LLM acts as the "synthesis" layer of GraphRAG:
-  graph context + vector context → structured LLM prompt → human answer
+Design:
+  - Graph results (source="graph" or "both") are ALWAYS trusted — Cypher already
+    filtered them precisely. They are NEVER sent to the LLM judge.
+  - Vector-only results (source="vector") are sent to a lightweight relevance judge.
+  - The judge receives a compact but RICH per-project context:
+      BHK options, unit types, areas, ALL amenities, special rooms, landmarks,
+      and a truncated society description — enough to judge any query type.
+  - Primary LLM: Groq (Llama 3.3 70b) — fast, free, generous limits.
+  - Fallback LLM: Gemini 2.5 Flash — if Groq fails.
+  - If both fail: all vector results pass (safe fallback, never drops results).
+  - Judge returns strictly: {"results": [{"project_name": "...", "relevant": true/false}]}
+    — no reasoning, no prose, minimal tokens.
+  - The _fallback_answer() function builds the structured card data for the
+    frontend. The LLM judge only gates which projects are included.
 """
 
 import json
+import re
+
+import google.generativeai as genai
 from groq import Groq
 from loguru import logger
 
@@ -16,53 +28,210 @@ from graphrag_config import settings
 from graphrag_intent import QueryIntent
 from graphrag_retriever import ProjectResult
 
-# ── Configure Groq client ───────────────────────────────────────────────────
-_groq_client = Groq(api_key=settings.GROQ_API_KEY)
 
+# ── Judge system prompt ────────────────────────────────────────────────────────
 
-# ── System prompt ─────────────────────────────────────────────────────────────
+_JUDGE_SYSTEM_PROMPT = """\
+You are a relevance filter for a real estate search engine.
 
-_ANSWER_SYSTEM_PROMPT = """You are a knowledgeable and helpful real estate advisor specializing in residential properties in Gujarat, India (primarily Ahmedabad and Surat).
+Given a user query and a list of residential project summaries, decide for each project
+whether it is RELEVANT to the query.
 
-Your role is to help users find the right residential project based on their needs.
+First, classify the query type:
+- SPECIFIC: user mentions concrete requirements (specific rooms, exact BHK, named amenities,
+  facing direction, minimum area, developer name, etc.)
+- GENERAL: broad or exploratory query (location only, lifestyle words, vague descriptions).
 
-You will be given:
-1. The user's original query
-2. A list of retrieved residential projects with their details (extracted from actual project brochures)
+Relevance rules:
+- SPECIFIC query: mark relevant=true if you feel the project satisfies around 75% or more of
+  what the user asked for. Consider all stated requirements together and judge holistically —
+  if the overall fit feels strong enough, mark true. If the project clearly falls short on
+  most of the specific requirements, mark false.
+- GENERAL query: mark relevant=true if the project has around 65% or more overlap with the
+  user's description. Partial matches (right area, similar type, some amenities) count.
+- When uncertain on a GENERAL query, prefer relevant=true.
+- When uncertain on a SPECIFIC query, prefer relevant=false.
+- Never drop a project solely on subjective/lifestyle mismatches (e.g. "luxury feel").
+- Return ONLY raw JSON, no markdown, no explanation.
 
-Your task:
-- Recommend the most suitable projects based on the user's stated requirements
-- If multiple projects match, detail them in order of relevance
-
-You MUST respond in strict JSON format. Do not use Markdown backticks for the JSON block, just raw JSON.
-The JSON must have the following exact structure:
-{
-  "general_summary": "A friendly introductory sentence or two.",
-  "projects": [
-    {
-      "project_name": "Exact Name of the project from context",
-      "reasoning": "Brief Markdown explanation (MAX 2 bullet points) of why this project is recommended and key details. IMPORTANT: If the user asks about floor layouts or units per floor, you MUST explicitly state the 'units per floor' in this reasoning block based on the provided context. You MUST use dashes (-) for bullet points, and separate each bullet point with a newline character (\\n) so that the entire reasoning is returned as a single valid JSON string. Do NOT use asterisks (*). IF THERE ARE MORE THAN 20 PROJECTS TOTAL, LEAVE THIS STRING EMPTY \"\"."
-    }
-  ],
-  "conclusion": "A brief summary or next steps suggestion."
-}
-
-Important rules:
-- IF THERE ARE MORE THAN 20 PROJECTS TO RECOMMEND, DO NOT WRITE ANY REASONING. JUST PROVIDE THE PROJECT NAMES AND A GOOD GENERAL SUMMARY.
-- ONLY use information from the provided context — do not invent data
-- If price/area is not in the context, do not guess it
-- Always ground your recommendations in the actual retrieved data
-- The project_name MUST perfectly match the name provided in the context.
-- CRITICAL: You MUST filter out and omit any projects from the context that do not meaningfully match the user's specific requirements (e.g. if they asked for a 1 BHK, do not list a 3 BHK, if they asked for a clubhouse, do not list projects without a clubhouse). 
-- STRICT LOGIC: Pay very close attention to AND vs OR conditions in the user's query. 
-  - If a user asks for "Location A OR Location B AND Amenity C", a project is ONLY a perfect match if it actually HAS Amenity C AND is in either Location A OR Location B.
-  - PERFECT MATCHES: Only projects that satisfy ALL strict mandatory criteria should be included in the 'projects' array (these will be rendered as detailed UI cards).
-  - PARTIAL MATCHES: If a project only meets some conditions but fails others (e.g. it is in the right location but lacks the requested amenity), DO NOT include it in the 'projects' array. Instead, briefly mention these partial matches in the 'conclusion' string as plain text (e.g. "Note: Project X is in Location A but lacks Amenity C...").
-- If no projects match perfectly, leave the 'projects' array empty and explain the partial matches in the 'general_summary' or 'conclusion'.
+Output format (strict):
+{"results": [{"project_name": "<exact name>", "relevant": true}, ...]}
 """
 
 
-# ── Answer generator ──────────────────────────────────────────────────────────
+# ── Judge context builder — rich but token-efficient ──────────────────────────
+
+def _build_judge_summary(p: ProjectResult) -> dict:
+    """
+    Build a compact but comprehensive per-project dict for the LLM judge.
+
+    Covers ALL query dimensions:
+      - BHK + unit types + areas         (for BHK / size queries)
+      - Special rooms                    (for room-specific queries)
+      - Full amenity list                (for amenity queries)
+      - Landmarks                        (for proximity queries)
+      - Truncated society description    (for fuzzy / lifestyle queries)
+
+    Token budget: ~150-200 tokens per project at most.
+    """
+    # BHK numbers & unit types
+    bhk_set = sorted({u.get("bhk") for u in p.units if u.get("bhk")})
+    unit_types = sorted({u.get("unit_type") for u in p.units if u.get("unit_type")})
+
+    # Area ranges (super built-up, carpet)
+    sbua_vals = [u.get("super_builtup_sqft") for u in p.units if u.get("super_builtup_sqft")]
+    carpet_vals = [u.get("carpet_sqft") for u in p.units if u.get("carpet_sqft")]
+    area_parts = []
+    if sbua_vals:
+        lo, hi = min(sbua_vals), max(sbua_vals)
+        area_parts.append(f"SBA {int(lo)}–{int(hi)} sqft" if lo != hi else f"SBA {int(lo)} sqft")
+    if carpet_vals:
+        lo, hi = min(carpet_vals), max(carpet_vals)
+        area_parts.append(f"carpet {int(lo)}–{int(hi)} sqft" if lo != hi else f"carpet {int(lo)} sqft")
+
+    # Special rooms — everything except generic bedroom/kitchen/hall/toilet/dining
+    _COMMON_ROOMS = {"bedroom", "master bedroom", "kitchen", "hall", "toilet",
+                     "bathroom", "wc", "dining", "passage", "lobby", "wash area"}
+    special_rooms: set[str] = set()
+    for u in p.units:
+        for r in (u.get("rooms") or []):
+            rname = (r.get("name") or "").strip()
+            if rname and rname.lower() not in _COMMON_ROOMS:
+                special_rooms.add(rname)
+    # Also check project-level boolean flags for quick wins
+    flag_rooms = []
+    ep = p.extra_props
+    if ep.get("has_pool") == 1:       flag_rooms.append("Swimming Pool")
+    if ep.get("has_clubhouse") == 1:  flag_rooms.append("Clubhouse")
+    if ep.get("has_park") == 1:       flag_rooms.append("Park/Garden")
+    if ep.get("has_parking") == 1:    flag_rooms.append("Parking")
+
+    # Society description — truncate hard at 150 chars to stay token-efficient
+    soc_desc = (ep.get("society_description") or "").strip()
+    soc_desc_short = (soc_desc[:150] + "…") if len(soc_desc) > 150 else soc_desc
+
+    return {
+        "project_name": p.project_name,
+        "location": f"{p.neighbourhood}, {p.city}",
+        "bhk": bhk_set,
+        "unit_types": unit_types,
+        "area": ", ".join(area_parts) if area_parts else None,
+        "special_rooms": sorted(special_rooms)[:8] if special_rooms else None,
+        "amenities": p.amenities or None,          # FULL list — names are short
+        "nearby": p.landmarks[:6] if p.landmarks else None,
+        "description": soc_desc_short or None,
+    }
+
+
+# ── Core judge function ────────────────────────────────────────────────────────
+
+def _judge_vector_relevance(
+    user_query: str,
+    vector_only: list[ProjectResult],
+    api_keys: dict,
+) -> list[ProjectResult]:
+    """
+    Use Groq (Llama) → Gemini 2.5 Flash fallback to decide which vector-only
+    projects are relevant to the user query.
+
+    Returns the filtered list. On any LLM failure, returns all unchanged.
+    """
+    if not vector_only:
+        return vector_only
+
+    # Build compact summaries
+    summaries = [_build_judge_summary(p) for p in vector_only]
+    # Strip None values for cleaner JSON (saves tokens)
+    summaries_clean = [{k: v for k, v in s.items() if v is not None} for s in summaries]
+
+    judge_user_msg = (
+        f"User query: {user_query}\n\n"
+        f"Projects to evaluate:\n{json.dumps(summaries_clean, indent=2)}"
+    )
+
+    # ── Primary: Groq (Llama 3.3 70b) ──────────────────────────────────────
+    groq_key = (api_keys or {}).get("GROQ_API_KEY") or settings.GROQ_API_KEY
+    if groq_key:
+        try:
+            groq_client = Groq(api_key=groq_key)
+            response = groq_client.chat.completions.create(
+                model=settings.GROQ_MODEL,
+                response_format={"type": "json_object"},
+                messages=[
+                    {"role": "system", "content": _JUDGE_SYSTEM_PROMPT},
+                    {"role": "user",   "content": judge_user_msg},
+                ],
+                temperature=0.0,
+                max_tokens=256,   # yes/no per project — very small output
+            )
+            raw = response.choices[0].message.content.strip()
+            tokens_in  = response.usage.prompt_tokens if response.usage else "?"
+            tokens_out = response.usage.completion_tokens if response.usage else "?"
+            logger.info(f"[RelevanceJudge/Groq] tokens: {tokens_in} in / {tokens_out} out")
+            return _parse_judge_response(raw, vector_only)
+        except Exception as e:
+            logger.warning(f"[RelevanceJudge] Groq failed ({e}). Trying Gemini fallback.")
+
+    # ── Fallback: Gemini 2.5 Flash ─────────────────────────────────────────
+    gemini_key = (api_keys or {}).get("GEMINI_API_KEY") or settings.GEMINI_API_KEY
+    if gemini_key:
+        try:
+            genai.configure(api_key=gemini_key)
+            model = genai.GenerativeModel(
+                model_name="gemini-2.5-flash",   # always use 2.5 Flash for judge
+                system_instruction=_JUDGE_SYSTEM_PROMPT,
+                generation_config=genai.GenerationConfig(
+                    temperature=0.0,
+                    response_mime_type="application/json",
+                ),
+            )
+            response = model.generate_content(judge_user_msg)
+            raw = response.text.strip()
+            raw = re.sub(r"^```(?:json)?\s*", "", raw)
+            raw = re.sub(r"\s*```$", "", raw)
+            tokens = (response.usage_metadata.total_token_count
+                      if hasattr(response, "usage_metadata") and response.usage_metadata else "?")
+            logger.info(f"[RelevanceJudge/Gemini] tokens total: {tokens}")
+            return _parse_judge_response(raw, vector_only)
+        except Exception as e:
+            logger.warning(f"[RelevanceJudge] Gemini also failed ({e}). Keeping all vector results.")
+
+    # Both failed — safe fallback
+    logger.warning("[RelevanceJudge] All LLMs failed. Returning vector results unfiltered.")
+    return vector_only
+
+
+def _parse_judge_response(
+    raw: str,
+    vector_only: list[ProjectResult],
+) -> list[ProjectResult]:
+    """Parse the LLM response and filter the vector-only list."""
+    data = json.loads(raw)
+    results_map: dict[str, bool] = {
+        r["project_name"].lower(): bool(r["relevant"])
+        for r in data.get("results", [])
+        if isinstance(r, dict) and "project_name" in r and "relevant" in r
+    }
+    kept, dropped = [], []
+    for p in vector_only:
+        p_lower = p.project_name.lower()
+        # Fuzzy match — LLM may slightly rephrase names
+        match_key = next(
+            (k for k in results_map if k in p_lower or p_lower in k), None
+        )
+        is_relevant = results_map.get(match_key, True)  # unknown → keep (safe)
+        if is_relevant:
+            kept.append(p)
+        else:
+            dropped.append(p.project_name)
+
+    if dropped:
+        logger.info(f"[RelevanceJudge] Filtered out {len(dropped)} vector-only result(s): {dropped}")
+    logger.info(f"[RelevanceJudge] Kept {len(kept)} / {len(vector_only)} vector-only result(s)")
+    return kept
+
+
+# ── Main entry point ───────────────────────────────────────────────────────────
 
 def generate_answer(
     user_query: str,
@@ -73,193 +242,107 @@ def generate_answer(
     api_keys: dict = None,
 ) -> dict:
     """
-    Generate a JSON-structured recommendation answer.
+    Filter vector-only results through the slim LLM relevance judge, then
+    return the structured card data for the frontend.
 
-    Args:
-        user_query: The original user query string.
-        context_text: The assembled context from DualRetriever.
-        project_results: Structured project results (for fallback display).
-        intent: The structured parser intent.
-        direct_answer_text: Pre-formatted direct answer for LOOKUP/AGGREGATE queries.
-
-    Returns:
-        A formatted dictionary answer suitable for display in the chat UI.
-        Includes 'direct_answer' key if direct_answer_text is provided.
+    Graph/both results bypass the judge entirely.
     """
     if not project_results:
         ans = {
-            "general_summary": "I couldn't find any projects matching your criteria in our current database. Try broadening your search.",
+            "general_summary": "I couldn't find any projects matching your criteria. Try broadening your search.",
             "projects": [],
-            "conclusion": ""
+            "conclusion": "",
         }
         if direct_answer_text:
             ans["direct_answer"] = direct_answer_text
         return ans
 
-    # Optimization: bypass LLM to prevent long inference times ONLY for genuine global/overview queries.
-    # We check if there are ANY specific filters applied in the intent.
+    # ── Split by source ───────────────────────────────────────────────────────
+    graph_and_both: list[ProjectResult] = []
+    vector_only: list[ProjectResult] = []
+    for r in project_results:
+        (vector_only if r.source == "vector" else graph_and_both).append(r)
+
+    logger.info(
+        f"[generate_answer] {len(graph_and_both)} graph/both (always kept), "
+        f"{len(vector_only)} vector-only (to judge)"
+    )
+
+    # ── Skip judge for global queries or when no vector-only results ──────────
     has_specific_filters = any([
         intent.bhk, intent.property_type, intent.amenities, intent.landmark_types,
         intent.specific_landmarks, intent.min_sqft, intent.max_sqft,
         intent.min_price_lakhs, intent.max_price_lakhs, intent.has_balcony,
         intent.has_parking, intent.entrance_facing, intent.developer,
-        intent.project_names, intent.min_units_per_floor, intent.max_units_per_floor
+        intent.project_names, intent.min_units_per_floor, intent.max_units_per_floor,
     ])
+    is_global = any(
+        ph in user_query.lower()
+        for ph in ["show all", "list all", "all available", "what's available"]
+    )
+    # SKIP_VECTOR_JUDGE=true → bypass judge entirely; distance threshold already
+    # gates quality. Zero judge tokens used. Set in .env to control behaviour.
+    skip_judge = (
+        (not vector_only)
+        or (is_global and not has_specific_filters)
+        or settings.SKIP_VECTOR_JUDGE
+    )
 
-    is_global_command = any(ph in user_query.lower() for ph in ["show all", "list all", "all available", "what's available"])
-    
-    # Bypass ONLY if it's a generic "list all" without ANY specific criteria (amenities, BHK, etc.)
-    if is_global_command and not has_specific_filters and len(project_results) > 10:
-        logger.info("Bypassing LLM generation for genuine filter-free global query to save time.")
-        return _fallback_answer(user_query, project_results)
+    if skip_judge:
+        reason = (
+            "SKIP_VECTOR_JUDGE=true (distance-threshold gating only)"
+            if settings.SKIP_VECTOR_JUDGE and vector_only
+            else "no vector-only results or global query"
+        )
+        logger.info(f"[generate_answer] Skipping judge ({reason}).")
+        judged_vector = vector_only
+    else:
+        judged_vector = _judge_vector_relevance(user_query, vector_only, api_keys or {})
 
-    # Prevent rate limit errors by hard-capping the context size
-    max_chars = 35000
-    if len(context_text) > max_chars:
-        logger.warning(f"Context too long ({len(context_text)} chars). Truncating to {max_chars} chars.")
-        context_text = context_text[:max_chars] + "\n\n...[Context truncated due to size limits]..."
+    # ── Reassemble: graph/both first, then judged vector ─────────────────────
+    final_results: list[ProjectResult] = graph_and_both + judged_vector
 
-    # ────────── TEMPORARILY DISABLED LLM FOR GRAPH DEBUGGING ──────────
-    # Bypass LLM generation entirely and just return the structured fallback answer
-    # so we can see exactly what the Graph DB retrieved without hitting rate limits.
-    logger.info("TEMPORARY: Bypassing LLM generation to debug Graph Retrieval.")
-    ans = _fallback_answer(user_query, project_results)
+    if not final_results:
+        ans = {
+            "general_summary": "I couldn't find any projects that precisely match your requirements. Try adjusting your filters.",
+            "projects": [],
+            "conclusion": "",
+        }
+        if direct_answer_text:
+            ans["direct_answer"] = direct_answer_text
+        return ans
+
+    ans = _fallback_answer(user_query, final_results)
     if direct_answer_text:
         ans["direct_answer"] = direct_answer_text
     return ans
-    # ──────────────────────────────────────────────────────────────────
-    
-    # ... (Original code commented out or bypassed)
-    prompt = f"""{_ANSWER_SYSTEM_PROMPT}
 
----
 
-{context_text}
-
----
-
-Based on the above retrieved project data, please provide a clear, helpful recommendation to the user.
-
-User Query: {user_query}
-"""
-
-    try:
-        response = _groq_client.chat.completions.create(
-            model=settings.GROQ_MODEL,
-            messages=[
-                {"role": "system", "content": _ANSWER_SYSTEM_PROMPT},
-                {"role": "user", "content": f"{context_text}\n\nBased on the above retrieved project data, please provide a clear, helpful recommendation to the user.\n\nUser Query: {user_query}"},
-            ],
-            temperature=0.3,
-            response_format={"type": "json_object"}
-        )
-        answer_text = response.choices[0].message.content.strip()
-        logger.success(f"Answer generated ({len(answer_text)} chars)")
-        
-        try:
-            parsed = json.loads(answer_text)
-            
-            if hasattr(response, "usage") and response.usage:
-                parsed["llm_metadata"] = {
-                    "model_name": response.model,
-                    "prompt_tokens": response.usage.prompt_tokens,
-                    "completion_tokens": response.usage.completion_tokens,
-                    "total_tokens": response.usage.total_tokens
-                }
-
-            return parsed
-            
-        except json.JSONDecodeError:
-            logger.error("Failed to parse LLM JSON output. Falling back.")
-            return _fallback_answer(user_query, project_results)
-
-    except Exception as e:
-        logger.error(f"Answer generation failed: {e}")
-        # Fallback: generate a simple structured answer without LLM
-        return _fallback_answer(user_query, project_results)
-
+# ── Structured card builder ────────────────────────────────────────────────────
 
 def _fallback_answer(user_query: str, results: list[ProjectResult]) -> dict:
-    """Simple structured answer if LLM call fails — includes rich detail."""
+    """
+    Build the structured project list rendered as cards on the frontend.
+    All card content comes from the ProjectResult objects — no LLM prose.
+    """
     projects = []
     for proj in results:
-        reasoning_lines = []
+        lines: list[str] = []
+
+        # Only add details that are NOT fully covered by the card headers/attributes above.
         
-        address = proj.extra_props.get("address")
-        location_str = address if address else f"{proj.neighbourhood}, {proj.city}"
-        reasoning_lines.append(f"- Location: {location_str}")
-        
-        reasoning_lines.append(f"- Developer: {proj.developer}")
-        
-        # Project status
-        status_val = proj.extra_props.get("project_status")
-        if status_val and status_val.upper() not in ("UNKNOWN", "NONE"):
-            reasoning_lines.append(f"- Status: {status_val.replace('_', ' ').title()}")
-        
-        # Possession date
-        poss_date = proj.extra_props.get("possession_date")
-        if poss_date:
-            reasoning_lines.append(f"- Possession: {poss_date}")
-        
-        # RERA
-        rera = proj.extra_props.get("rera_number")
-        if rera:
-            reasoning_lines.append(f"- RERA: {rera}")
-        
-        # Buildings
-        bldgs = proj.extra_props.get("total_buildings")
-        if bldgs:
-            reasoning_lines.append(f"- Buildings: {bldgs}")
-        
-        if proj.units:
-            unit_types = list({u.get("unit_type", "?") for u in proj.units})
-            reasoning_lines.append(f"- Units: {', '.join(unit_types)}")
-            
-            # Show rooms from first unit
-            for u in proj.units[:1]:
-                rooms = u.get("rooms") or []
-                room_strs = []
-                for r in rooms[:6]:
-                    rname = r.get("name", "")
-                    rarea = r.get("area_sqft")
-                    rlen = r.get("length")
-                    rwid = r.get("width")
-                    parts = []
-                    if rlen and rwid:
-                        parts.append(f"{rlen} x {rwid}")
-                    if rarea:
-                        try:
-                            parts.append(f"{float(rarea):.1f} sqft")
-                        except (ValueError, TypeError):
-                            parts.append(f"{rarea} sqft")
-                    if rname:
-                        dim_str = f" ({', '.join(parts)})" if parts else ""
-                        room_strs.append(f"{rname}{dim_str}")
-                if room_strs:
-                    reasoning_lines.append(f"- Rooms ({u.get('unit_type', '?')}): {'; '.join(room_strs)}")
-        
-        if getattr(proj, "floor_layouts", None):
-            layout_details = []
-            for f in proj.floor_layouts:
-                name = f.get('layout_name', 'Unnamed')
-                units = f.get('total_units_on_floor', '?')
-                layout_details.append(f"{name} ({units} units/floor)")
-            reasoning_lines.append(f"- Floor Layouts: {', '.join(layout_details)}")
-        
-        if proj.amenities:
-            reasoning_lines.append(f"- Amenities: {', '.join(proj.amenities[:8])}")
-        
-        if proj.landmarks:
-            reasoning_lines.append(f"- Nearby: {', '.join(proj.landmarks[:5])}")
-            
+        # 1. Full Society Description
+        soc_desc = proj.extra_props.get("society_description")
+        if soc_desc and len(soc_desc) > 10:
+            lines.append(f"**About:** *{soc_desc.strip()}*")
+
         projects.append({
             "project_name": proj.project_name,
-            "reasoning": "\n".join(reasoning_lines)
+            "reasoning": "\n\n".join(lines), 
         })
 
     return {
         "general_summary": f"Here are the residential projects matching your query: **{user_query}**\n",
         "projects": projects,
-        "conclusion": "Hope this helps!"
+        "conclusion": "Hope this helps!",
     }
-

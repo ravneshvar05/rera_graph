@@ -409,10 +409,7 @@ for msg in st.session_state.messages:
             for p in projects_data:
                 if p.get("html_content"):
                     st.markdown(p["html_content"], unsafe_allow_html=True)
-                # Reasoning is only rendered if it exists (not empty) and we are not in large list mode
-                reasoning_text = str(p.get("reasoning", "")).strip()
-                if reasoning_text and not is_large_list:
-                    st.markdown(f'<div class="llm-explanation" markdown="1">\n\n{reasoning_text}\n\n</div>', unsafe_allow_html=True)
+                # reasoning text not shown — all info is rendered inside the card HTML above
                     
             if content.get("conclusion"):
                 st.markdown(content.get("conclusion"))
@@ -451,22 +448,26 @@ if query:
             cypher_result = generate_cypher(query, api_keys=st.session_state.user_settings)
             intent = cypher_result.intent
 
-            # Mandatory Slot Check: City — only needed for broad filter queries
-            # Skip city requirement when user mentions a project name, neighbourhood, or area
-            needs_city = (
-                not intent.city
-                and not intent.neighbourhood
-                and not intent.zone
-                and not intent.project_names
-            )
-            if needs_city:
-                status.update(
-                    label="Need more information", state="complete", expanded=False
-                )
-                answer = "I have many options available! To give you the best recommendations, please mention which **city** you are looking in (e.g., Ahmedabad or Surat)."
-                results = []
-                context_text = ""
-            else:
+            # ── TEMPORARILY DISABLED: City slot-filling prompt ──────────────────
+            # Uncomment the block below to re-enable asking for a city when
+            # the query has no city / neighbourhood / zone / project name.
+            #
+            # needs_city = (
+            #     not intent.city
+            #     and not intent.neighbourhood
+            #     and not intent.zone
+            #     and not intent.project_names
+            # )
+            # if needs_city:
+            #     status.update(
+            #         label="Need more information", state="complete", expanded=False
+            #     )
+            #     answer = "I have many options available! To give you the best recommendations, please mention which **city** you are looking in (e.g., Ahmedabad or Surat)."
+            #     results = []
+            #     context_text = ""
+            # else:
+            # ──────────────────────────────────────────────────────────────────
+            if True:  # placeholder for the disabled needs_city block above
                 # Step 2: Retrieve (Graph + Vector run in PARALLEL internally)
                 status.write("🔍 Searching knowledge graph and vector index…")
                 retriever: DualRetriever = st.session_state.retriever
@@ -499,7 +500,11 @@ if query:
                 amen_str = ", ".join(proj.amenities[:6]) or "—"
                 address = proj.extra_props.get("address")
                 location_str = address if address else f"{proj.neighbourhood}, {proj.city}"
-                
+
+                # BHK — deduplicated, sorted
+                bhk_vals = sorted({u.get("bhk") for u in proj.units if u.get("bhk")})
+                bhk_str = ", ".join(f"{b} BHK" for b in bhk_vals) if bhk_vals else ""
+
                 # Build extra info lines
                 extra_lines = []
                 status_val = proj.extra_props.get("project_status")
@@ -515,7 +520,7 @@ if query:
                 bldgs = proj.extra_props.get("total_buildings")
                 if bldgs:
                     extra_lines.append(f'🏢 Buildings: {bldgs}')
-                
+
                 # Show key rooms from first unit
                 room_snippets = []
                 if proj.units:
@@ -531,31 +536,25 @@ if query:
                                     room_snippets.append(f"{rname}: {rarea} sqft")
                         if room_snippets:
                             break  # only show rooms from one unit type
-                
+
                 room_line = ""
                 if room_snippets:
                     room_line = f'<br>📐 {" · ".join(room_snippets[:4])}'
-                
-                soc_desc = proj.extra_props.get("society_description", "")
-                soc_snippet = ""
-                if soc_desc and len(soc_desc) > 10:
-                    truncated = soc_desc[:120] + ("…" if len(soc_desc) > 120 else "")
-                    soc_snippet = f'<br><span style="color:#718096;font-size:0.85rem">{truncated}</span>'
-                
+
                 extra_html = ""
                 if extra_lines:
                     extra_html = '<br>' + ' &nbsp;|&nbsp; '.join(extra_lines)
-                
+
                 return (
                     f'<div class="project-card">'
                     f'<h4>{proj.project_name} <span class="{tag_c}">{tag_l}</span></h4>'
                     f'📍 {location_str}<br>'
                     f'🏗️ {proj.developer}<br>'
-                    f'🏠 {", ".join(u_types) if u_types else "—"}<br>'
+                    + (f'🛏️ {bhk_str}<br>' if bhk_str else '')
+                    + f'🏠 {", ".join(u_types) if u_types else "—"}<br>'
                     f'✨ {amen_str}'
                     f'{room_line}'
                     f'{extra_html}'
-                    f'{soc_snippet}'
                     f"</div>"
                 )
 
@@ -564,9 +563,16 @@ if query:
                 address = proj.extra_props.get("address")
                 location_str = address if address else f"{proj.neighbourhood}, {proj.city}"
 
+                # BHK — deduplicated, sorted
+                bhk_vals = sorted({u.get("bhk") for u in proj.units if u.get("bhk")})
+                bhk_str = ", ".join(f"{b} BHK" for b in bhk_vals) if bhk_vals else ""
+
                 # Build detail lines for the expandable section
                 detail_lines = []
                 detail_lines.append(f'<div class="pc-row">🏗️ <strong>Developer:</strong> {proj.developer}</div>')
+
+                if bhk_str:
+                    detail_lines.append(f'<div class="pc-row">🛏️ <strong>BHK:</strong> {bhk_str}</div>')
 
                 u_types = list({u.get("unit_type", "?") for u in proj.units}) if proj.units else []
                 if u_types:
@@ -608,11 +614,10 @@ if query:
                 if room_snippets:
                     detail_lines.append(f'<div class="pc-rooms">📐 {" · ".join(room_snippets[:4])}</div>')
 
-                # Society snippet
+                # Society snippet — only show if the description is complete (not truncated)
                 soc_desc = proj.extra_props.get("society_description", "")
-                if soc_desc and len(soc_desc) > 10:
-                    truncated = soc_desc[:150] + ("…" if len(soc_desc) > 150 else "")
-                    detail_lines.append(f'<div class="pc-row" style="color:#718096;font-size:0.85rem;margin-top:4px">{truncated}</div>')
+                if soc_desc and len(soc_desc) > 10 and len(soc_desc) <= 300:
+                    detail_lines.append(f'<div class="pc-row" style="color:#718096;font-size:0.85rem;margin-top:4px">{soc_desc}</div>')
 
                 if proj.landmarks:
                     lm_str = ", ".join(proj.landmarks[:5])
@@ -683,11 +688,11 @@ if query:
             if answer.get("conclusion"):
                 st.markdown(answer.get("conclusion"))
 
-            # Display token usage for the active model
-            st.markdown(f"<div style='font-size: 0.8rem; color: #718096; margin-top: 10px; text-align: right;'>🤖 Cypher Engine tokens used: <strong>{cypher_result.tokens_used}</strong> | Engine: <strong>{cypher_result.engine_used}</strong></div>", unsafe_allow_html=True)
+            # Display token usage for the active model (Commented out per user request)
+            # st.markdown(f"<div style='font-size: 0.8rem; color: #718096; margin-top: 10px; text-align: right;'>🤖 Cypher Engine tokens used: <strong>{cypher_result.tokens_used}</strong> | Engine: <strong>{cypher_result.engine_used}</strong></div>", unsafe_allow_html=True)
         else:
             st.markdown(answer)
-            st.markdown(f"<div style='font-size: 0.8rem; color: #718096; margin-top: 10px; text-align: right;'>🤖 Cypher Engine tokens used: <strong>{cypher_result.tokens_used}</strong> | Engine: <strong>{cypher_result.engine_used}</strong></div>", unsafe_allow_html=True)
+            # st.markdown(f"<div style='font-size: 0.8rem; color: #718096; margin-top: 10px; text-align: right;'>🤖 Cypher Engine tokens used: <strong>{cypher_result.tokens_used}</strong> | Engine: <strong>{cypher_result.engine_used}</strong></div>", unsafe_allow_html=True)
 
         # ── Debug / context expanders ──────────────────────────────────────────
         if show_debug:

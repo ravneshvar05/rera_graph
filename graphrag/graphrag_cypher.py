@@ -418,7 +418,7 @@ Return a JSON object:
     "city": <string, list, or null>,
     "neighbourhood": <string, list, or null>,
     "zone": <string, list, or null>,
-    "amenities": [<amenity strings>],
+    "amenities": [<EXTRACT STRICTLY: Do NOT guess amenities from vague words like 'luxurious' or 'peaceful'. Only extract if user explicitly names them (e.g., 'pool', 'gym').>],
     "landmark_types": [<EDUCATION|HEALTHCARE|COMMERCIAL|TRANSPORT|RELIGIOUS|RECREATION>],
     "specific_landmarks": [<place names>],
     "min_sqft": <number or null>, "max_sqft": <number or null>,
@@ -427,7 +427,7 @@ Return a JSON object:
     "entrance_facing": <"East"|"West"|"North"|"South"|null>,
     "developer": <string, list, or null>,
     "project_names": [<project names>],
-    "semantic_keywords": [<subjective keywords>],
+    "semantic_keywords": [<PUT VAGUE/SUBJECTIVE ADJECTIVES HERE: e.g., 'peaceful', 'luxurious', 'affordable', 'premium'>],
     "min_units_per_floor": <int or null>, "max_units_per_floor": <int or null>
   }}
 }}
@@ -446,13 +446,25 @@ All templates use this common base for fetching projects with full context:
 --- BASE MATCH (use for GLOBAL, SPECIFIC, LOOKUP, AGGREGATE) ---
 MATCH (p:Project)-[:LOCATED_IN]->(n:Neighbourhood)-[:IN_CITY]->(c:City)
 OPTIONAL MATCH (p)-[:BUILT_BY]->(dev:Developer)
-OPTIONAL MATCH (p)-[:HAS_UNIT]->(u:Unit)
-OPTIONAL MATCH (p)-[:HAS_AMENITY]->(am:Amenity)
-OPTIONAL MATCH (p)-[:NEAR]->(lm:Landmark)
-WITH p, n, c, dev,
-     collect(DISTINCT CASE WHEN u IS NOT NULL THEN u {{ .*, rooms: [(u)-[:HAS_ROOM]->(r:Room) | properties(r)] }} ELSE null END) AS units,
-     collect(DISTINCT am.name) AS amenities,
-     collect(DISTINCT lm.name) AS landmarks
+CALL {{
+  WITH p
+  OPTIONAL MATCH (p)-[:HAS_UNIT]->(u:Unit)
+  WITH u WHERE u IS NOT NULL
+  RETURN collect(u {{ .*, rooms: [(u)-[:HAS_ROOM]->(r:Room) | properties(r)] }}) AS units
+}}
+CALL {{
+  WITH p
+  OPTIONAL MATCH (p)-[:HAS_AMENITY]->(am:Amenity)
+  WITH am WHERE am IS NOT NULL
+  RETURN collect(am.name) AS amenities
+}}
+CALL {{
+  WITH p
+  OPTIONAL MATCH (p)-[:NEAR]->(lm:Landmark)
+  WITH lm WHERE lm IS NOT NULL
+  RETURN collect(lm.name) AS landmarks
+}}
+WITH p, n, c, dev, units, amenities, landmarks
 
 --- RETURN clause (append to all queries) ---
 RETURN p, n.name AS neighbourhood, c.name AS city, dev.name AS developer,
@@ -511,7 +523,7 @@ then add a second WITH to compute answer_data. Include answer_data in RETURN.
     description: u.description, rooms: u.rooms
   }}]
 
-3c. PROJECT INFO ("address of OUM Orbit?", "RERA number?"): answer_data =
+3c. PROJECT INFO (\"address of OUM Orbit?\", \"RERA number?\"): answer_data =
   {{
     project_name: p.project_name, address: p.address, city: c.name, neighbourhood: n.name,
     developer: dev.name, rera_number: p.rera_number, project_status: p.project_status,
@@ -526,14 +538,57 @@ then add a second WITH to compute answer_data. Include answer_data in RETURN.
 
 ── TEMPLATE 4: AGGREGATE (numeric comparisons, counts, statistics) ──
 
-4a. ROOM SIZE COMPARISON ("hall > 100 sqft"): Use BASE + WHERE EXISTS {{
-  MATCH (p)-[:HAS_UNIT]->(u2)-[:HAS_ROOM]->(r2)
+4a. ROOM SIZE COMPARISON ("hall > 100 sqft"):
+Use the BASE MATCH pattern, then add a WHERE EXISTS filter, then return BOTH the project context
+AND the matching room details in answer_data. Use this EXACT structure:
+
+MATCH (p:Project)-[:LOCATED_IN]->(n:Neighbourhood)-[:IN_CITY]->(c:City)
+OPTIONAL MATCH (p)-[:BUILT_BY]->(dev:Developer)
+CALL {{
+  WITH p
+  OPTIONAL MATCH (p)-[:HAS_UNIT]->(u:Unit)
+  WITH u WHERE u IS NOT NULL
+  RETURN collect(u {{ .*, rooms: [(u)-[:HAS_ROOM]->(r:Room) | properties(r)] }}) AS units
+}}
+CALL {{
+  WITH p
+  OPTIONAL MATCH (p)-[:HAS_AMENITY]->(am:Amenity)
+  WITH am WHERE am IS NOT NULL
+  RETURN collect(am.name) AS amenities
+}}
+CALL {{
+  WITH p
+  OPTIONAL MATCH (p)-[:NEAR]->(lm:Landmark)
+  WITH lm WHERE lm IS NOT NULL
+  RETURN collect(lm.name) AS landmarks
+}}
+WITH p, n, c, dev, units, amenities, landmarks
+WHERE EXISTS {{
+  MATCH (p)-[:HAS_UNIT]->(u2:Unit)-[:HAS_ROOM]->(r2:Room)
   WHERE r2.name = $room_name AND r2.area_sqft IS NOT NULL AND toFloat(r2.area_sqft) > toFloat($min_area)
 }}
-Then answer_data with matching_rooms filtered by same condition.
-Use > for "greater/larger/bigger", < for "less/smaller/under". Always toFloat() for area comparisons.
+RETURN p, n.name AS neighbourhood, c.name AS city, dev.name AS developer,
+       units, amenities, landmarks,
+       {{ project_name: p.project_name, city: c.name, neighbourhood: n.name,
+          matching_rooms: [u_item IN units WHERE u_item IS NOT NULL |
+            {{ unit_type: u_item.unit_type, bhk: u_item.bhk,
+               rooms: [r_item IN u_item.rooms WHERE r_item.name = $room_name
+                       AND r_item.area_sqft IS NOT NULL
+                       AND toFloat(r_item.area_sqft) > toFloat($min_area) |
+                 {{ room_name: r_item.name, area_sqft: r_item.area_sqft,
+                    length: r_item.length, width: r_item.width }}] }}]
+       }} AS answer_data
+LIMIT $limit
 
-4b. ROOM EXISTENCE ("projects with study room"): Same but WHERE just checks r2.name = $room_name.
+Key rules:
+- ALWAYS include RETURN p, n.name, c.name, dev.name, units, amenities, landmarks PLUS answer_data
+- Use > for "greater/larger/bigger", < for "less/smaller/under". Always toFloat() for area comparisons.
+- For "at least N sqft" → toFloat(r2.area_sqft) >= toFloat($min_area)
+- Use the r.name field for room name matching (canonical names from the ROOM NAMES table above)
+- NEVER create a second WITH block that re-aggregates — do it all in one WITH + WHERE EXISTS
+
+4b. ROOM EXISTENCE ("projects with study room"): Same pattern but WHERE only checks r2.name = $room_name (no area filter).
+answer_data includes list of matching room details for each unit.
 
 4c. COUNT ("how many projects in Ahmedabad?"):
   WITH count(DISTINCT p) AS total_count, collect(DISTINCT p.project_name) AS project_names
@@ -582,13 +637,25 @@ def _fallback_cypher(city: Optional[str] = None, bhk: Optional[int] = None, user
     """
     match_base = """MATCH (p:Project)-[:LOCATED_IN]->(n:Neighbourhood)-[:IN_CITY]->(c:City)
 OPTIONAL MATCH (p)-[:BUILT_BY]->(dev:Developer)
-OPTIONAL MATCH (p)-[:HAS_UNIT]->(u:Unit)
-OPTIONAL MATCH (p)-[:HAS_AMENITY]->(am:Amenity)
-OPTIONAL MATCH (p)-[:NEAR]->(lm:Landmark)
-WITH p, n, c, dev,
-     collect(DISTINCT CASE WHEN u IS NOT NULL THEN u { .*, rooms: [(u)-[:HAS_ROOM]->(r:Room) | properties(r)] } ELSE null END) AS units,
-     collect(DISTINCT am.name) AS amenities,
-     collect(DISTINCT lm.name) AS landmarks"""
+CALL {
+  WITH p
+  OPTIONAL MATCH (p)-[:HAS_UNIT]->(u:Unit)
+  WITH u WHERE u IS NOT NULL
+  RETURN collect(u { .*, rooms: [(u)-[:HAS_ROOM]->(r:Room) | properties(r)] }) AS units
+}
+CALL {
+  WITH p
+  OPTIONAL MATCH (p)-[:HAS_AMENITY]->(am:Amenity)
+  WITH am WHERE am IS NOT NULL
+  RETURN collect(am.name) AS amenities
+}
+CALL {
+  WITH p
+  OPTIONAL MATCH (p)-[:NEAR]->(lm:Landmark)
+  WITH lm WHERE lm IS NOT NULL
+  RETURN collect(lm.name) AS landmarks
+}
+WITH p, n, c, dev, units, amenities, landmarks"""
 
     wheres = []
     params: dict[str, Any] = {"limit": 50}
@@ -643,7 +710,83 @@ def generate_cypher(user_query: str, api_keys: dict = None) -> CypherQuery:
     gemini_key = api_keys.get("GEMINI_API_KEY") or settings.GEMINI_API_KEY
     groq_key = api_keys.get("GROQ_API_KEY") or settings.GROQ_API_KEY
 
-    # ── Try Gemini First ──
+    # ── Try Groq First (fast: ~0.3-0.8s) ──────────────────────────────────────
+    if groq_key:
+        try:
+            groq_client = Groq(api_key=groq_key)
+            response = groq_client.chat.completions.create(
+                model=settings.GROQ_MODEL,
+                response_format={"type": "json_object"},
+                messages=[
+                    {"role": "system", "content": _SYSTEM_PROMPT},
+                    {"role": "user", "content": user_query},
+                ],
+                temperature=0.0,
+                max_tokens=2048,
+            )
+            raw = response.choices[0].message.content.strip()
+            tokens_used = response.usage.total_tokens if hasattr(response, "usage") and response.usage else 0
+            engine_used = f"Groq ({settings.GROQ_MODEL})"
+
+            # Strip accidental markdown fences
+            raw = re.sub(r"^```(?:json)?\s*", "", raw)
+            raw = re.sub(r"\s*```$", "", raw)
+
+            data = json.loads(raw)
+
+            cypher = data.get("cypher", "").strip()
+            params = data.get("params", {})
+            query_type = data.get("query_type", "SPECIFIC")
+            vector_query = data.get("vector_query", user_query)
+            answer_columns = data.get("answer_columns", [])
+
+            # ── Parse intent from the unified response ──
+            intent_data = data.get("intent", {})
+            if intent_data and isinstance(intent_data, dict):
+                intent_data["query_type"] = query_type
+                try:
+                    intent = QueryIntent(**intent_data)
+                except Exception as ie:
+                    logger.warning(f"[Text-to-Cypher] Intent parsing from Groq failed ({ie}). Using minimal intent.")
+                    intent = _extract_fallback_intent(user_query, query_type)
+            else:
+                intent = _extract_fallback_intent(user_query, query_type)
+
+            logger.info(
+                f"Intent parsed ({engine_used}): bhk={intent.bhk}, location={intent.neighbourhood or intent.city}, "
+                f"amenities={intent.amenities}, type={intent.query_type}"
+            )
+
+            if "limit" not in params:
+                params["limit"] = 50
+            if query_type in ("LOOKUP", "AGGREGATE") and not answer_columns:
+                answer_columns = ["answer_data"]
+            if not cypher:
+                raise ValueError("Groq returned empty cypher")
+
+            cypher = _post_process_cypher(cypher, params)
+
+            logger.info(
+                f"[Text-to-Cypher] Engine: {engine_used} | type={query_type} | params={list(params.keys())} | "
+                f"answer_cols={answer_columns} | vector_query={vector_query!r}"
+            )
+            logger.debug(f"[Text-to-Cypher] Cypher:\n{cypher}")
+
+            return CypherQuery(
+                cypher=cypher,
+                params=params,
+                query_type=query_type,
+                vector_query=vector_query,
+                answer_columns=answer_columns,
+                intent=intent,
+                tokens_used=tokens_used,
+                engine_used=engine_used
+            )
+
+        except Exception as e:
+            logger.warning(f"[Text-to-Cypher] Groq generation failed ({e}). Falling back to Gemini.")
+
+    # ── Fallback: Gemini (used only when Groq is unavailable/rate-limited) ─────
     if gemini_key:
         try:
             genai.configure(api_key=gemini_key)
@@ -710,89 +853,9 @@ def generate_cypher(user_query: str, api_keys: dict = None) -> CypherQuery:
             )
 
         except Exception as e:
-            logger.warning(f"[Text-to-Cypher] Gemini generation failed ({e}). Falling back to Groq.")
+            logger.warning(f"[Text-to-Cypher] Gemini generation also failed ({e}). Using minimal fallback.")
 
-    # ── Fallback to Groq ──
-    try:
-        groq_client = Groq(api_key=groq_key)
-        response = groq_client.chat.completions.create(
-            model=settings.GROQ_MODEL,
-            response_format={"type": "json_object"},
-            messages=[
-                {"role": "system", "content": _SYSTEM_PROMPT},
-                {"role": "user", "content": user_query},
-            ],
-            temperature=0.0,
-            max_tokens=2048,
-        )
-        raw = response.choices[0].message.content.strip()
-        tokens_used = response.usage.total_tokens if hasattr(response, "usage") and response.usage else 0
-        engine_used = f"Groq ({settings.GROQ_MODEL})"
-
-        # Strip accidental markdown fences
-        raw = re.sub(r"^```(?:json)?\s*", "", raw)
-        raw = re.sub(r"\s*```$", "", raw)
-
-        data = json.loads(raw)
-
-        cypher = data.get("cypher", "").strip()
-        params = data.get("params", {})
-        query_type = data.get("query_type", "SPECIFIC")
-        vector_query = data.get("vector_query", user_query)
-        answer_columns = data.get("answer_columns", [])
-
-        # ── Parse intent from the unified response ──
-        intent_data = data.get("intent", {})
-        if intent_data and isinstance(intent_data, dict):
-            # Inject query_type into intent so it stays consistent
-            intent_data["query_type"] = query_type
-            try:
-                intent = QueryIntent(**intent_data)
-            except Exception as ie:
-                logger.warning(f"[Text-to-Cypher] Intent parsing from Groq failed ({ie}). Using minimal intent.")
-                intent = _extract_fallback_intent(user_query, query_type)
-        else:
-            intent = _extract_fallback_intent(user_query, query_type)
-
-        logger.info(
-            f"Intent parsed ({engine_used}): bhk={intent.bhk}, location={intent.neighbourhood or intent.city}, "
-            f"amenities={intent.amenities}, type={intent.query_type}"
-        )
-
-        # Safety: ensure limit param is present
-        if "limit" not in params:
-            params["limit"] = 50
-
-        # Safety: LOOKUP/AGGREGATE must declare answer_columns
-        if query_type in ("LOOKUP", "AGGREGATE") and not answer_columns:
-            answer_columns = ["answer_data"]
-
-        if not cypher:
-            raise ValueError("Groq returned empty cypher")
-
-        # ── Post-process: fix common LLM Cypher mistakes ──
-        cypher = _post_process_cypher(cypher, params)
-
-        logger.info(
-            f"[Text-to-Cypher] Engine: {engine_used} | type={query_type} | params={list(params.keys())} | "
-            f"answer_cols={answer_columns} | vector_query={vector_query!r}"
-        )
-        logger.debug(f"[Text-to-Cypher] Cypher:\n{cypher}")
-
-        return CypherQuery(
-            cypher=cypher,
-            params=params,
-            query_type=query_type,
-            vector_query=vector_query,
-            answer_columns=answer_columns,
-            intent=intent,
-            tokens_used=tokens_used,
-            engine_used=engine_used
-        )
-
-    except Exception as e:
-        logger.warning(f"[Text-to-Cypher] Groq generation failed ({e}). Using minimal fallback.")
-        return _fallback_cypher(user_query=user_query)
+    return _fallback_cypher(user_query=user_query)
 
 
 # ── Known neighbourhood names for fallback extraction ──────────────────────────
