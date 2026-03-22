@@ -320,87 +320,97 @@ def classify_landmark(name: str) -> str:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  EMBEDDING TEXT BUILDER  — combines ALL descriptive fields → one rich document
+#  EMBEDDING TEXT BUILDERS — dual-document strategy for optimal vector search
+#
+#  1. build_project_embedding_text() → ONE doc per project (catches broad queries)
+#  2. build_unit_embedding_text()    → ONE doc per unit    (catches specific queries)
 # ══════════════════════════════════════════════════════════════════════════════
 
-def build_embedding_text(
+def build_project_embedding_text(
     project: dict,
-    unit: dict,
-    unit_idx: int,
     amenities: list[str],
     landmarks: list[str],
 ) -> str:
     """
-    Build a rich, production-quality text for ChromaDB embedding of one unit.
+    Build a comprehensive project-level embedding document.
 
-    Combines EVERY descriptive field:
-      - Project identity (name, developer, location)
-      - Society/project-level description
-      - Unit description + specs (bhk, area, facing, applicable buildings)
-      - Floor layout info (lifts, floors)
-      - Room-level details (all rooms with names, types, dimensions, floor levels)
-      - Amenities (full raw strings)
-      - Nearby landmarks (all of them, with type classification)
-      - RERA / status / date info
-
-    This ensures a query like "4 BHK villa with home theatre near Karnavati Club"
-    matches even if "home theatre" only appears in a room name or amenity string.
+    This document captures the FULL project identity — society description,
+    all amenities, all landmarks, all available configurations, and project
+    metadata.  It is designed to match broad/fuzzy queries like:
+      "luxury project with pool and clubhouse near school"
+      "ready to move flat in Bopal"
+      "affordable family-friendly project"
     """
     loc     = project.get("location") or {}
     society = project.get("society_layout") or {}
-    rooms   = unit.get("rooms") or []
+    units   = project.get("units") or []
     parts: list[str] = []
 
     # ── Project identity ──────────────────────────────────────────────────────
-    bhk       = _int(unit.get("bhk"))
-    ptype     = _str(unit.get("property_type")) or "PROPERTY"
+    proj_name = _str(project.get("project_name")) or "Unknown Project"
+    developer = _str(project.get("developer_name")) or ""
     city      = _str(loc.get("city")) or ""
     nbhd      = _str(loc.get("neighbourhood")) or ""
-    proj_name = _str(project.get("project_name")) or ""
-    developer = _str(project.get("developer_name")) or ""
     address   = _str(loc.get("address")) or ""
-    unit_type = _str(unit.get("unit_type")) or ""
-    facing    = _str(unit.get("entrance_Facing") or unit.get("entrance_facing"))
 
     parts.append(
-        f"{bhk} BHK {ptype} in {nbhd}, {city}."
-        f" Project: {proj_name} by {developer}."
+        f"{proj_name} is a residential project"
+        f"{f' by {developer}' if developer else ''}"
+        f"{f' in {nbhd}, {city}' if nbhd and city else f' in {city or nbhd}'}."
     )
 
     if address:
         parts.append(f"Address: {address}.")
 
-    # RERA / status
+    # ── Available configurations summary ──────────────────────────────────────
+    bhk_set: set[str] = set()
+    ptype_set: set[str] = set()
+    unit_type_list: list[str] = []
+    for u in units:
+        bhk = _int(u.get("bhk"))
+        pt  = _str(u.get("property_type"))
+        ut  = _str(u.get("unit_type"))
+        if bhk:
+            bhk_set.add(f"{bhk} BHK")
+        if pt:
+            ptype_set.add(pt.title())
+        if ut:
+            unit_type_list.append(ut)
+
+    if bhk_set or ptype_set:
+        configs = sorted(bhk_set) + sorted(ptype_set)
+        parts.append(f"Available configurations: {', '.join(configs)}.")
+    if unit_type_list:
+        unique_types = list(dict.fromkeys(unit_type_list))  # preserve order
+        parts.append(f"Unit variants: {', '.join(unique_types[:10])}.")
+
+    # ── RERA / status / possession ─────────────────────────────────────────────
     rera   = _str(project.get("rera_registration_number"))
     status = _str(project.get("project_status"))
     pos_dt = _str(project.get("possession_date"))
-    if rera:
-        parts.append(f"RERA number: {rera}.")
     if status and status.upper() not in ("UNKNOWN", "NONE"):
-        parts.append(f"Project status: {status}.")
+        readable = status.replace("_", " ").title()
+        parts.append(f"Project status: {readable}.")
     if pos_dt:
         parts.append(f"Possession date: {pos_dt}.")
+    if rera:
+        parts.append(f"RERA registered: {rera}.")
 
-    # Pin code
-    pin = _str(loc.get("pin_code"))
-    if pin:
-        parts.append(f"Pin code: {pin}.")
-
-    # ── Society description ───────────────────────────────────────────────────
+    # ── Society description (verbatim — rich for fuzzy matching) ──────────────
     soc_desc = _str(society.get("description"))
     if soc_desc:
-        parts.append(f"Society: {soc_desc}")
+        parts.append(soc_desc)
 
-    # Society boolean flags (convert to readable text)
+    # Society boolean flags as human-readable features
     soc_flags: list[str] = []
-    if society.get("has_clubhouse"):        soc_flags.append("clubhouse")
-    if society.get("has_park_or_garden"):   soc_flags.append("park or garden")
-    if society.get("has_swimming_pool"):    soc_flags.append("swimming pool")
-    if society.get("has_sports_courts"):    soc_flags.append("sports courts")
-    if society.get("has_parking_area"):     soc_flags.append("parking")
+    if society.get("has_clubhouse"):            soc_flags.append("clubhouse")
+    if society.get("has_park_or_garden"):       soc_flags.append("park and garden")
+    if society.get("has_swimming_pool"):        soc_flags.append("swimming pool")
+    if society.get("has_sports_courts"):        soc_flags.append("sports courts")
+    if society.get("has_parking_area"):         soc_flags.append("covered parking")
     if society.get("commercial_shops_included"): soc_flags.append("commercial shops")
     if soc_flags:
-        parts.append(f"Society facilities: {', '.join(soc_flags)}.")
+        parts.append(f"Society features include: {', '.join(soc_flags)}.")
 
     total_blocks = _int(society.get("total_apartment_blocks"))
     total_villas = _int(society.get("total_independent_villas_or_tenements"))
@@ -411,11 +421,11 @@ def build_embedding_text(
     if total_villas:
         parts.append(f"Total villas/tenements: {total_villas}.")
     if bnames:
-        parts.append(f"Buildings: {', '.join(bnames[:10])}.")  # cap at 10
+        parts.append(f"Building names: {', '.join(bnames[:10])}.")
     if road_widths:
         parts.append(f"Road widths: {', '.join(road_widths)}.")
 
-    # ── Floor layouts (project-level) ──────────────────────────────────────────
+    # ── Floor layouts ─────────────────────────────────────────────────────────
     floor_layouts = project.get("floor_layouts") or []
     if floor_layouts:
         fl_descs: list[str] = []
@@ -425,30 +435,106 @@ def build_embedding_text(
             fl_lift  = fl.get("has_lifts")
             fl_text  = fl_name
             if fl_units:
-                fl_text += f" ({fl_units} units/floor)"
+                fl_text += f" ({fl_units} units per floor)"
             if fl_lift:
-                fl_text += ", with lifts"
+                fl_text += " with lifts"
             if fl_text.strip():
                 fl_descs.append(fl_text)
         if fl_descs:
             parts.append(f"Floor layouts: {'; '.join(fl_descs)}.")
 
-    # ── Unit description + specs ──────────────────────────────────────────────
+    # ── All amenities (full raw strings + canonical tags for redundancy) ──────
+    if amenities:
+        parts.append(f"Amenities: {'; '.join(amenities)}.")
+        # Also add canonical tags for better keyword matching
+        all_tags: set[str] = set()
+        for am in amenities:
+            all_tags.update(amenity_canonical_tags(am))
+        all_tags.discard("Other")
+        if all_tags:
+            parts.append(f"Key facilities: {', '.join(sorted(all_tags))}.")
+
+    # ── All nearby landmarks with types ───────────────────────────────────────
+    if landmarks:
+        lm_with_types: list[str] = []
+        for lm in landmarks:
+            lm_type = classify_landmark(lm)
+            lm_with_types.append(f"{lm} ({lm_type.replace('_', ' ').title()})")
+        parts.append(f"Nearby landmarks: {', '.join(lm_with_types)}.")
+
+    # ── Pin code ──────────────────────────────────────────────────────────────
+    pin = _str(loc.get("pin_code"))
+    if pin:
+        parts.append(f"Pin code: {pin}.")
+
+    return " ".join(parts)
+
+
+def build_unit_embedding_text(
+    project: dict,
+    unit: dict,
+    unit_idx: int,
+    amenities: list[str],
+    landmarks: list[str],
+) -> str:
+    """
+    Build a focused unit-level embedding document.
+
+    This document emphasises what makes THIS unit unique — BHK, area, facing,
+    room details with dimensions, and the unit description.  It includes the
+    project name and location for context anchoring, plus a compact amenity
+    summary (full list lives in the project-level doc).
+
+    Designed to match unit-specific queries like:
+      "2 BHK with large hall and attached bathroom"
+      "east facing 3 BHK with balcony"
+      "flat with pooja room and servant room"
+    """
+    loc   = project.get("location") or {}
+    rooms = unit.get("rooms") or []
+    parts: list[str] = []
+
+    # ── Context anchor (project + location) ───────────────────────────────────
+    bhk       = _int(unit.get("bhk"))
+    ptype     = _str(unit.get("property_type")) or "Property"
+    city      = _str(loc.get("city")) or ""
+    nbhd      = _str(loc.get("neighbourhood")) or ""
+    proj_name = _str(project.get("project_name")) or ""
+    developer = _str(project.get("developer_name")) or ""
+    unit_type = _str(unit.get("unit_type")) or ""
+    facing    = _str(unit.get("entrance_Facing") or unit.get("entrance_facing"))
+
+    # Lead with the most searchable phrase
+    lead = f"{bhk} BHK {ptype}" if bhk else ptype
+    parts.append(
+        f"{lead} in {proj_name}"
+        f"{f', {nbhd}' if nbhd else ''}"
+        f"{f', {city}' if city else ''}"
+        f"{f' by {developer}' if developer else ''}."
+    )
+
+    # ── Unit variant name ─────────────────────────────────────────────────────
+    if unit_type and unit_type not in (f"{bhk} BHK", f"{bhk}BHK"):
+        parts.append(f"Unit type: {unit_type}.")
+
+    # ── Unit description (rich, fuzzy-search friendly) ────────────────────────
     desc = _str(unit.get("description"))
     if desc:
         parts.append(desc)
 
+    # ── Area specs ────────────────────────────────────────────────────────────
     sba  = _float(unit.get("super_built_up_area_sqft"))
     ca   = _float(unit.get("carpet_area_sqft"))
     bal  = _float(unit.get("balcony_area_sqft"))
     wash = _float(unit.get("wash_area_sqft"))
-    if sba:   parts.append(f"Super built-up area: {sba} sqft.")
-    if ca:    parts.append(f"Carpet area: {ca} sqft.")
-    if bal:   parts.append(f"Balcony area: {bal} sqft.")
-    if wash:  parts.append(f"Wash area: {wash} sqft.")
+    area_parts: list[str] = []
+    if sba:   area_parts.append(f"super built-up {sba} sqft")
+    if ca:    area_parts.append(f"carpet {ca} sqft")
+    if bal:   area_parts.append(f"balcony {bal} sqft")
+    if wash:  area_parts.append(f"wash area {wash} sqft")
+    if area_parts:
+        parts.append(f"Area: {', '.join(area_parts)}.")
 
-    if unit_type and unit_type not in (f"{bhk} BHK", f"{bhk}BHK"):
-        parts.append(f"Unit variant: {unit_type}.")
     if facing:
         parts.append(f"Entrance facing: {facing}.")
 
@@ -456,8 +542,9 @@ def build_embedding_text(
     if appl_bldgs:
         parts.append(f"Applicable buildings: {', '.join(appl_bldgs)}.")
 
-    # ── Rooms (ALL rooms with names, types, dimensions, floor levels) ─────────
+    # ── Rooms — THE key differentiator for unit docs ──────────────────────────
     room_parts: list[str] = []
+    room_names: list[str] = []
     for room in rooms:
         rname  = _str(room.get("name")) or ""
         rtype  = _str(room.get("room_type")) or ""
@@ -468,6 +555,9 @@ def build_embedding_text(
         r_ab   = room.get("attached_bathroom")
         r_bal  = room.get("has_balcony_access")
 
+        if rname:
+            room_names.append(rname)
+
         room_str = rname
         if rtype and rtype.upper() not in ("OTHER",):
             room_str += f" ({rtype.replace('_', ' ').title()})"
@@ -475,32 +565,38 @@ def build_embedding_text(
             room_str += f" [{rfloor} floor]"
         dims: list[str] = []
         if rlen and rwid:
-            dims.append(f"{rlen}×{rwid}")
+            dims.append(f"{rlen} x {rwid}")
         if rarea:
             dims.append(f"{rarea} sqft")
         if dims:
             room_str += f" {', '.join(dims)}"
         if r_ab:
-            room_str += " [attached bath]"
+            room_str += " with attached bathroom"
         if r_bal:
-            room_str += " [balcony access]"
+            room_str += " with balcony access"
         if room_str.strip():
             room_parts.append(room_str)
 
     if room_parts:
         parts.append(f"Rooms: {'; '.join(room_parts)}.")
 
-    # ── Project amenities (full raw strings) ──────────────────────────────────
+    # ── Compact amenity summary (top canonical tags only) ─────────────────────
     if amenities:
-        parts.append(f"Amenities: {'; '.join(amenities)}.")
+        all_tags: set[str] = set()
+        for am in amenities:
+            all_tags.update(amenity_canonical_tags(am))
+        all_tags.discard("Other")
+        if all_tags:
+            parts.append(f"Amenities: {', '.join(sorted(all_tags))}.")
 
-    # ── Nearby landmarks (ALL of them + type) ─────────────────────────────────
+    # ── Compact landmark summary ──────────────────────────────────────────────
     if landmarks:
-        lm_with_types: list[str] = []
-        for lm in landmarks:
-            lm_type = classify_landmark(lm)
-            lm_with_types.append(f"{lm} ({lm_type.title()})")
-        parts.append(f"Nearby: {', '.join(lm_with_types)}.")
+        parts.append(f"Nearby: {', '.join(landmarks[:8])}.")
+
+    # ── Project status for relevance ──────────────────────────────────────────
+    status = _str(project.get("project_status"))
+    if status and status.upper() not in ("UNKNOWN", "NONE"):
+        parts.append(f"Status: {status.replace('_', ' ').title()}.")
 
     return " ".join(parts)
 
@@ -791,6 +887,44 @@ def ingest_one(
         # ── 5. Units + Rooms ─────────────────────────────────────────────────
         chroma_docs, chroma_metas, chroma_ids = [], [], []
 
+        # ── 5a. Project-level ChromaDB document (ONE per project) ─────────
+        # Shared metadata fields for both project and unit docs
+        _shared_meta = {
+            "project_id":     project_id,
+            "project_name":   project_name,
+            "city":           city or "",
+            "neighbourhood":  neighbourhood or "",
+            "developer":      developer or "",
+            "project_status": (_str(data.get("project_status")) or "").upper(),
+            "has_clubhouse":  _bool_int(society.get("has_clubhouse")) or 0,
+            "has_pool":       _bool_int(society.get("has_swimming_pool")) or 0,
+            "has_park":       _bool_int(society.get("has_park_or_garden")) or 0,
+            "has_parking":    _bool_int(society.get("has_parking_area")) or 0,
+            "has_sports_courts": _bool_int(society.get("has_sports_courts")) or 0,
+            "amenities":      ", ".join(amenities_raw)[:1500],
+        }
+
+        proj_text = build_project_embedding_text(
+            project=data,
+            amenities=amenities_raw,
+            landmarks=landmarks_raw,
+        )
+        chroma_docs.append(proj_text)
+        chroma_ids.append(f"{project_id}__project")
+        chroma_metas.append({
+            **_shared_meta,
+            "doc_type":            "project",
+            "unit_id":             "",
+            "bhk":                 0,
+            "property_type":       "",
+            "area_sqft":           0.0,
+            "unit_type":           "",
+            "entrance_facing":     "",
+            "room_names":          "",
+            "num_units_available": len(units),
+        })
+
+        # ── 5b. Unit-level ChromaDB documents + Neo4j ingestion ───────────
         for idx, unit in enumerate(units):
             unit_id = f"{project_id}__{idx}"
             # Safely handle key inconsistency: entrance_Facing vs entrance_facing
@@ -822,11 +956,15 @@ def ingest_one(
             })
 
             # Rooms — CREATE (not MERGE)
+            room_name_list: list[str] = []
             for room in (unit.get("rooms") or []):
+                rn = _str(room.get("name"))
+                if rn:
+                    room_name_list.append(rn)
                 session.run(_CYPHER_ROOM, {
                     "unit_id":          unit_id,
                     "room_type":        _str(room.get("room_type")),
-                    "name":             _str(room.get("name")),
+                    "name":             rn,
                     "length":           _str(room.get("length")),
                     "width":            _str(room.get("width")),
                     "area_sqft":        _float(room.get("area_sqft")),
@@ -835,8 +973,8 @@ def ingest_one(
                     "has_balcony_access":_bool_int(room.get("has_balcony_access")),
                 })
 
-            # ChromaDB document
-            text = build_embedding_text(
+            # ChromaDB unit document
+            text = build_unit_embedding_text(
                 project=data,
                 unit=unit,
                 unit_idx=idx,
@@ -846,16 +984,16 @@ def ingest_one(
             chroma_docs.append(text)
             chroma_ids.append(unit_id)
             chroma_metas.append({
-                "project_id":    project_id,
-                "unit_id":       unit_id,
-                "project_name":  project_name,
-                "city":          city or "",
-                "neighbourhood": neighbourhood or "",
-                "bhk":           _int(unit.get("bhk")) or 0,
-                "property_type": (_str(unit.get("property_type")) or "").upper(),
-                "area_sqft":     float(_float(unit.get("super_built_up_area_sqft")) or 0),
-                "developer":     _str(data.get("developer_name")),
-                "amenities":     ", ".join(amenities_raw)[:800],
+                **_shared_meta,
+                "doc_type":        "unit",
+                "unit_id":         unit_id,
+                "bhk":             _int(unit.get("bhk")) or 0,
+                "property_type":   (_str(unit.get("property_type")) or "").upper(),
+                "area_sqft":       float(_float(unit.get("super_built_up_area_sqft")) or 0),
+                "unit_type":       _str(unit.get("unit_type")) or "",
+                "entrance_facing": facing or "",
+                "room_names":      ", ".join(room_name_list),
+                "num_units_available": 0,
             })
 
         # ── 6. ChromaDB batch upsert ──────────────────────────────────────────

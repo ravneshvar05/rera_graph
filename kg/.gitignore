@@ -6,10 +6,6 @@ __pycache__/
 *.pyo
 *.pyd
 
-# Databases
-db/
-*.db
-
 # Logs
 logs/
 *.log

@@ -29,3 +29,7 @@ Thumbs.db
 # Logs and outputs
 *.log
 /output/
+/data/
+/dataset/
+/preprocessed/
+/pdf_tests/
