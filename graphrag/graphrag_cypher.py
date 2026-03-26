@@ -363,6 +363,7 @@ RELATIONSHIPS:
 - carpet_sqft, super_builtup_sqft → FLOAT/NULL. Use toFloat() + IS NOT NULL check.
 - bhk → INTEGER. Direct compare: u.bhk = $bhk
 - Boolean flags (has_clubhouse etc.) → INTEGER 0/1: p.has_pool = 1
+- road_widths is a list of mixed strings (e.g., ["30.00 MT.", "12.00M ROAD"]). Extract integer safely: ANY(x IN p.road_widths WHERE toInteger(split(x, '.')[0]) >= toInteger($min_width))
 - String comparisons → toLower() both sides: toLower(p.project_name) CONTAINS toLower($name)
 - NEVER apply toLower/toFloat/toInteger to a list. Use comprehension: [x IN $list | toLower(x)]
 
@@ -637,20 +638,17 @@ def _fallback_cypher(city: Optional[str] = None, bhk: Optional[int] = None, user
     """
     match_base = """MATCH (p:Project)-[:LOCATED_IN]->(n:Neighbourhood)-[:IN_CITY]->(c:City)
 OPTIONAL MATCH (p)-[:BUILT_BY]->(dev:Developer)
-CALL {
-  WITH p
+CALL (p) {
   OPTIONAL MATCH (p)-[:HAS_UNIT]->(u:Unit)
   WITH u WHERE u IS NOT NULL
   RETURN collect(u { .*, rooms: [(u)-[:HAS_ROOM]->(r:Room) | properties(r)] }) AS units
 }
-CALL {
-  WITH p
+CALL (p) {
   OPTIONAL MATCH (p)-[:HAS_AMENITY]->(am:Amenity)
   WITH am WHERE am IS NOT NULL
   RETURN collect(am.name) AS amenities
 }
-CALL {
-  WITH p
+CALL (p) {
   OPTIONAL MATCH (p)-[:NEAR]->(lm:Landmark)
   WITH lm WHERE lm IS NOT NULL
   RETURN collect(lm.name) AS landmarks

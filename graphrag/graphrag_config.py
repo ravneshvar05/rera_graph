@@ -5,10 +5,19 @@ Reads from .env file in the graphrag/ directory (or inherits from parent).
 Import `settings` anywhere:  from graphrag_config import settings
 """
 
+import os
 from pathlib import Path
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings
 
+try:
+    import streamlit as st
+    # Mirror Streamlit secrets to os.environ so pydantic-settings can read them
+    for k, v in st.secrets.items():
+        if isinstance(v, (str, int, float, bool)):
+            os.environ[k] = str(v)
+except Exception:
+    pass
 
 class GraphRAGSettings(BaseSettings):
 
@@ -36,12 +45,12 @@ class GraphRAGSettings(BaseSettings):
     )
 
     # ── Retrieval tuning ──────────────────────────────────────────────────────
-    VECTOR_TOP_K:      int  = Field(25,  description="How many ChromaDB results to retrieve per doc type")
-    GRAPH_MAX_RESULTS: int  = Field(25,  description="Max projects from Neo4j Cypher queries")
-    FINAL_TOP_N:       int  = Field(25,  description="Max projects to include in final answer")
+    VECTOR_TOP_K:      int  = Field(15,  description="How many ChromaDB results to retrieve per doc type")
+    GRAPH_MAX_RESULTS: int  = Field(20,  description="Max projects from Neo4j Cypher queries")
+    FINAL_TOP_N:       int  = Field(20,  description="Max projects to include in final answer")
     RERANK_MODEL:      str  = Field("cross-encoder/ms-marco-MiniLM-L-6-v2", description="Cross-encoder model for re-ranking vector results")
-    RERANK_TOP_K:      int  = Field(8,   description="Hard cap on projects sent to LLM judge (controls judge token budget)")
-    VECTOR_DISTANCE_THRESHOLD: float = Field(1.0,  description="Max L2 distance from ChromaDB; discard results beyond this (lower = stricter)")
+    RERANK_TOP_K:      int  = Field(10,   description="Hard cap on projects sent to LLM judge (controls judge token budget)")
+    VECTOR_DISTANCE_THRESHOLD: float = Field(1.3,  description="Max L2 distance from ChromaDB; discard results beyond this (lower = stricter)")
     RERANK_SCORE_THRESHOLD:    float = Field(-3.0, description="Min cross-encoder score; discard re-ranked results below this (only used when ENABLE_RERANKER=true)")
 
     # ── Cross-encoder toggle ──────────────────────────────────────────────────
@@ -51,7 +60,7 @@ class GraphRAGSettings(BaseSettings):
     # When enabled: cross-encoder re-ranks candidates for higher precision
     # at the cost of ~7-10s CPU inference per query.
     # Re-enable any time without code changes — just set ENABLE_RERANKER=true.
-    ENABLE_RERANKER:   bool = Field(True, description="Enable cross-encoder re-ranking (slower but more precise for ambiguous queries)")
+    ENABLE_RERANKER:   bool = Field(False, description="Enable cross-encoder re-ranking (slower but more precise for ambiguous queries)")
 
     # ── Relevance judge toggle ──────────────────────────────────────────────
     # Set SKIP_VECTOR_JUDGE=true to bypass the LLM relevance judge for vector-only
