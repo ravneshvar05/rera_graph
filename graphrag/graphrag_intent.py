@@ -34,7 +34,7 @@ class QueryIntent(BaseModel):
     )
     bhk: Optional[Union[int, List[int]]] = Field(None, description="Number of BHK rooms requested (1, 2, 3, 4, 5) or list of numbers")
     property_type: Optional[Union[str, List[str]]] = Field(
-        None, description="APARTMENT, VILLA, TENEMENT, BUNGALOW, or None or list of types"
+        None, description="APARTMENT, VILLA, TENEMENT, BUNGALOW, PENTHOUSE, ROW_HOUSE, or None or list of types"
     )
     city: Optional[Union[str, List[str]]] = Field(None, description="City name or list of cities, e.g. Ahmedabad, Surat")
     neighbourhood: Optional[Union[str, List[str]]] = Field(
@@ -92,7 +92,7 @@ Schema:
 {
   "query_type": "SPECIFIC" or "GLOBAL",
   "bhk": <integer, list of integers, or null>,
-  "property_type": <"APARTMENT" | "VILLA" | "TENEMENT" | "BUNGALOW" | list of types | null>,
+  "property_type": <"APARTMENT" | "VILLA" | "TENEMENT" | "BUNGALOW" | "PENTHOUSE" | "ROW_HOUSE" | list of types | null>,
   "city": <string, list of strings, or null>,
   "neighbourhood": <string, list of strings, or null>,
   "zone": <string, list of strings, or null, e.g. "West Ahmedabad">,

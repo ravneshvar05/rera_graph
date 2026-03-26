@@ -462,6 +462,21 @@ class GraphRetriever:
                 )
                 params["bhk"] = intent.bhk
 
+        # Property type filtering — exclude completely wrong types
+        # e.g. user asks for PENTHOUSE → don't return VILLAs or TEEMENTs
+        if intent.property_type:
+            if isinstance(intent.property_type, list):
+                pt_list = [pt.upper() for pt in intent.property_type]
+                where_clauses.append(
+                    "ANY(u IN units WHERE toLower(u.property_type) IN [x IN $property_types | toLower(x)])"
+                )
+                params["property_types"] = pt_list
+            else:
+                where_clauses.append(
+                    "ANY(u IN units WHERE toLower(u.property_type) = toLower($property_type))"
+                )
+                params["property_type"] = intent.property_type.upper()
+
         # Amenity filtering — check HAS_AMENITY nodes AND project-level boolean flags
         if intent.amenities:
             for i, am in enumerate(intent.amenities):
@@ -1332,6 +1347,47 @@ class DualRetriever:
                 final = final_candidates[: settings.FINAL_TOP_N]
         else:
             final = final_candidates[: settings.FINAL_TOP_N]
+
+        # ── Property-type post-filter ──────────────────────────────────────────
+        # If the user explicitly requested a specific property type (e.g. PENTHOUSE,
+        # APARTMENT), drop any merged result whose units are ALL of a different type.
+        # This prevents villas from appearing in apartment/penthouse searches and
+        # vice versa.  A project is kept if it has AT LEAST ONE unit matching the
+        # requested type(s), or if its units have no property_type metadata at all
+        # (to avoid false negatives from sparse knowledge-graph data).
+        if intent.property_type and cypher_result.query_type not in ("LOOKUP", "AGGREGATE"):
+            requested_types: list[str]
+            if isinstance(intent.property_type, list):
+                requested_types = [pt.upper() for pt in intent.property_type]
+            else:
+                requested_types = [intent.property_type.upper()]
+
+            def _matches_property_type(proj: ProjectResult) -> bool:
+                if not proj.units:
+                    return True  # no unit metadata — keep to avoid false negatives
+                unit_types = [
+                    u.get("property_type", "").upper()
+                    for u in proj.units
+                    if u.get("property_type")
+                ]
+                if not unit_types:
+                    return True  # units exist but no property_type field — keep
+                return any(ut in requested_types for ut in unit_types)
+
+            filtered_by_type = [p for p in final if _matches_property_type(p)]
+            if filtered_by_type:
+                logger.info(
+                    f"Property-type filter ({requested_types}): "
+                    f"{len(final)} → {len(filtered_by_type)} project(s)"
+                )
+                final = filtered_by_type
+            else:
+                # All candidates were filtered out — likely sparse data.
+                # Fall back to the original list so we don't return empty.
+                logger.info(
+                    f"Property-type filter ({requested_types}) would remove all results — "
+                    "keeping originals (sparse unit data)."
+                )
 
         # 5. Build direct answer text for LOOKUP / AGGREGATE
         direct_answer_text = ""

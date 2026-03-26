@@ -415,7 +415,7 @@ Return a JSON object:
   "answer_columns": ["<RETURN columns with direct answer>"],
   "intent": {{
     "bhk": <int, list, or null>,
-    "property_type": <"APARTMENT"|"VILLA"|"TENEMENT"|"BUNGALOW"|list|null>,
+    "property_type": <"APARTMENT"|"VILLA"|"TENEMENT"|"BUNGALOW"|"PENTHOUSE"|"ROW_HOUSE"|list|null>,
     "city": <string, list, or null>,
     "neighbourhood": <string, list, or null>,
     "zone": <string, list, or null>,
@@ -497,7 +497,14 @@ Common filters:
   Unit area:     ANY(u IN units WHERE u.carpet_sqft IS NOT NULL AND toFloat(u.carpet_sqft) >= toFloat($min_sqft))
   Facing:        ANY(u IN units WHERE toLower(u.entrance_facing) = toLower($facing))
   Developer:     toLower(dev.name) CONTAINS toLower($developer)
-  Property type: ANY(u IN units WHERE toLower(u.property_type) = toLower($property_type))
+  Property type [MANDATORY when user specifies a type]: ANY(u IN units WHERE toLower(u.property_type) = toLower($property_type))
+    Valid values: APARTMENT, VILLA, PENTHOUSE, TENEMENT, ROW_HOUSE, BUNGALOW
+    - "apartment" / "flat" / "flats" → $property_type = "APARTMENT"
+    - "villa" / "villas" / "bungalow" → $property_type = "VILLA" or "BUNGALOW"
+    - "penthouse" / "pent house" / "sky villa" → $property_type = "PENTHOUSE"
+    - "row house" / "rowhouse" → $property_type = "ROW_HOUSE"
+    - "tenement" → $property_type = "TENEMENT"
+    NEVER treat apartment/villa/penthouse/tenement as a semantic_keyword. Always use property_type filter.
   Landmark type: EXISTS {{ MATCH (p)-[:NEAR]->(lm2:Landmark) WHERE lm2.landmark_type = $landmark_type }}
   Specific landmark: (EXISTS {{ MATCH (p)-[:NEAR]->(lm2:Landmark) WHERE toLower(lm2.name) CONTAINS toLower($landmark_name) }} OR toLower(p.address) CONTAINS toLower($landmark_name))
   Total buildings: p.total_buildings IS NOT NULL AND toInteger(p.total_buildings) >= toInteger($min_buildings)
@@ -611,17 +618,27 @@ answer_data includes list of matching room details for each unit.
 8. No city filter when project name or neighbourhood is specified.
 9. Fence area comparisons: IS NOT NULL AND toFloat() > ...
 10. Handle >/</>=/<=/ between. "at least" → >=, "under" → <.
-11. Multiple rooms → OR in filter. Prefer MORE data over empty results when ambiguous.
+11. Multiple rooms → OR in filter. For room existence queries, do NOT drop property_type filter to get more results — the user's type is always a hard constraint.
 12. ADDRESS + HYPHEN NORM: For ANY location filter, ALWAYS also search p.address AND normalize hyphens:
     (toLower(n.name) CONTAINS toLower($loc) OR REPLACE(toLower(n.name), ' - ', '-') CONTAINS toLower($loc) OR toLower(p.address) CONTAINS toLower($loc))
 13. Specific landmark queries: also search p.address.
 14. MULTI-LOCATION: When user asks about multiple locations, use SEPARATE params ($nbh_0, $nbh_1 ...) joined with OR. NEVER put them in one comma-joined string.
+15. PROPERTY TYPE IS A HARD FILTER: If the user says "apartment", "villa", "penthouse", "tenement", "row house", or "bungalow", that word is NEVER a semantic_keyword — it is ALWAYS a property_type filter in the Cypher WHERE clause AND in intent.property_type.
 
 === INTENT EXTRACTION ===
 - "all projects"/"show all" → query_type="GLOBAL". Filtered → "SPECIFIC".
 - "2 bedroom"/"2BHK" → bhk=2. "west Ahmedabad" → zone="West Ahmedabad". "Bopal" → neighbourhood="Bopal".
 - "school nearby" → landmark_types=["EDUCATION"]. "near hospital" → ["HEALTHCARE"].
 - Fuzzy words → semantic_keywords: "spacious", "luxury", "affordable", "family-friendly".
+- PROPERTY TYPE (hard structural filter, NEVER put in semantic_keywords):
+    "apartment" / "flat" / "flats" → property_type="APARTMENT"
+    "villa" / "villas" → property_type="VILLA"
+    "penthouse" / "pent house" / "sky villa" → property_type="PENTHOUSE"
+    "row house" / "rowhouse" → property_type="ROW_HOUSE"
+    "tenement" → property_type="TENEMENT"
+    "bungalow" → property_type="BUNGALOW"
+  Whenever property_type is set in intent, the Cypher WHERE clause MUST include:
+    ANY(u IN units WHERE toLower(u.property_type) = toLower($property_type))
 - If a field is not mentioned, use null or empty list.
 - Gujarat localities: Vinzol, Bopal, Nikol, Naroda, Vatva, Gamdi, Gamdi Gaam, Satellite, Chandkheda, Thaltej, Vastrapur, Hanspura, Paldi, Sarkhej, Isanpur, Ghodasar, Kotarpur, Chiloda.
 - Sub-locality/road names → neighbourhood. System searches both n.name and p.address.
@@ -923,7 +940,8 @@ def _extract_fallback_intent(user_query: str, query_type: str = "SPECIFIC") -> Q
     property_type = None
     for pt_keyword, pt_value in [("villa", "VILLA"), ("apartment", "APARTMENT"),
                                   ("flat", "APARTMENT"), ("tenement", "TENEMENT"),
-                                  ("bungalow", "BUNGALOW"), ("penthouse", "PENTHOUSE")]:
+                                  ("bungalow", "BUNGALOW"), ("penthouse", "PENTHOUSE"),
+                                  ("row house", "ROW_HOUSE"), ("rowhouse", "ROW_HOUSE")]:
         if pt_keyword in lower_query:
             property_type = pt_value
             break
