@@ -1,0 +1,73 @@
+======================================================================
+1. Projects with 2 BHK units that have a 'Wash Area' room
+======================================================================
+  AMBER 2 BHK RESIDENCY          | unit=08c1bd4c-96dd-426f-8d6b-9c4cc0295135__0 | room=Wash Area | balcony=None
+  AMBER 2 BHK RESIDENCY          | unit=08c1bd4c-96dd-426f-8d6b-9c4cc0295135__1 | room=Wash Area | balcony=None
+  AMBER 2 BHK RESIDENCY          | unit=08c1bd4c-96dd-426f-8d6b-9c4cc0295135__2 | room=Wash Area | balcony=None
+  AMBER 2 BHK RESIDENCY          | unit=08c1bd4c-96dd-426f-8d6b-9c4cc0295135__3 | room=Wash Area | balcony=None
+  AMBER 2 BHK RESIDENCY          | unit=08c1bd4c-96dd-426f-8d6b-9c4cc0295135__4 | room=Wash Area | balcony=None
+  AMBER 2 BHK RESIDENCY          | unit=08c1bd4c-96dd-426f-8d6b-9c4cc0295135__5 | room=Wash Area | balcony=None
+  AMBER 2 BHK RESIDENCY          | unit=08c1bd4c-96dd-426f-8d6b-9c4cc0295135__6 | room=Wash Area | balcony=None
+  AMBER 2 BHK RESIDENCY          | unit=08c1bd4c-96dd-426f-8d6b-9c4cc0295135__7 | room=Wash Area | balcony=None
+  AMBER 2 BHK RESIDENCY          | unit=08c1bd4c-96dd-426f-8d6b-9c4cc0295135__8 | room=Wash Area | balcony=None
+  Elysium at Shantigram          | unit=005f2659-1878-4035-aecc-c2a4ff8e5b1e__0 | room=Wash Area | balcony=36.81
+  Elysium at Shantigram          | unit=005f2659-1878-4035-aecc-c2a4ff8e5b1e__1 | room=Wash Area | balcony=40.79
+  OUM ORBIT                      | unit=99797e01-9e2d-4c2a-9d29-3f53780f6fe1__0 | room=Wash Area | balcony=None
+  OUM ORBIT                      | unit=99797e01-9e2d-4c2a-9d29-3f53780f6fe1__1 | room=Wash Area | balcony=None
+  OUM ORBIT                      | unit=99797e01-9e2d-4c2a-9d29-3f53780f6fe1__2 | room=Wash Area | balcony=None
+  OUM ORBIT                      | unit=99797e01-9e2d-4c2a-9d29-3f53780f6fe1__3 | room=Wash Area | balcony=None
+  OUM ORBIT                      | unit=99797e01-9e2d-4c2a-9d29-3f53780f6fe1__4 | room=Wash Area | balcony=None
+Traceback (most recent call last):
+  OUM ORBIT                      | unit=99797e01-9e2d-4c2a-9d29-3f53780f6fe1__5 | room=Wash Area | balcony=None
+  OUM ORBIT                      | unit=99797e01-9e2d-4c2a-9d29-3f53780f6fe1__6 | room=Wash Area | balcony=None
+  OUM ORBIT                      | unit=99797e01-9e2d-4c2a-9d29-3f53780f6fe1__7 | room=Wash Area | balcony=None
+  OUM ORBIT                      | unit=99797e01-9e2d-4c2a-9d29-3f53780f6fe1__8 | room=Wash Area | balcony=None
+  Sitaram City                   | unit=31bcc3dd-5fa6-4c34-b4aa-91073705ab43__0 | room=Wash Area | balcony=None
+  Sitaram City                   | unit=31bcc3dd-5fa6-4c34-b4aa-91073705ab43__4 | room=Wash Area | balcony=None
+  Sitaram City                   | unit=31bcc3dd-5fa6-4c34-b4aa-91073705ab43__5 | room=Wash Area | balcony=None
+  Sky Avenue                     | unit=c8828cab-5c96-44d0-ac03-eee8292fa5ba__0 | room=Wash Area | balcony=None
+  Sky Avenue                     | unit=c8828cab-5c96-44d0-ac03-eee8292fa5ba__1 | room=Wash Area | balcony=None
+  File "D:\Rerachatbot\graphrag\diag_wash_balcony.py", line 75, in <module>
+  Sunflower Enclave              | unit=d63bcc50-f29a-4ff1-b164-8f114cedb11d__0 | room=Wash Area | balcony=None
+  Sunflower Enclave              | unit=d63bcc50-f29a-4ff1-b164-8f114cedb11d__1 | room=Wash Area | balcony=None
+  svasaar pravesh                | unit=0a615d49-307a-45a6-842f-fae903c9e08b__0 | room=Wash Area | balcony=None
+
+======================================================================
+2. Projects with 2 BHK units that have balcony_sqft > 0
+======================================================================
+  Elysium at Shantigram          | unit=005f2659-1878-4035-aecc-c2a4ff8e5b1e__0 | balcony=36.81
+  Elysium at Shantigram          | unit=005f2659-1878-4035-aecc-c2a4ff8e5b1e__1 | balcony=40.79
+
+======================================================================
+3. All Room names for svasaar pravesh & OUM ORBIT (2 BHK)
+======================================================================
+  OUM ORBIT            | unit=99797e01-9e2d-4c2a-9d29-3f53780f6fe1__0 | balcony=None
+    print(f"  \u2713 {rec['project']:30s} | unit={rec['unit_id']} | wash={rec['wash_room']} | balcony={rec['balcony']}")
+    Rooms: ['Bedroom', 'Drawing / Dining', 'Kitchen', 'Wash Area', 'Balcony', 'Toilet']
+  OUM ORBIT            | unit=99797e01-9e2d-4c2a-9d29-3f53780f6fe1__1 | balcony=None
+    Rooms: ['Bedroom', 'Drawing / Dining', 'Kitchen', 'Wash Area', 'Balcony', 'Toilet']
+  OUM ORBIT            | unit=99797e01-9e2d-4c2a-9d29-3f53780f6fe1__2 | balcony=None
+    Rooms: ['Bedroom', 'Drawing / Dining', 'Kitchen', 'Wash Area', 'Balcony', 'Toilet']
+  OUM ORBIT            | unit=99797e01-9e2d-4c2a-9d29-3f53780f6fe1__3 | balcony=None
+    Rooms: ['Bedroom', 'Drawing / Dining', 'Kitchen', 'Wash Area', 'Balcony', 'Toilet']
+  OUM ORBIT            | unit=99797e01-9e2d-4c2a-9d29-3f53780f6fe1__4 | balcony=None
+    Rooms: ['Bedroom', 'Hall', 'Kitchen', 'Wash Area', 'Balcony', 'Toilet']
+  OUM ORBIT            | unit=99797e01-9e2d-4c2a-9d29-3f53780f6fe1__5 | balcony=None
+    Rooms: ['Bedroom', 'Hall', 'Kitchen', 'Wash Area', 'Balcony', 'Toilet']
+  OUM ORBIT            | unit=99797e01-9e2d-4c2a-9d29-3f53780f6fe1__6 | balcony=None
+    Rooms: ['Bedroom', 'Drawing / Dining', 'Kitchen', 'Wash Area', 'Balcony', 'Toilet']
+  OUM ORBIT            | unit=99797e01-9e2d-4c2a-9d29-3f53780f6fe1__7 | balcony=None
+    Rooms: ['Bedroom', 'Drawing / Dining', 'Kitchen', 'Wash Area', 'Balcony', 'Toilet']
+  OUM ORBIT            | unit=99797e01-9e2d-4c2a-9d29-3f53780f6fe1__8 | balcony=None
+    Rooms: ['Bedroom', 'Drawing / Dining', 'Kitchen', 'Wash Area', 'Balcony', 'Toilet']
+  svasaar pravesh      | unit=0a615d49-307a-45a6-842f-fae903c9e08b__0 | balcony=None
+    Rooms: ['Balcony', 'Bedroom', 'Toilet', 'Wash Area', 'Kitchen', 'Dining', 'Hall']
+
+======================================================================
+4. Correlated query: 2 BHK with SAME unit having Wash Area + balcony
+   (Using unit_id correlation)
+======================================================================
+  File "C:\Users\USER\AppData\Local\Programs\Python\Python312\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode character '\u2713' in position 2: character maps to <undefined>

@@ -330,8 +330,17 @@ class GraphRetriever:
             return True
         if intent.entrance_facing:
             return True
-        # property_type alone is intentionally NOT listed — too broad to be useful
-        # as a sole fallback filter (would return all apartments or all villas)
+        # property_type alone counts as a graph filter ONLY for specific types
+        # (VILLA, TENEMENT, PENTHOUSE, ROW_HOUSE, BUNGALOW) — these are narrow enough
+        # to be useful as a sole filter.  APARTMENT alone is too broad.
+        if intent.property_type:
+            pt = intent.property_type
+            non_apartment_types = {"VILLA", "TENEMENT", "PENTHOUSE", "ROW_HOUSE", "BUNGALOW"}
+            if isinstance(pt, list):
+                if any(p.upper() in non_apartment_types for p in pt):
+                    return True
+            elif isinstance(pt, str) and pt.upper() in non_apartment_types:
+                return True
         return False
 
     def _execute_cypher(self, cq: CypherQuery) -> tuple[list[ProjectResult], list[dict]]:
@@ -494,10 +503,14 @@ class GraphRetriever:
                     )
                 params[key] = am
 
-        # Has balcony
+        # Has balcony — check BOTH the unit-level property AND the embedded Balcony/Terrace Room.
+        # Many projects store the balcony only as a Room node (r.name='Balcony') with
+        # balcony_sqft=null on the Unit; checking only balcony_sqft causes false negatives.
         if intent.has_balcony:
             where_clauses.append(
-                "ANY(u IN units WHERE u.balcony_sqft IS NOT NULL AND u.balcony_sqft > 0)"
+                "ANY(u IN units WHERE "
+                "(u.balcony_sqft IS NOT NULL AND toFloat(u.balcony_sqft) > 0) "
+                "OR ANY(r IN u.rooms WHERE r.name IN ['Balcony', 'Terrace']))"
             )
 
         # Has parking

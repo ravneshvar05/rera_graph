@@ -491,9 +491,56 @@ Common filters:
   Neighbourhood: (toLower(n.name) CONTAINS toLower($neighbourhood) OR REPLACE(toLower(n.name), ' - ', '-') CONTAINS toLower($neighbourhood) OR toLower(p.address) CONTAINS toLower($neighbourhood))
   Multi-neighbourhood: ANY(x IN $neighbourhoods WHERE toLower(n.name) CONTAINS toLower(x) OR REPLACE(toLower(n.name), ' - ', '-') CONTAINS toLower(x) OR toLower(p.address) CONTAINS toLower(x))
   Status:        toLower(p.project_status) CONTAINS toLower($status)
-  Room existence: EXISTS {{ MATCH (p)-[:HAS_UNIT]->(u2)-[:HAS_ROOM]->(r) WHERE r.name = $room_name }}
+  Room existence (single room): EXISTS {{ MATCH (p)-[:HAS_UNIT]->(u2)-[:HAS_ROOM]->(r) WHERE r.name = $room_name }}
   Amenity tag:   EXISTS {{ MATCH (p)-[:HAS_AMENITY]->(am2) WHERE $tag IN am2.canonical_tags }}
   Amenity flags: p.has_pool = 1, p.has_clubhouse = 1, p.has_park = 1, p.has_parking = 1
+
+  EMBEDDED ROOMS PATTERN (PREFERRED — use when filtering inside ANY(u IN units WHERE ...)):
+  The CALL subquery already embeds rooms into each unit: u.rooms is a list of room property maps.
+  Use ANY(r IN u.rooms WHERE ...) to check rooms WITHIN the same unit — simpler and always correct.
+
+  Balcony check (CRITICAL — check BOTH the unit property AND the Balcony room node, since many
+  projects store balcony only as a Room called 'Balcony' with u.balcony_sqft = null):
+    (u.balcony_sqft IS NOT NULL AND toFloat(u.balcony_sqft) > 0)
+    OR ANY(r IN u.rooms WHERE r.name IN ['Balcony', 'Terrace'])
+
+  CORRELATED MULTI-ROOM / ROOM+FEATURE filter (ALL conditions on the SAME unit):
+  When user wants a unit with MULTIPLE features (e.g. wash area + balcony), use ONE ANY(u IN units WHERE ...) clause:
+    Example — "2 BHK with wash area AND balcony":
+      ANY(u IN units WHERE
+        u.bhk = 2
+        AND ANY(r IN u.rooms WHERE r.name IN ['Wash Area'])
+        AND (
+          (u.balcony_sqft IS NOT NULL AND toFloat(u.balcony_sqft) > 0)
+          OR ANY(r IN u.rooms WHERE r.name IN ['Balcony', 'Terrace'])
+        )
+      )
+    Example — "wash area and balcony" without BHK:
+      ANY(u IN units WHERE
+        ANY(r IN u.rooms WHERE r.name IN ['Wash Area'])
+        AND (
+          (u.balcony_sqft IS NOT NULL AND toFloat(u.balcony_sqft) > 0)
+          OR ANY(r IN u.rooms WHERE r.name IN ['Balcony', 'Terrace'])
+        )
+      )
+    Example — "2 BHK with pooja room and servant room":
+      ANY(u IN units WHERE
+        u.bhk = 2
+        AND ANY(r IN u.rooms WHERE r.name IN ['Pooja Room'])
+        AND ANY(r IN u.rooms WHERE r.name IN ['Servant Room'])
+      )
+    NEVER split conditions onto separate top-level AND clauses — always keep them inside ONE ANY(u IN units WHERE ...).
+    For room checks, ALWAYS use ANY(r IN u.rooms WHERE r.name IN [...]) — do NOT use correlated EXISTS with id().
+
+  Floor-level / accessibility filter (for "ground floor bedroom", "senior-friendly", "aging parents"):
+    Room.floor_level stores the floor number (0 = ground floor, 1 = first floor, etc.).
+    "ground floor bedroom" = a bedroom room at floor_level = 0:
+      EXISTS {{ MATCH (p)-[:HAS_UNIT]->(u2)-[:HAS_ROOM]->(r2) WHERE r2.name IN ['Bedroom','Master Bedroom'] AND toInteger(r2.floor_level) = 0 }}
+    Combine with property_type if user specifies (e.g. "ground floor bedroom villa"):
+      ANY(u IN units WHERE toLower(u.property_type) = 'villa')
+      AND EXISTS {{ MATCH (p)-[:HAS_UNIT]->(u2)-[:HAS_ROOM]->(r2) WHERE r2.name IN ['Bedroom','Master Bedroom'] AND toInteger(r2.floor_level) = 0 }}
+    "aging parents" / "senior-friendly" / "elderly" + villas -> always include ground-floor bedroom check.
+
   Unit area — NO qualifier ("area N sqft", user did not say carpet or super built-up):
     ANY(u IN units WHERE
       (u.carpet_sqft IS NOT NULL AND <comparison on toFloat(u.carpet_sqft)>)
@@ -659,7 +706,7 @@ answer_data includes list of matching room details for each unit.
 7. CONTAINS (case-insensitive) for project name matching — never exact =.
 8. No city filter when project name or neighbourhood is specified.
 9. Fence area comparisons: IS NOT NULL AND toFloat() > ...
-10. Handle >/</>=/<=/ between. "at least" → >=, "under" → <.
+10. Handle >/</>=/<= between. "at least" → >=, "under" → <.
 11. Multiple rooms → OR in filter. For room existence queries, do NOT drop property_type filter to get more results — the user's type is always a hard constraint.
 12. ADDRESS + HYPHEN NORM: For ANY location filter, ALWAYS also search p.address AND normalize hyphens:
     (toLower(n.name) CONTAINS toLower($loc) OR REPLACE(toLower(n.name), ' - ', '-') CONTAINS toLower($loc) OR toLower(p.address) CONTAINS toLower($loc))
@@ -677,6 +724,19 @@ answer_data includes list of matching room details for each unit.
     - "super built-up" / "super builtup" / "built-up area" / "SBA" → super_builtup_sqft ONLY.
     - "exactly N sqft" → = toFloat($area_sqft), still apply field selection.
     - Rooms only have area_sqft — field selection does not apply to rooms, only comparison logic.
+18. SAME-UNIT CORRELATION (CRITICAL): When user wants a unit that has MULTIPLE features simultaneously
+    (e.g. BHK + room type + balcony), ALL conditions MUST be in ONE ANY(u IN units WHERE ...) clause.
+    NEVER split into separate top-level AND clauses.
+    For room checks within the same unit, use ANY(r IN u.rooms WHERE r.name IN [...]) — NOT correlated EXISTS.
+    Balcony check must be: (u.balcony_sqft IS NOT NULL AND toFloat(u.balcony_sqft) > 0) OR ANY(r IN u.rooms WHERE r.name IN ['Balcony','Terrace'])
+    Wrong:  ANY(u IN units WHERE u.bhk=2) AND EXISTS{{...wash area...}} AND ANY(u IN units WHERE u.balcony_sqft>0)
+    Correct: ANY(u IN units WHERE u.bhk=2 AND ANY(r IN u.rooms WHERE r.name IN ['Wash Area']) AND ((u.balcony_sqft IS NOT NULL AND toFloat(u.balcony_sqft)>0) OR ANY(r IN u.rooms WHERE r.name IN ['Balcony','Terrace'])))
+19. GROUND FLOOR / ACCESSIBILITY QUERIES: Phrases like "ground floor bedroom", "bedroom on ground floor",
+    "suitable for aging parents", "elderly", "senior-friendly villa" → the key structural signal is a bedroom
+    at floor_level=0. Always generate:
+      EXISTS {{ MATCH (p)-[:HAS_UNIT]->(u2)-[:HAS_ROOM]->(r2) WHERE r2.name IN ['Bedroom','Master Bedroom'] AND toInteger(r2.floor_level) = 0 }}
+    Combined with property_type if user specified one (villa, tenement, etc.).
+    Also set intent.semantic_keywords=["ground floor bedroom", "senior-friendly"] for vector fallback.
 
 === INTENT EXTRACTION ===
 - "all projects"/"show all" → query_type="GLOBAL". Filtered → "SPECIFIC".
