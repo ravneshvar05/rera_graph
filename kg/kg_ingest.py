@@ -384,8 +384,7 @@ def build_project_embedding_text(
         unique_types = list(dict.fromkeys(unit_type_list))  # preserve order
         parts.append(f"Unit variants: {', '.join(unique_types[:10])}.")
 
-    # ── RERA / status / possession ─────────────────────────────────────────────
-    rera   = _str(project.get("rera_registration_number"))
+    # ── Status / possession ──────────────────────────────────────────────────────
     status = _str(project.get("project_status"))
     pos_dt = _str(project.get("possession_date"))
     if status and status.upper() not in ("UNKNOWN", "NONE"):
@@ -393,8 +392,6 @@ def build_project_embedding_text(
         parts.append(f"Project status: {readable}.")
     if pos_dt:
         parts.append(f"Possession date: {pos_dt}.")
-    if rera:
-        parts.append(f"RERA registered: {rera}.")
 
     # ── Society description (verbatim — rich for fuzzy matching) ──────────────
     soc_desc = _str(society.get("description"))
@@ -414,14 +411,11 @@ def build_project_embedding_text(
 
     total_blocks = _int(society.get("total_apartment_blocks"))
     total_villas = _int(society.get("total_independent_villas_or_tenements"))
-    bnames       = [b for b in (society.get("building_names") or []) if b]
     road_widths  = [r for r in (society.get("road_width_details") or []) if r]
     if total_blocks:
         parts.append(f"Total apartment blocks: {total_blocks}.")
     if total_villas:
         parts.append(f"Total villas/tenements: {total_villas}.")
-    if bnames:
-        parts.append(f"Building names: {', '.join(bnames[:10])}.")
     if road_widths:
         parts.append(f"Road widths: {', '.join(road_widths)}.")
 
@@ -522,25 +516,21 @@ def build_unit_embedding_text(
     if desc:
         parts.append(desc)
 
-    # ── Area specs ────────────────────────────────────────────────────────────
+    # ── Area specs (super built-up and carpet only — balcony/wash removed,
+    #   no semantic value for similarity search) ────────────────────────────────
     sba  = _float(unit.get("super_built_up_area_sqft"))
     ca   = _float(unit.get("carpet_area_sqft"))
-    bal  = _float(unit.get("balcony_area_sqft"))
-    wash = _float(unit.get("wash_area_sqft"))
     area_parts: list[str] = []
     if sba:   area_parts.append(f"super built-up {sba} sqft")
     if ca:    area_parts.append(f"carpet {ca} sqft")
-    if bal:   area_parts.append(f"balcony {bal} sqft")
-    if wash:  area_parts.append(f"wash area {wash} sqft")
     if area_parts:
         parts.append(f"Area: {', '.join(area_parts)}.")
 
     if facing:
         parts.append(f"Entrance facing: {facing}.")
 
-    appl_bldgs = [b for b in (unit.get("applicable_buildings") or []) if b]
-    if appl_bldgs:
-        parts.append(f"Applicable buildings: {', '.join(appl_bldgs)}.")
+    # applicable_buildings (A-BLOCK, B-BLOCK) removed — internal metadata,
+    # no realistic user search term; stored in Neo4j for Cypher use.
 
     # ── Rooms — THE key differentiator for unit docs ──────────────────────────
     room_parts: list[str] = []
@@ -548,9 +538,6 @@ def build_unit_embedding_text(
     for room in rooms:
         rname  = _str(room.get("name")) or ""
         rtype  = _str(room.get("room_type")) or ""
-        rlen   = _str(room.get("length")) or ""
-        rwid   = _str(room.get("width")) or ""
-        rarea  = _float(room.get("area_sqft"))
         rfloor = _str(room.get("floor_level")) or ""
         r_ab   = room.get("attached_bathroom")
         r_bal  = room.get("has_balcony_access")
@@ -563,13 +550,6 @@ def build_unit_embedding_text(
             room_str += f" ({rtype.replace('_', ' ').title()})"
         if rfloor:
             room_str += f" [{rfloor} floor]"
-        dims: list[str] = []
-        if rlen and rwid:
-            dims.append(f"{rlen} x {rwid}")
-        if rarea:
-            dims.append(f"{rarea} sqft")
-        if dims:
-            room_str += f" {', '.join(dims)}"
         if r_ab:
             room_str += " with attached bathroom"
         if r_bal:
@@ -589,9 +569,8 @@ def build_unit_embedding_text(
         if all_tags:
             parts.append(f"Amenities: {', '.join(sorted(all_tags))}.")
 
-    # ── Compact landmark summary ──────────────────────────────────────────────
-    if landmarks:
-        parts.append(f"Nearby: {', '.join(landmarks[:8])}.")
+    # landmarks removed from unit doc — project doc has richer version
+    # (all landmarks with classified types) and is always searched in parallel.
 
     # ── Project status for relevance ──────────────────────────────────────────
     status = _str(project.get("project_status"))
