@@ -526,19 +526,49 @@ class GraphRetriever:
                 where_clauses.append("toLower(dev.name) CONTAINS toLower($developer)")
                 params["developer"] = intent.developer
 
-        # Area range
-        if intent.min_sqft is not None:
-            where_clauses.append(
-                "ANY(u IN units WHERE u.super_builtup_sqft >= $min_sqft OR u.carpet_sqft >= $min_sqft)"
-            )
-            params["min_sqft"] = intent.min_sqft
+        # ── Area range — qualifier-aware (carpet / super_builtup / both) + around ±15% ──
+        _AREA_TOLERANCE = 0.15
+        area_qualifier = getattr(intent, "area_qualifier", None)   # "carpet" | "super_builtup" | None
+        around_area    = getattr(intent, "around_area", False)      # True → ±15% BETWEEN window
 
-        if intent.max_sqft is not None:
-            where_clauses.append(
-                "ANY(u IN units WHERE (u.super_builtup_sqft IS NULL OR u.super_builtup_sqft <= $max_sqft) "
-                "AND (u.carpet_sqft IS NULL OR u.carpet_sqft <= $max_sqft))"
-            )
-            params["max_sqft"] = intent.max_sqft
+        if intent.min_sqft is not None or intent.max_sqft is not None:
+
+            # Determine lo/hi bounds
+            if around_area and intent.min_sqft is not None and intent.max_sqft is None:
+                # "around N sqft" — build symmetric ±15% window from min_sqft as the target
+                target = float(intent.min_sqft)
+                lo: Optional[float] = round(target * (1 - _AREA_TOLERANCE), 2)
+                hi: Optional[float] = round(target * (1 + _AREA_TOLERANCE), 2)
+            else:
+                lo = float(intent.min_sqft) if intent.min_sqft is not None else None
+                hi = float(intent.max_sqft) if intent.max_sqft is not None else None
+
+            if lo is not None:
+                params["area_lo"] = lo
+            if hi is not None:
+                params["area_hi"] = hi
+
+            def _field_cond(field: str) -> str:
+                """Build the IS NOT NULL + range sub-expression for one field."""
+                parts = [f"u.{field} IS NOT NULL"]
+                if lo is not None:
+                    parts.append(f"toFloat(u.{field}) >= $area_lo")
+                if hi is not None:
+                    parts.append(f"toFloat(u.{field}) <= $area_hi")
+                return " AND ".join(parts)
+
+            carpet_cond      = _field_cond("carpet_sqft")
+            super_builtup_cond = _field_cond("super_builtup_sqft")
+
+            if area_qualifier == "carpet":
+                where_clauses.append(f"ANY(u IN units WHERE {carpet_cond})")
+            elif area_qualifier == "super_builtup":
+                where_clauses.append(f"ANY(u IN units WHERE {super_builtup_cond})")
+            else:
+                # No qualifier — match if EITHER area field satisfies the range
+                where_clauses.append(
+                    f"ANY(u IN units WHERE ({carpet_cond}) OR ({super_builtup_cond}))"
+                )
 
         # Units per floor filtering
         if intent.min_units_per_floor is not None:
@@ -1097,10 +1127,20 @@ def _format_answer_data(
 
         min_area = params.get("min_area")
         max_area = params.get("max_area")
-        if min_area is not None:
+        area_min = params.get("area_min")  # LLM "around" style
+        area_max = params.get("area_max")  # LLM "around" style
+        if area_min is not None and area_max is not None:
+            filter_desc = f"~{area_min}–{area_max} sqft (±15%)"
+        elif min_area is not None and max_area is not None:
+            filter_desc = f"~{min_area}–{max_area} sqft (±15%)"
+        elif min_area is not None:
             filter_desc = f"> {min_area} sqft"
         elif max_area is not None:
             filter_desc = f"< {max_area} sqft"
+        elif area_min is not None:
+            filter_desc = f">= {area_min} sqft"
+        elif area_max is not None:
+            filter_desc = f"<= {area_max} sqft"
         else:
             filter_desc = "available"
 
@@ -1111,30 +1151,61 @@ def _format_answer_data(
         for entry in answer_data:
             if not isinstance(entry, dict):
                 continue
-            unit_type = str(entry.get("unit_type") or entry.get("bhk") or "")
+            # entry is the outer project dict: {project_name, matching_rooms: [...]}
             matching = entry.get("matching_rooms") or []
-            for r in matching:
-                if not r:
+            for item in matching:
+                if not item:
                     continue
-                rname  = r.get("room_name") or r.get("name") or room_display
-                length = r.get("length")
-                width  = r.get("width")
-                area   = r.get("area_sqft")
-                parts  = []
-                if length and width:
-                    parts.append(f"{length} x {width}")
-                if area:
-                    try:
-                        parts.append(f"{float(area):.1f} sqft")
-                    except (ValueError, TypeError):
-                        parts.append(f"{area} sqft")
-                key = f"{unit_type}|{rname}|{'|'.join(parts)}"
-                if key in seen:
-                    continue
-                seen.add(key)
-                dim_str    = ": " + ", ".join(parts) if parts else ""
-                unit_prefix = f"[{unit_type}] " if unit_type else ""
-                lines.append(f"  - {unit_prefix}{rname}{dim_str}")
+                # Handle both formats LLM may generate:
+                # NEW flat:  {unit_type, bhk, room_name, area_sqft, length, width}
+                # OLD wrapped: {unit_type, bhk, rooms: [{room_name, area_sqft, ...}]}
+                if "rooms" in item and isinstance(item.get("rooms"), list):
+                    # Old unit-wrapped format — iterate inner rooms sub-list
+                    unit_type = str(item.get("unit_type") or item.get("bhk") or "")
+                    for r in item["rooms"]:
+                        if not r:
+                            continue
+                        rname  = r.get("room_name") or r.get("name") or room_display
+                        length = r.get("length")
+                        width  = r.get("width")
+                        area   = r.get("area_sqft")
+                        parts: list[str] = []
+                        if length and width:
+                            parts.append(f"{length} x {width}")
+                        if area:
+                            try:
+                                parts.append(f"{float(area):.1f} sqft")
+                            except (ValueError, TypeError):
+                                parts.append(f"{area} sqft")
+                        key = f"{unit_type}|{rname}|{'|'.join(parts)}"
+                        if key in seen:
+                            continue
+                        seen.add(key)
+                        dim_str = ": " + ", ".join(parts) if parts else ""
+                        unit_prefix = f"[{unit_type}] " if unit_type else ""
+                        # lines.append(f"  - {unit_prefix}{rname}{dim_str}")
+                else:
+                    # New flat format: room_name + unit_type are direct fields
+                    unit_type = str(item.get("unit_type") or item.get("bhk") or "")
+                    rname  = item.get("room_name") or item.get("name") or room_display
+                    length = item.get("length")
+                    width  = item.get("width")
+                    area   = item.get("area_sqft")
+                    parts = []
+                    if length and width:
+                        parts.append(f"{length} x {width}")
+                    if area:
+                        try:
+                            parts.append(f"{float(area):.1f} sqft")
+                        except (ValueError, TypeError):
+                            parts.append(f"{area} sqft")
+                    key = f"{unit_type}|{rname}|{'|'.join(parts)}"
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    dim_str = ": " + ", ".join(parts) if parts else ""
+                    unit_prefix = f"[{unit_type}] " if unit_type else ""
+                    # lines.append(f"  - {unit_prefix}{rname}{dim_str}")
 
     return "\n".join(lines) if lines else ""
 

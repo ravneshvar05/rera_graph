@@ -24,7 +24,7 @@ import google.generativeai as genai
 from groq import Groq
 from loguru import logger
 
-from graphrag_config import settings
+from graphrag_config import settings, build_gemini_pool, build_groq_pool
 from graphrag_intent import QueryIntent
 from graphrag_retriever import ProjectResult
 
@@ -131,17 +131,17 @@ def _judge_vector_relevance(
     api_keys: dict,
 ) -> list[ProjectResult]:
     """
-    Use Groq (Llama) → Gemini 2.5 Flash fallback to decide which vector-only
+    Use Groq (Llama) pool → Gemini pool fallback to decide which vector-only
     projects are relevant to the user query.
 
-    Returns the filtered list. On any LLM failure, returns all unchanged.
+    Tries each key in the pool on failure before moving to the next service.
+    Returns the filtered list. On total LLM failure, returns all results unchanged.
     """
     if not vector_only:
         return vector_only
 
     # Build compact summaries
     summaries = [_build_judge_summary(p) for p in vector_only]
-    # Strip None values for cleaner JSON (saves tokens)
     summaries_clean = [{k: v for k, v in s.items() if v is not None} for s in summaries]
 
     judge_user_msg = (
@@ -149,11 +149,19 @@ def _judge_vector_relevance(
         f"Projects to evaluate:\n{json.dumps(summaries_clean, indent=2)}"
     )
 
-    # ── Primary: Groq (Llama 3.3 70b) ──────────────────────────────────────
-    groq_key = (api_keys or {}).get("GROQ_API_KEY") or settings.GROQ_API_KEY
-    if groq_key:
+    groq_pool   = build_groq_pool(api_keys)
+    gemini_pool = build_gemini_pool(api_keys)
+
+    # ── Primary: Groq pool (Llama 3.3 70b) ─────────────────────────────────
+    n_groq = len(groq_pool)
+    for attempt in range(n_groq):
+        key = groq_pool.next()
+        if not key:
+            break
+        key_slot = groq_pool.last_slot
+        logger.info(f"[RelevanceJudge] Groq key slot {key_slot}/{n_groq} (retry attempt {attempt + 1})")
         try:
-            groq_client = Groq(api_key=groq_key)
+            groq_client = Groq(api_key=key)
             response = groq_client.chat.completions.create(
                 model=settings.GROQ_MODEL,
                 response_format={"type": "json_object"},
@@ -162,7 +170,7 @@ def _judge_vector_relevance(
                     {"role": "user",   "content": judge_user_msg},
                 ],
                 temperature=0.0,
-                max_tokens=256,   # yes/no per project — very small output
+                max_tokens=256,
             )
             raw = response.choices[0].message.content.strip()
             tokens_in  = response.usage.prompt_tokens if response.usage else "?"
@@ -170,15 +178,25 @@ def _judge_vector_relevance(
             logger.info(f"[RelevanceJudge/Groq] tokens: {tokens_in} in / {tokens_out} out")
             return _parse_judge_response(raw, vector_only)
         except Exception as e:
-            logger.warning(f"[RelevanceJudge] Groq failed ({e}). Trying Gemini fallback.")
+            logger.warning(
+                f"[RelevanceJudge] Groq slot {key_slot} failed ({e}). "
+                f"{'Trying next Groq key.' if attempt + 1 < n_groq else 'Groq pool exhausted.'}"
+            )
 
-    # ── Fallback: Gemini 2.5 Flash ─────────────────────────────────────────
-    gemini_key = (api_keys or {}).get("GEMINI_API_KEY") or settings.GEMINI_API_KEY
-    if gemini_key:
+    # ── Fallback: Gemini pool ─────────────────────────────────────────────
+    n_gemini = len(gemini_pool)
+    if n_gemini:
+        logger.warning("[RelevanceJudge] Falling back to Gemini pool.")
+    for attempt in range(n_gemini):
+        key = gemini_pool.next()
+        if not key:
+            break
+        key_slot = gemini_pool.last_slot
+        logger.info(f"[RelevanceJudge] Gemini key slot {key_slot}/{n_gemini} (retry attempt {attempt + 1})")
         try:
-            genai.configure(api_key=gemini_key)
+            genai.configure(api_key=key)
             model = genai.GenerativeModel(
-                model_name="gemini-2.5-flash",   # always use 2.5 Flash for judge
+                model_name="gemini-2.5-flash",
                 system_instruction=_JUDGE_SYSTEM_PROMPT,
                 generation_config=genai.GenerationConfig(
                     temperature=0.0,
@@ -189,15 +207,20 @@ def _judge_vector_relevance(
             raw = response.text.strip()
             raw = re.sub(r"^```(?:json)?\s*", "", raw)
             raw = re.sub(r"\s*```$", "", raw)
-            tokens = (response.usage_metadata.total_token_count
-                      if hasattr(response, "usage_metadata") and response.usage_metadata else "?")
+            tokens = (
+                response.usage_metadata.total_token_count
+                if hasattr(response, "usage_metadata") and response.usage_metadata else "?"
+            )
             logger.info(f"[RelevanceJudge/Gemini] tokens total: {tokens}")
             return _parse_judge_response(raw, vector_only)
         except Exception as e:
-            logger.warning(f"[RelevanceJudge] Gemini also failed ({e}). Keeping all vector results.")
+            logger.warning(
+                f"[RelevanceJudge] Gemini slot {key_slot} failed ({e}). "
+                f"{'Trying next Gemini key.' if attempt + 1 < n_gemini else 'All keys exhausted.'}"
+            )
 
-    # Both failed — safe fallback
-    logger.warning("[RelevanceJudge] All LLMs failed. Returning vector results unfiltered.")
+    # Both pools exhausted — safe fallback: keep all results
+    logger.warning("[RelevanceJudge] All LLM keys exhausted. Returning vector results unfiltered.")
     return vector_only
 
 

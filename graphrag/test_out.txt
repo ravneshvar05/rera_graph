@@ -7,144 +7,121 @@ See README for more details:
 https://github.com/google-gemini/deprecated-generative-ai-python/blob/main/README.md
 
   import google.generativeai as genai
-2026-03-16 20:16:56.781 | INFO     | graphrag_cypher:generate_cypher:687 - Intent parsed (Gemini (gemini-2.5-flash)): bhk=2, location=['Sarkhej', 'Vinzol', 'Gamdi Gaam'], amenities=[], type=SPECIFIC
-2026-03-16 20:17:07.501 | INFO     | graphrag_cypher:generate_cypher:687 - Intent parsed (Gemini (gemini-2.5-flash)): bhk=None, location=['Shantigram', 'Satellite', 'New Nikol-Naroda Road'], amenities=['Gym'], type=SPECIFIC
-2026-03-16 20:17:07.502 | DEBUG    | graphrag_cypher:_post_process_cypher:984 - [Post-process] Expanded amenity 'Gym' -> ['Gym', 'Health Club']
-2026-03-16 20:17:15.180 | INFO     | graphrag_cypher:generate_cypher:687 - Intent parsed (Gemini (gemini-2.5-flash)): bhk=4, location=None, amenities=[], type=SPECIFIC
-2026-03-16 20:17:22.229 | INFO     | graphrag_cypher:generate_cypher:687 - Intent parsed (Gemini (gemini-2.5-flash)): bhk=2, location=None, amenities=[], type=SPECIFIC
-2026-03-16 20:17:29.582 | INFO     | graphrag_cypher:generate_cypher:687 - Intent parsed (Gemini (gemini-2.5-flash)): bhk=None, location=Paldi, amenities=[], type=SPECIFIC
-2026-03-16 20:17:35.980 | INFO     | graphrag_cypher:generate_cypher:687 - Intent parsed (Gemini (gemini-2.5-flash)): bhk=None, location=Hanspura, amenities=[], type=SPECIFIC
-======================================================================
-GRAPH RETRIEVAL FIX VERIFICATION
-======================================================================
+2026-03-26 11:47:13.556 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2026-03-26 11:47:14.305 
+  Warning: to view this Streamlit app on a browser, run it with the following
+  command:
 
-======================================================================
-TEST: Q1: Multi-location including Gamdi Gaam (only in address)
-QUERY: Can you suggest some 2 BHK apartments in Sarkhej, Vinzol, or Gamdi Gaam?
-  Type:    SPECIFIC
-  Params:  {'bhk': 2, 'property_type': 'APARTMENT', 'neighbourhoods': ['sarkhej', 'vinzol', 'gamdi gaam'], 'limit': 50}
-  Vector:  2 BHK apartments in Sarkhej, Vinzol, or Gamdi Gaam
-  Has p.address search: YES
-  Intent neighbourhood: ['Sarkhej', 'Vinzol', 'Gamdi Gaam']
-  Intent landmarks: []
-  Results: 4 projects -> ['svasaar pravesh', 'OUM ORBIT', 'AMBER 2 BHK RESIDENCY', 'Sunflower Enclave']
-  PASS: Found expected project(s): ['svasaar pravesh', 'Sunflower Enclave', 'AMBER 2 BHK RESIDENCY', 'OUM ORBIT']
-
-======================================================================
-TEST: Q4: New Nikol (compound neighbourhood name) + gym amenity
-QUERY: Are there any apartments with a gym in Shantigram, Satellite, or New Nikol-Naroda Road?
-  Type:    SPECIFIC
-  Params:  {'property_type': 'APARTMENT', 'amenity_tag': ['Gym', 'Health Club'], 'neighbourhood_0': 'Shantigram', 'neighbourhood_1': 'Satellite', 'neighbourhood_2': 'New Nikol-Naroda Road', 'limit': 50}
-  Vector:  apartments with a gym in Shantigram, Satellite, or New Nikol-Naroda Road
-  Has p.address search: YES
-  Intent neighbourhood: ['Shantigram', 'Satellite', 'New Nikol-Naroda Road']
-  Intent landmarks: []
-  Results: 2 projects -> ['Swastik Harmony', 'Elysium at Shantigram']
-  PASS: Found expected project(s): ['Swastik Harmony', 'Elysium at Shantigram']
-
-======================================================================
-TEST: Q7: Landmark-based search (Kotarpur Water Works)
-QUERY: Show me properties near Kotarpur Water Works that offer 4 BHK villas.
-  Type:    SPECIFIC
-  Params:  {'bhk': 4, 'property_type': 'VILLA', 'landmark_name': 'kotarpur water works', 'limit': 50}
-  Vector:  properties near Kotarpur Water Works that offer 4 BHK villas
-  Has p.address search: YES
-  Intent neighbourhood: None
-  Intent landmarks: ['Kotarpur Water Works']
-  Results: 0 projects -> []
-  FAIL: None of ['Sudama Homes'] found in []
-  Cypher:
+    streamlit run test_intent.py [ARGUMENTS]
+2026-03-26 11:47:14.306 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2026-03-26 11:47:15.780 | WARNING  | graphrag_cypher:generate_cypher:785 - [Text-to-Cypher] Groq generation failed (Error code: 401 - {'error': {'message': 'Invalid API Key', 'type': 'invalid_request_error', 'code': 'invalid_api_key'}}). Falling back to Gemini.
+2026-03-26 11:47:16.169 | WARNING  | graphrag_cypher:generate_cypher:854 - [Text-to-Cypher] Gemini generation also failed (400 API Key not found. Please pass a valid API key. [reason: "API_KEY_INVALID"
+domain: "googleapis.com"
+metadata {
+  key: "service"
+  value: "generativelanguage.googleapis.com"
+}
+, locale: "en-US"
+message: "API Key not found. Please pass a valid API key."
+]). Using minimal fallback.
+2026-03-26 11:47:16.973 | WARNING  | graphrag_cypher:generate_cypher:785 - [Text-to-Cypher] Groq generation failed (Error code: 401 - {'error': {'message': 'Invalid API Key', 'type': 'invalid_request_error', 'code': 'invalid_api_key'}}). Falling back to Gemini.
+2026-03-26 11:47:17.220 | WARNING  | graphrag_cypher:generate_cypher:854 - [Text-to-Cypher] Gemini generation also failed (400 API Key not found. Please pass a valid API key. [reason: "API_KEY_INVALID"
+domain: "googleapis.com"
+metadata {
+  key: "service"
+  value: "generativelanguage.googleapis.com"
+}
+, locale: "en-US"
+message: "API Key not found. Please pass a valid API key."
+]). Using minimal fallback.
+=== Query 1 ===
+{
+  "query_type": "GLOBAL",
+  "bhk": 5,
+  "property_type": "PENTHOUSE",
+  "city": null,
+  "neighbourhood": null,
+  "zone": null,
+  "amenities": [],
+  "landmark_types": [],
+  "specific_landmarks": [],
+  "min_sqft": null,
+  "max_sqft": null,
+  "min_price_lakhs": null,
+  "max_price_lakhs": null,
+  "has_balcony": null,
+  "has_parking": null,
+  "entrance_facing": null,
+  "developer": null,
+  "project_names": [],
+  "semantic_keywords": [],
+  "min_units_per_floor": null,
+  "max_units_per_floor": null
+}
 MATCH (p:Project)-[:LOCATED_IN]->(n:Neighbourhood)-[:IN_CITY]->(c:City)
 OPTIONAL MATCH (p)-[:BUILT_BY]->(dev:Developer)
-OPTIONAL MATCH (p)-[:HAS_UNIT]->(u:Unit)
-OPTIONAL MATCH (p)-[:HAS_AMENITY]->(am:Amenity)
-OPTIONAL MATCH (p)-[:NEAR]->(lm:Landmark)
-WITH p, n, c, dev,
-     collect(DISTINCT CASE WHEN u IS NOT NULL THEN u { .*, rooms: [(u)-[:HAS_ROOM]->(r:Room) | properties(r)] } ELSE null END) AS units,
-     collect(DISTINCT am.name) AS amenities,
-     collect(DISTINCT lm.name) AS landmarks
-WHERE ANY(u_item IN units WHERE u_item.bhk = $bhk AND toLower(u_item.property_type) = toLower($property_type))
-  AND (EXISTS { MATCH (p)-[:NEAR]->(lm2:Landmark) WHERE toLower(lm2.name) CONTAINS toLower($landmark_name) } OR toLower(p.address) CONTAINS toLower($landmark_name))
+CALL (p) {
+  OPTIONAL MATCH (p)-[:HAS_UNIT]->(u:Unit)
+  WITH u WHERE u IS NOT NULL
+  RETURN collect(u { .*, rooms: [(u)-[:HAS_ROOM]->(r:Room) | properties(r)] }) AS units
+}
+CALL (p) {
+  OPTIONAL MATCH (p)-[:HAS_AMENITY]->(am:Amenity)
+  WITH am WHERE am IS NOT NULL
+  RETURN collect(am.name) AS amenities
+}
+CALL (p) {
+  OPTIONAL MATCH (p)-[:NEAR]->(lm:Landmark)
+  WITH lm WHERE lm IS NOT NULL
+  RETURN collect(lm.name) AS landmarks
+}
+WITH p, n, c, dev, units, amenities, landmarks
 RETURN p, n.name AS neighbourhood, c.name AS city, dev.name AS developer,
        units, amenities, landmarks
 LIMIT $limit
 
-======================================================================
-TEST: Q8: Landmark-based search (Karnavati APMC Market)
-QUERY: Is there a 2 BHK project located opposite the Karnavati APMC Market?
-  Type:    SPECIFIC
-  Params:  {'bhk': 2, 'landmark_name': 'karnavati apmc market', 'limit': 50}
-  Vector:  2 BHK project near Karnavati APMC Market
-  Has p.address search: YES
-  Intent neighbourhood: None
-  Intent landmarks: ['Karnavati APMC Market']
-  Results: 1 projects -> ['OUM ORBIT']
-  PASS: Found expected project(s): ['OUM ORBIT']
-
-======================================================================
-TEST: Q10: Road name only in address, Paldi in neighbourhood
-QUERY: Can you find me an apartment situated on Shaikh Adam Abuvala Road in Paldi?
-  Type:    SPECIFIC
-  Params:  {'property_type': 'APARTMENT', 'neighbourhood': 'Paldi', 'road_name': 'Shaikh Adam Abuvala Road', 'limit': 50}
-  Vector:  apartment on Shaikh Adam Abuvala Road in Paldi
-  Has p.address search: YES
-  Intent neighbourhood: Paldi
-  Intent landmarks: []
-  Results: 0 projects -> []
-  FAIL: None of ['Gandhi Galaxy'] found in []
-  Cypher:
+=== Query 2 ===
+{
+  "query_type": "GLOBAL",
+  "bhk": null,
+  "property_type": "APARTMENT",
+  "city": null,
+  "neighbourhood": null,
+  "zone": null,
+  "amenities": [],
+  "landmark_types": [],
+  "specific_landmarks": [],
+  "min_sqft": null,
+  "max_sqft": null,
+  "min_price_lakhs": null,
+  "max_price_lakhs": null,
+  "has_balcony": null,
+  "has_parking": null,
+  "entrance_facing": null,
+  "developer": null,
+  "project_names": [],
+  "semantic_keywords": [],
+  "min_units_per_floor": null,
+  "max_units_per_floor": null
+}
 MATCH (p:Project)-[:LOCATED_IN]->(n:Neighbourhood)-[:IN_CITY]->(c:City)
 OPTIONAL MATCH (p)-[:BUILT_BY]->(dev:Developer)
-OPTIONAL MATCH (p)-[:HAS_UNIT]->(u:Unit)
-OPTIONAL MATCH (p)-[:HAS_AMENITY]->(am:Amenity)
-OPTIONAL MATCH (p)-[:NEAR]->(lm:Landmark)
-WITH p, n, c, dev,
-     collect(DISTINCT CASE WHEN u IS NOT NULL THEN u { .*, rooms: [(u)-[:HAS_ROOM]->(r:Room) | properties(r)] } ELSE null END) AS units,
-     collect(DISTINCT am.name) AS amenities,
-     collect(DISTINCT lm.name) AS landmarks
-WHERE ANY(unit IN units WHERE toLower(unit.property_type) = toLower($property_type))
-  AND (toLower(n.name) CONTAINS toLower($neighbourhood) OR REPLACE(toLower(n.name), ' - ', '-') CONTAINS toLower($neighbourhood) OR toLower(p.address) CONTAINS toLower($neighbourhood))
-  AND toLower(p.address) CONTAINS toLower($road_name)
+CALL (p) {
+  OPTIONAL MATCH (p)-[:HAS_UNIT]->(u:Unit)
+  WITH u WHERE u IS NOT NULL
+  RETURN collect(u { .*, rooms: [(u)-[:HAS_ROOM]->(r:Room) | properties(r)] }) AS units
+}
+CALL (p) {
+  OPTIONAL MATCH (p)-[:HAS_AMENITY]->(am:Amenity)
+  WITH am WHERE am IS NOT NULL
+  RETURN collect(am.name) AS amenities
+}
+CALL (p) {
+  OPTIONAL MATCH (p)-[:NEAR]->(lm:Landmark)
+  WITH lm WHERE lm IS NOT NULL
+  RETURN collect(lm.name) AS landmarks
+}
+WITH p, n, c, dev, units, amenities, landmarks
 RETURN p, n.name AS neighbourhood, c.name AS city, dev.name AS developer,
        units, amenities, landmarks
 LIMIT $limit
-
-======================================================================
-TEST: Q11: 200 FT Ring Road (landmark) + Hanspura (in neighbourhood name)
-QUERY: I'm searching for a property near the 200 FT. Ring Road in the Hanspura area.
-  Type:    SPECIFIC
-  Params:  {'neighbourhood_0': 'hanspura', 'landmark_0': '200 ft. ring road', 'limit': 50}
-  Vector:  property near 200 FT. Ring Road in Hanspura area
-  Has p.address search: YES
-  Intent neighbourhood: Hanspura
-  Intent landmarks: ['200 FT. Ring Road']
-  Results: 0 projects -> []
-  FAIL: None of ['Devnandan Sankalp'] found in []
-  Cypher:
-MATCH (p:Project)-[:LOCATED_IN]->(n:Neighbourhood)-[:IN_CITY]->(c:City)
-OPTIONAL MATCH (p)-[:BUILT_BY]->(dev:Developer)
-OPTIONAL MATCH (p)-[:HAS_UNIT]->(u:Unit)
-OPTIONAL MATCH (p)-[:HAS_AMENITY]->(am:Amenity)
-OPTIONAL MATCH (p)-[:NEAR]->(lm:Landmark)
-WITH p, n, c, dev,
-     collect(DISTINCT CASE WHEN u IS NOT NULL THEN u { .*, rooms: [(u)-[:HAS_ROOM]->(r:Room) | properties(r)] } ELSE null END) AS units,
-     collect(DISTINCT am.name) AS amenities,
-     collect(DISTINCT lm.name) AS landmarks
-WHERE (toLower(n.name) CONTAINS toLower($neighbourhood_0) OR REPLACE(toLower(n.name), ' - ', '-') CONTAINS toLower($neighbourhood_0) OR toLower(p.address) CONTAINS toLower($neighbourhood_0))
-AND (toLower(n.name) CONTAINS toLower($landmark_0) OR REPLACE(toLower(n.name), ' - ', '-') CONTAINS toLower($landmark_0) OR toLower(p.address) CONTAINS toLower($landmark_0))
-RETURN p, n.name AS neighbourhood, c.name AS city, dev.name AS developer,
-       units, amenities, landmarks
-LIMIT $limit
-
-
-======================================================================
-SUMMARY
-======================================================================
-  [PASS] Q1: Multi-location including Gamdi Gaam (only in address)
-  [PASS] Q4: New Nikol (compound neighbourhood name) + gym amenity
-  [FAIL] Q7: Landmark-based search (Kotarpur Water Works)
-  [PASS] Q8: Landmark-based search (Karnavati APMC Market)
-  [FAIL] Q10: Road name only in address, Paldi in neighbourhood
-  [FAIL] Q11: 200 FT Ring Road (landmark) + Hanspura (in neighbourhood name)
-
-3/6 tests passed

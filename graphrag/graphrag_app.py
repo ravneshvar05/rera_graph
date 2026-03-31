@@ -368,15 +368,39 @@ with st.sidebar:
     def save_settings():
         with open(SETTINGS_PATH, "w") as f:
             json.dump(st.session_state.user_settings, f)
-            
-    gemini_key = st.text_input("Gemini API Key (Primary)", value=st.session_state.user_settings.get("GEMINI_API_KEY", ""), type="password")
-    if gemini_key != st.session_state.user_settings.get("GEMINI_API_KEY", ""):
-        st.session_state.user_settings["GEMINI_API_KEY"] = gemini_key
+
+    # ── Migrate old single-key format to new multi-key format ─────────────────
+    # If the user had a single GEMINI_API_KEY saved before, pre-fill the new pool box
+    existing_gemini = st.session_state.user_settings.get("GEMINI_API_KEYS", "")
+    if not existing_gemini and st.session_state.user_settings.get("GEMINI_API_KEY", ""):
+        existing_gemini = st.session_state.user_settings["GEMINI_API_KEY"]
+
+    existing_groq = st.session_state.user_settings.get("GROQ_API_KEYS", "")
+    if not existing_groq and st.session_state.user_settings.get("GROQ_API_KEY", ""):
+        existing_groq = st.session_state.user_settings["GROQ_API_KEY"]
+
+    st.markdown("<div style='font-size: 0.78rem; color: #a0aec0; margin-bottom: 6px;'>Enter one key per line. Multiple keys are used in round-robin — if one hits the limit, the next is used automatically.</div>", unsafe_allow_html=True)
+
+    gemini_keys_raw = st.text_area(
+        "🔵 Gemini API Keys (cypher generation)",
+        value=existing_gemini,
+        height=110,
+        placeholder="AIzaSy...key1\nAIzaSy...key2\nAIzaSy...key3\nAIzaSy...key4",
+        key="gemini_keys_input",
+    )
+    if gemini_keys_raw != st.session_state.user_settings.get("GEMINI_API_KEYS", ""):
+        st.session_state.user_settings["GEMINI_API_KEYS"] = gemini_keys_raw
         save_settings()
-        
-    groq_key = st.text_input("Groq API Key (Fallback)", value=st.session_state.user_settings.get("GROQ_API_KEY", ""), type="password")
-    if groq_key != st.session_state.user_settings.get("GROQ_API_KEY", ""):
-        st.session_state.user_settings["GROQ_API_KEY"] = groq_key
+
+    groq_keys_raw = st.text_area(
+        "🟠 Groq API Keys (relevance judge)",
+        value=existing_groq,
+        height=80,
+        placeholder="gsk_...key1\ngsk_...key2",
+        key="groq_keys_input",
+    )
+    if groq_keys_raw != st.session_state.user_settings.get("GROQ_API_KEYS", ""):
+        st.session_state.user_settings["GROQ_API_KEYS"] = groq_keys_raw
         save_settings()
 
 # ── Header ─────────────────────────────────────────────────────────────────────

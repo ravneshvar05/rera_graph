@@ -1,0 +1,49 @@
+==== Q1 ====
+{'limit': 50}
+
+MATCH (p:Project)-[:LOCATED_IN]->(n:Neighbourhood)-[:IN_CITY]->(c:City)
+OPTIONAL MATCH (p)-[:BUILT_BY]->(dev:Developer)
+CALL (p) {
+  OPTIONAL MATCH (p)-[:HAS_UNIT]->(u:Unit)
+  WITH u WHERE u IS NOT NULL
+  RETURN collect(u { .*, rooms: [(u)-[:HAS_ROOM]->(r:Room) | properties(r)] }) AS units
+}
+CALL (p) {
+  OPTIONAL MATCH (p)-[:HAS_AMENITY]->(am:Amenity)
+  WITH am WHERE am IS NOT NULL
+  RETURN collect(am.name) AS amenities
+}
+CALL (p) {
+  OPTIONAL MATCH (p)-[:NEAR]->(lm:Landmark)
+  WITH lm WHERE lm IS NOT NULL
+  RETURN collect(lm.name) AS landmarks
+}
+WITH p, n, c, dev, units, amenities, landmarks
+RETURN p, n.name AS neighbourhood, c.name AS city, dev.name AS developer,
+       units, amenities, landmarks
+LIMIT $limit
+
+==== Q2 ====
+{'limit': 50}
+
+MATCH (p:Project)-[:LOCATED_IN]->(n:Neighbourhood)-[:IN_CITY]->(c:City)
+OPTIONAL MATCH (p)-[:BUILT_BY]->(dev:Developer)
+CALL (p) {
+  OPTIONAL MATCH (p)-[:HAS_UNIT]->(u:Unit)
+  WITH u WHERE u IS NOT NULL
+  RETURN collect(u { .*, rooms: [(u)-[:HAS_ROOM]->(r:Room) | properties(r)] }) AS units
+}
+CALL (p) {
+  OPTIONAL MATCH (p)-[:HAS_AMENITY]->(am:Amenity)
+  WITH am WHERE am IS NOT NULL
+  RETURN collect(am.name) AS amenities
+}
+CALL (p) {
+  OPTIONAL MATCH (p)-[:NEAR]->(lm:Landmark)
+  WITH lm WHERE lm IS NOT NULL
+  RETURN collect(lm.name) AS landmarks
+}
+WITH p, n, c, dev, units, amenities, landmarks
+RETURN p, n.name AS neighbourhood, c.name AS city, dev.name AS developer,
+       units, amenities, landmarks
+LIMIT $limit

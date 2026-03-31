@@ -1,0 +1,3 @@
+{neo4j_code: Neo.ClientError.Statement.SyntaxError} {message: Invalid input 'BETWEEN': expected an expression, 'ORDER BY', 'CALL', 'CREATE', 'LOAD CSV', 'DELETE', 'DETACH', 'FILTER', 'FINISH', 'FOREACH', 'INSERT', 'LET', 'LIMIT', 'MATCH', 'MERGE', 'NEXT', 'NODETACH', 'OFFSET', 'OPTIONAL', 'REMOVE', 'RETURN', 'SEARCH', 'SET', 'SHOW', 'SKIP', 'TERMINATE', 'UNION', 'UNWIND', 'USE', 'WITH' or <EOF> (line 5, column 29 (offset: 227))
+"  AND toFloat(r2.area_sqft) BETWEEN toFloat(50.0) AND toFloat(80.0)"
+                             ^} {gql_status: 42001} {gql_status_description: error: syntax error or access rule violation - invalid syntax}

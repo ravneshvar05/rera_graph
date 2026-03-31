@@ -78,6 +78,14 @@ class QueryIntent(BaseModel):
     max_units_per_floor: Optional[int] = Field(
         None, description="Maximum number of units per floor requested"
     )
+    area_qualifier: Optional[str] = Field(
+        None,
+        description="'carpet' if user explicitly says 'carpet area/sqft'; 'super_builtup' if user says 'super built-up area/SBA/built-up area'. null if just 'area' or 'sqft' with no qualifier."
+    )
+    around_area: Optional[bool] = Field(
+        None,
+        description="True if user says 'around', 'approximately', 'roughly', 'about', '~', 'close to', 'approx'. Null/False otherwise."
+    )
 
 
 # ── Prompt ────────────────────────────────────────────────────────────────────
@@ -101,6 +109,8 @@ Schema:
   "specific_landmarks": [<list of specific place names> or null],
   "min_sqft": <number or null>,
   "max_sqft": <number or null>,
+  "area_qualifier": "carpet" | "super_builtup" | null,
+  "around_area": true | false | null,
   "min_price_lakhs": <number or null>,
   "max_price_lakhs": <number or null>,
   "has_balcony": <true/false/null>,
@@ -122,6 +132,8 @@ Rules:
 - Extract semantic/fuzzy words into semantic_keywords: "nice", "spacious", "luxury", "affordable", "family-friendly" etc.
 - If a field is not mentioned, use null or empty list.
 - Locality names in Gujarat: Vinzol, Bopal, Nikol, Naroda, Vatva, Gamdi, Satellite, Chandkheda, Thaltej, Vastrapur, etc.
+- area_qualifier: Set "carpet" if user says "carpet area", "carpet sqft", "by carpet". Set "super_builtup" if user says "super built-up area", "super builtup", "built-up area", "SBA". Leave null if user just says "area" or "sqft" with no such qualifier.
+- around_area: Set true if user says "around", "approximately", "roughly", "about", "~", "close to", "near about", "approx". Leave null/false for "at least", "minimum", "more than", "less than", "exactly", or a plain numeric mention with no qualifier word.
 """
 
 

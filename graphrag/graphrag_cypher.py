@@ -22,7 +22,7 @@ import google.generativeai as genai
 from groq import Groq
 from loguru import logger
 
-from graphrag_config import settings
+from graphrag_config import settings, build_gemini_pool, build_groq_pool
 from graphrag_intent import QueryIntent
 
 
@@ -494,7 +494,17 @@ Common filters:
   Room existence: EXISTS {{ MATCH (p)-[:HAS_UNIT]->(u2)-[:HAS_ROOM]->(r) WHERE r.name = $room_name }}
   Amenity tag:   EXISTS {{ MATCH (p)-[:HAS_AMENITY]->(am2) WHERE $tag IN am2.canonical_tags }}
   Amenity flags: p.has_pool = 1, p.has_clubhouse = 1, p.has_park = 1, p.has_parking = 1
-  Unit area:     ANY(u IN units WHERE u.carpet_sqft IS NOT NULL AND toFloat(u.carpet_sqft) >= toFloat($min_sqft))
+  Unit area — NO qualifier ("area N sqft", user did not say carpet or super built-up):
+    ANY(u IN units WHERE
+      (u.carpet_sqft IS NOT NULL AND <comparison on toFloat(u.carpet_sqft)>)
+      OR (u.super_builtup_sqft IS NOT NULL AND <comparison on toFloat(u.super_builtup_sqft)>))
+  Unit area — "carpet area" explicitly: ANY(u IN units WHERE u.carpet_sqft IS NOT NULL AND <comparison on toFloat(u.carpet_sqft)>)
+  Unit area — "super built-up" explicitly: ANY(u IN units WHERE u.super_builtup_sqft IS NOT NULL AND <comparison on toFloat(u.super_builtup_sqft)>)
+  Area comparisons:
+    "around/approximately/roughly/about/~" → BETWEEN toFloat($area_min) AND toFloat($area_max)  [params: area_min=val*0.85, area_max=val*1.15]
+    "exactly N sqft" / plain "N sqft" (no qualifier word) → = toFloat($area_sqft)
+    "at least/minimum/>=" → >= toFloat($min_sqft)
+    "less than/<" → <= toFloat($max_sqft)
   Facing:        ANY(u IN units WHERE toLower(u.entrance_facing) = toLower($facing))
   Developer:     toLower(dev.name) CONTAINS toLower($developer)
   Property type [MANDATORY when user specifies a type]: ANY(u IN units WHERE toLower(u.property_type) = toLower($property_type))
@@ -535,7 +545,7 @@ then add a second WITH to compute answer_data. Include answer_data in RETURN.
   {{
     project_name: p.project_name, address: p.address, city: c.name, neighbourhood: n.name,
     developer: dev.name, rera_number: p.rera_number, project_status: p.project_status,
-    possession_date: p.possession_date, total_buildings: p.total_buildings,
+    possession_date: p.project_status, total_buildings: p.total_buildings,
     total_villas: p.total_villas, society_description: p.society_description,
     has_clubhouse: p.has_clubhouse, has_pool: p.has_pool, has_park: p.has_park,
     has_parking: p.has_parking, has_sports_courts: p.has_sports_courts,
@@ -546,11 +556,31 @@ then add a second WITH to compute answer_data. Include answer_data in RETURN.
 
 ── TEMPLATE 4: AGGREGATE (numeric comparisons, counts, statistics) ──
 
-4a. ROOM SIZE COMPARISON ("hall > 100 sqft"):
-Use the BASE MATCH pattern, then add a WHERE EXISTS filter, then return BOTH the project context
-AND the matching room details in answer_data. Use this EXACT structure:
+4a. ROOM SIZE COMPARISON ("hall > 100 sqft", "bedroom around 150 sqft", "kitchen exactly 80 sqft",
+                         "2 BHK with Kitchen around 70 sqft", "master bedroom larger than 120 sqft"):
+Room comparison rules (applied to r2.area_sqft in WHERE EXISTS, and to r_item.area_sqft in RETURN):
+  "around/~" / plain N → >= toFloat($area_min) AND toFloat(r2.area_sqft) <= toFloat($area_max)  [area_min=val*0.85, area_max=val*1.15]
+  "exactly N" → = toFloat($area_sqft)
+  "at least/bigger/larger/>=" → >= toFloat($min_area)
+  "less than/<" → <= toFloat($max_area)
+(Room has only ONE area field: area_sqft. No carpet/super distinction for rooms.)
+
+CRITICAL: The area filter in the RETURN list comprehension MUST use the SAME
+parameters and comparison operator as in the WHERE EXISTS clause.
+  "around" → BOTH WHERE EXISTS and RETURN use: >= toFloat($area_min) AND toFloat(r_item.area_sqft) <= toFloat($area_max)
+  "larger than" → BOTH use: > toFloat($min_area)
+
+CRITICAL: matching_rooms must be a FLAT list of room objects (not unit-wrapped).
+Each item must contain: unit_type, bhk, room_name, area_sqft, length, width.
+
+Use this EXACT structure for "around" (+/- 15% range) queries:
 
 MATCH (p:Project)-[:LOCATED_IN]->(n:Neighbourhood)-[:IN_CITY]->(c:City)
+WHERE EXISTS {{
+  MATCH (p)-[:HAS_UNIT]->(u2:Unit)-[:HAS_ROOM]->(r2:Room)
+  WHERE r2.name = $room_name AND r2.area_sqft IS NOT NULL
+  AND toFloat(r2.area_sqft) >= toFloat($area_min) AND toFloat(r2.area_sqft) <= toFloat($area_max)
+}}
 OPTIONAL MATCH (p)-[:BUILT_BY]->(dev:Developer)
 CALL {{
   WITH p
@@ -571,22 +601,34 @@ CALL {{
   RETURN collect(lm.name) AS landmarks
 }}
 WITH p, n, c, dev, units, amenities, landmarks
-WHERE EXISTS {{
-  MATCH (p)-[:HAS_UNIT]->(u2:Unit)-[:HAS_ROOM]->(r2:Room)
-  WHERE r2.name = $room_name AND r2.area_sqft IS NOT NULL AND toFloat(r2.area_sqft) > toFloat($min_area)
-}}
 RETURN p, n.name AS neighbourhood, c.name AS city, dev.name AS developer,
        units, amenities, landmarks,
        {{ project_name: p.project_name, city: c.name, neighbourhood: n.name,
           matching_rooms: [u_item IN units WHERE u_item IS NOT NULL |
-            {{ unit_type: u_item.unit_type, bhk: u_item.bhk,
-               rooms: [r_item IN u_item.rooms WHERE r_item.name = $room_name
-                       AND r_item.area_sqft IS NOT NULL
-                       AND toFloat(r_item.area_sqft) > toFloat($min_area) |
-                 {{ room_name: r_item.name, area_sqft: r_item.area_sqft,
-                    length: r_item.length, width: r_item.width }}] }}]
+            [r_item IN u_item.rooms WHERE r_item.name = $room_name
+             AND r_item.area_sqft IS NOT NULL
+             AND toFloat(r_item.area_sqft) >= toFloat($area_min) AND toFloat(r_item.area_sqft) <= toFloat($area_max) |
+               {{ unit_type: u_item.unit_type, bhk: u_item.bhk,
+                  room_name: r_item.name, area_sqft: r_item.area_sqft,
+                  length: r_item.length, width: r_item.width }}]][0]
        }} AS answer_data
 LIMIT $limit
+
+For "larger than / greater than / >=" (non-around) queries, use this RETURN comprehension:
+       {{ project_name: p.project_name, city: c.name, neighbourhood: n.name,
+          matching_rooms: [u_item IN units WHERE u_item IS NOT NULL |
+            [r_item IN u_item.rooms WHERE r_item.name = $room_name
+             AND r_item.area_sqft IS NOT NULL
+             AND toFloat(r_item.area_sqft) > toFloat($min_area) |
+               {{ unit_type: u_item.unit_type, bhk: u_item.bhk,
+                  room_name: r_item.name, area_sqft: r_item.area_sqft,
+                  length: r_item.length, width: r_item.width }}]][0]
+       }} AS answer_data
+
+If the query also specifies BHK (e.g. "2 BHK with Kitchen around 70 sqft"), add BHK filter:
+  WHERE r2.name = $room_name AND u2.bhk = $bhk AND r2.area_sqft IS NOT NULL AND ...
+  AND in the RETURN comprehension: WHERE u_item IS NOT NULL AND u_item.bhk = $bhk
+Note: [list][0] flattens nested list — if no match it returns null (safely skipped by the reader).
 
 Key rules:
 - ALWAYS include RETURN p, n.name, c.name, dev.name, units, amenities, landmarks PLUS answer_data
@@ -624,6 +666,17 @@ answer_data includes list of matching room details for each unit.
 13. Specific landmark queries: also search p.address.
 14. MULTI-LOCATION: When user asks about multiple locations, use SEPARATE params ($nbh_0, $nbh_1 ...) joined with OR. NEVER put them in one comma-joined string.
 15. PROPERTY TYPE IS A HARD FILTER: If the user says "apartment", "villa", "penthouse", "tenement", "row house", or "bungalow", that word is NEVER a semantic_keyword — it is ALWAYS a property_type filter in the Cypher WHERE clause AND in intent.property_type.
+16. "AROUND" QUERIES: If the user provides a bare area number (e.g. "900 sqft") OR uses "around"/"approximately"/"roughly"/"about"/"~"/"close to" → use >= AND <= window.
+    area_min = val * 0.85, area_max = val * 1.15 — include BOTH in params.
+    Example: "900 sqft" or "around 900 sqft" → params: area_min=765.0, area_max=1035.0 → >= toFloat($area_min) AND toFloat(field) <= toFloat($area_max).
+    NEVER use one-sided >= for "around" or plain numbers. Same rule for room area_sqft queries.
+17. AREA FIELD SELECTION (unit level):
+    - No qualifier (user says just "area" or "sqft") → match EITHER field with OR:
+      (u.carpet_sqft IS NOT NULL AND ...) OR (u.super_builtup_sqft IS NOT NULL AND ...)
+    - "carpet area" / "carpet sqft" / "by carpet" → carpet_sqft ONLY.
+    - "super built-up" / "super builtup" / "built-up area" / "SBA" → super_builtup_sqft ONLY.
+    - "exactly N sqft" → = toFloat($area_sqft), still apply field selection.
+    - Rooms only have area_sqft — field selection does not apply to rooms, only comparison logic.
 
 === INTENT EXTRACTION ===
 - "all projects"/"show all" → query_type="GLOBAL". Filtered → "SPECIFIC".
@@ -710,166 +763,132 @@ def generate_cypher(user_query: str, api_keys: dict = None) -> CypherQuery:
     Generate a precise Cypher query AND extract structured intent from the
     user's natural language query in a **single** LLM call.
 
-    Returns a CypherQuery with:
-    - cypher: parameterized Cypher ready for Neo4j execution
-    - params: parameter dict for the Cypher
-    - query_type: "GLOBAL" / "SPECIFIC" / "LOOKUP" / "AGGREGATE"
-    - vector_query: text string for ChromaDB semantic search
-    - answer_columns: which RETURN columns hold the direct answer
-    - intent: QueryIntent parsed from the same LLM response
-    - engine_used: String specifying which LLM ran the query
+    Primary:  Gemini (pool of up to 4 keys, round-robin with auto-fallback)
+    Fallback: Groq   (pool of up to 2 keys, round-robin with auto-fallback)
 
-    Falls back to a simple city/BHK filter query if LLM generation fails.
+    If a key hits a rate-limit or fails, the next key in the pool is tried
+    automatically. If all keys in both pools fail, returns a rule-based fallback.
     """
     api_keys = api_keys or {}
-    gemini_key = api_keys.get("GEMINI_API_KEY") or settings.GEMINI_API_KEY
-    groq_key = api_keys.get("GROQ_API_KEY") or settings.GROQ_API_KEY
+    gemini_pool = build_gemini_pool(api_keys)
+    groq_pool   = build_groq_pool(api_keys)
 
-    # ── Try Groq First (fast: ~0.3-0.8s) ──────────────────────────────────────
-    if groq_key:
-        try:
-            groq_client = Groq(api_key=groq_key)
-            response = groq_client.chat.completions.create(
-                model=settings.GROQ_MODEL,
-                response_format={"type": "json_object"},
-                messages=[
-                    {"role": "system", "content": _SYSTEM_PROMPT},
-                    {"role": "user", "content": user_query},
-                ],
-                temperature=0.0,
-                max_tokens=2048,
-            )
-            raw = response.choices[0].message.content.strip()
-            tokens_used = response.usage.total_tokens if hasattr(response, "usage") and response.usage else 0
-            engine_used = f"Groq ({settings.GROQ_MODEL})"
+    def _parse_llm_response(raw: str, engine_used: str, tokens_used: int) -> CypherQuery:
+        """Parse the raw JSON string from any LLM into a CypherQuery."""
+        raw = re.sub(r"^```(?:json)?\s*", "", raw)
+        raw = re.sub(r"\s*```$", "", raw)
+        data = json.loads(raw)
 
-            # Strip accidental markdown fences
-            raw = re.sub(r"^```(?:json)?\s*", "", raw)
-            raw = re.sub(r"\s*```$", "", raw)
+        cypher       = data.get("cypher", "").strip()
+        params       = data.get("params", {})
+        query_type   = data.get("query_type", "SPECIFIC")
+        vector_query = data.get("vector_query", user_query)
+        answer_columns = data.get("answer_columns", [])
 
-            data = json.loads(raw)
-
-            cypher = data.get("cypher", "").strip()
-            params = data.get("params", {})
-            query_type = data.get("query_type", "SPECIFIC")
-            vector_query = data.get("vector_query", user_query)
-            answer_columns = data.get("answer_columns", [])
-
-            # ── Parse intent from the unified response ──
-            intent_data = data.get("intent", {})
-            if intent_data and isinstance(intent_data, dict):
-                intent_data["query_type"] = query_type
-                try:
-                    intent = QueryIntent(**intent_data)
-                except Exception as ie:
-                    logger.warning(f"[Text-to-Cypher] Intent parsing from Groq failed ({ie}). Using minimal intent.")
-                    intent = _extract_fallback_intent(user_query, query_type)
-            else:
+        intent_data = data.get("intent", {})
+        if intent_data and isinstance(intent_data, dict):
+            intent_data["query_type"] = query_type
+            try:
+                intent = QueryIntent(**intent_data)
+            except Exception as ie:
+                logger.warning(f"[Text-to-Cypher] Intent parsing failed ({ie}). Using fallback intent.")
                 intent = _extract_fallback_intent(user_query, query_type)
+        else:
+            intent = _extract_fallback_intent(user_query, query_type)
 
-            logger.info(
-                f"Intent parsed ({engine_used}): bhk={intent.bhk}, location={intent.neighbourhood or intent.city}, "
-                f"amenities={intent.amenities}, type={intent.query_type}"
-            )
+        logger.info(
+            f"Intent parsed ({engine_used}): bhk={intent.bhk}, "
+            f"location={intent.neighbourhood or intent.city}, "
+            f"amenities={intent.amenities}, type={intent.query_type}"
+        )
 
-            if "limit" not in params:
-                params["limit"] = 50
-            if query_type in ("LOOKUP", "AGGREGATE") and not answer_columns:
-                answer_columns = ["answer_data"]
-            if not cypher:
-                raise ValueError("Groq returned empty cypher")
+        if "limit" not in params:
+            params["limit"] = 50
+        if query_type in ("LOOKUP", "AGGREGATE") and not answer_columns:
+            answer_columns = ["answer_data"]
+        if not cypher:
+            raise ValueError(f"{engine_used} returned empty cypher")
 
-            cypher = _post_process_cypher(cypher, params)
+        cypher = _post_process_cypher(cypher, params, user_query)
+        logger.info(
+            f"[Text-to-Cypher] Engine: {engine_used} | type={query_type} | "
+            f"params={list(params.keys())} | answer_cols={answer_columns} | "
+            f"vector_query={vector_query!r}"
+        )
+        logger.debug(f"[Text-to-Cypher] Cypher:\n{cypher}")
 
-            logger.info(
-                f"[Text-to-Cypher] Engine: {engine_used} | type={query_type} | params={list(params.keys())} | "
-                f"answer_cols={answer_columns} | vector_query={vector_query!r}"
-            )
-            logger.debug(f"[Text-to-Cypher] Cypher:\n{cypher}")
+        return CypherQuery(
+            cypher=cypher, params=params, query_type=query_type,
+            vector_query=vector_query, answer_columns=answer_columns,
+            intent=intent, tokens_used=tokens_used, engine_used=engine_used,
+        )
 
-            return CypherQuery(
-                cypher=cypher,
-                params=params,
-                query_type=query_type,
-                vector_query=vector_query,
-                answer_columns=answer_columns,
-                intent=intent,
-                tokens_used=tokens_used,
-                engine_used=engine_used
-            )
-
-        except Exception as e:
-            logger.warning(f"[Text-to-Cypher] Groq generation failed ({e}). Falling back to Gemini.")
-
-    # ── Fallback: Gemini (used only when Groq is unavailable/rate-limited) ─────
-    if gemini_key:
+    # ── Primary: Gemini pool ───────────────────────────────────────────────────
+    n_gemini = len(gemini_pool)
+    for attempt in range(n_gemini):
+        key = gemini_pool.next()
+        if not key:
+            break
+        key_slot = gemini_pool.last_slot
+        logger.info(f"[Text-to-Cypher] Gemini key slot {key_slot}/{n_gemini} (retry attempt {attempt + 1})")
         try:
-            genai.configure(api_key=gemini_key)
+            genai.configure(api_key=key)
             model = genai.GenerativeModel(
                 model_name=settings.GEMINI_MODEL,
                 system_instruction=_SYSTEM_PROMPT,
                 generation_config=genai.GenerationConfig(
                     temperature=0.0,
                     response_mime_type="application/json",
-                )
+                ),
             )
             response = model.generate_content(user_query)
             raw = response.text
-            tokens_used = response.usage_metadata.total_token_count if hasattr(response, "usage_metadata") and response.usage_metadata else 0
-            engine_used = f"Gemini ({settings.GEMINI_MODEL})"
-
-            # Strip accidental markdown fences
-            raw = re.sub(r"^```(?:json)?\s*", "", raw)
-            raw = re.sub(r"\s*```$", "", raw)
-
-            data = json.loads(raw)
-
-            cypher = data.get("cypher", "").strip()
-            params = data.get("params", {})
-            query_type = data.get("query_type", "SPECIFIC")
-            vector_query = data.get("vector_query", user_query)
-            answer_columns = data.get("answer_columns", [])
-
-            # Parse intent
-            intent_data = data.get("intent", {})
-            if intent_data and isinstance(intent_data, dict):
-                intent_data["query_type"] = query_type
-                try:
-                    intent = QueryIntent(**intent_data)
-                except Exception as ie:
-                    logger.warning(f"[Text-to-Cypher] Intent parsing from Gemini failed ({ie}). Using minimal intent.")
-                    intent = _extract_fallback_intent(user_query, query_type)
-            else:
-                intent = _extract_fallback_intent(user_query, query_type)
-
-            logger.info(
-                f"Intent parsed ({engine_used}): bhk={intent.bhk}, location={intent.neighbourhood or intent.city}, "
-                f"amenities={intent.amenities}, type={intent.query_type}"
+            tokens_used = (
+                response.usage_metadata.total_token_count
+                if hasattr(response, "usage_metadata") and response.usage_metadata else 0
             )
-
-            if "limit" not in params:
-                params["limit"] = 50
-            if query_type in ("LOOKUP", "AGGREGATE") and not answer_columns:
-                answer_columns = ["answer_data"]
-            if not cypher:
-                raise ValueError("Gemini returned empty cypher")
-
-            cypher = _post_process_cypher(cypher, params)
-
-            return CypherQuery(
-                cypher=cypher,
-                params=params,
-                query_type=query_type,
-                vector_query=vector_query,
-                answer_columns=answer_columns,
-                intent=intent,
-                tokens_used=tokens_used,
-                engine_used=engine_used
-            )
-
+            return _parse_llm_response(raw, f"Gemini ({settings.GEMINI_MODEL})", tokens_used)
         except Exception as e:
-            logger.warning(f"[Text-to-Cypher] Gemini generation also failed ({e}). Using minimal fallback.")
+            logger.warning(
+                f"[Text-to-Cypher] Gemini slot {key_slot} failed ({e}). "
+                f"{'Trying next Gemini key.' if attempt + 1 < n_gemini else 'All Gemini keys exhausted.'}"
+            )
 
+    # ── Fallback: Groq pool ────────────────────────────────────────────────────
+    n_groq = len(groq_pool)
+    if n_groq:
+        logger.warning("[Text-to-Cypher] Falling back to Groq pool.")
+    for attempt in range(n_groq):
+        key = groq_pool.next()
+        if not key:
+            break
+        key_slot = groq_pool.last_slot
+        logger.info(f"[Text-to-Cypher] Groq key slot {key_slot}/{n_groq} (retry attempt {attempt + 1})")
+        try:
+            groq_client = Groq(api_key=key)
+            response = groq_client.chat.completions.create(
+                model=settings.GROQ_MODEL,
+                response_format={"type": "json_object"},
+                messages=[
+                    {"role": "system", "content": _SYSTEM_PROMPT},
+                    {"role": "user",   "content": user_query},
+                ],
+                temperature=0.0,
+                max_tokens=2048,
+            )
+            raw = response.choices[0].message.content.strip()
+            tokens_used = (
+                response.usage.total_tokens
+                if hasattr(response, "usage") and response.usage else 0
+            )
+            return _parse_llm_response(raw, f"Groq ({settings.GROQ_MODEL})", tokens_used)
+        except Exception as e:
+            logger.warning(
+                f"[Text-to-Cypher] Groq slot {key_slot} failed ({e}). "
+                f"{'Trying next Groq key.' if attempt + 1 < n_groq else 'All Groq keys exhausted.'}"
+            )
+
+    logger.warning("[Text-to-Cypher] All LLM keys exhausted. Using rule-based fallback.")
     return _fallback_cypher(user_query=user_query)
 
 
@@ -971,7 +990,7 @@ def _extract_fallback_intent(user_query: str, query_type: str = "SPECIFIC") -> Q
 
 
 
-def _post_process_cypher(cypher: str, params: dict) -> str:
+def _post_process_cypher(cypher: str, params: dict, user_query: str = "") -> str:
     """
     Fix common LLM-generated Cypher issues:
     - Ensure toFloat() wraps area_sqft comparisons
@@ -1018,6 +1037,8 @@ def _post_process_cypher(cypher: str, params: dict) -> str:
             if len(expanded) > 1:
                 new_pname = pname if pname.endswith('s') else pname + 's'
                 params[new_pname] = expanded
+                # Rewrite ALL occurrences of .name = $pname in the entire Cypher
+                # (covers both WHERE EXISTS subquery AND RETURN list comprehensions)
                 cypher = re.sub(
                     r'(\w+\.name)\s*=\s*\$' + re.escape(pname) + r'\b',
                     r'\1 IN $' + new_pname,
@@ -1028,8 +1049,20 @@ def _post_process_cypher(cypher: str, params: dict) -> str:
                     r'\1 IN $' + new_pname,
                     cypher,
                 )
-                if new_pname != pname and pname in params:
-                    del params[pname]
+                # Also fix any remaining bare $pname references (e.g. $room_name used
+                # as a plain string value inside comprehensions after = was rewritten)
+                # These are safe to leave as-is since we keep params[new_pname]=list.
+                # However, if any reference to $pname (the deleted key) still exists
+                # as a non-.name context (e.g. room_name: $room_name in RETURN map),
+                # rewrite those to $new_pname so Neo4j receives a valid param.
+                if new_pname != pname:
+                    cypher = re.sub(
+                        r'\$' + re.escape(pname) + r'\b',
+                        '$' + new_pname,
+                        cypher,
+                    )
+                    if pname in params:
+                        del params[pname]
                 logger.debug(f"[Post-process] Expanded room '{pval}' -> {expanded}")
 
         elif isinstance(pval, list):
@@ -1148,6 +1181,60 @@ def _post_process_cypher(cypher: str, params: dict) -> str:
         cypher = _nbh_plain.sub(_inject_hyphen_norm, cypher)
         if "REPLACE(toLower(n.name)" in cypher:
             logger.debug("[Post-process] Injected hyphen-space normalization for n.name CONTAINS")
+
+    # ── 7. "Around" safety net — patch one-sided >= / = into >= X AND <= Y ─────
+    _AROUND_WORDS = {"around", "approximately", "roughly", "about", "approx",
+                     "close to", "near about"}
+    _is_around = user_query and any(w in user_query.lower() for w in _AROUND_WORDS)
+    _is_exact = user_query and any(w in user_query.lower() for w in {"exactly", "exact", "precisely"})
+
+    _SOLO_CHECKS = []
+    if not _is_exact:
+        # If user didn't say "exactly", we expand any exact matches (= area_sqft) into bands
+        _SOLO_CHECKS.append(("area_sqft", None, "area_min", "area_max"))
+        
+    if _is_around:
+        # If user explicitly said "around" but LLM still generated a one-sided bound, patch it
+        _SOLO_CHECKS.extend([
+            ("min_sqft",  "max_sqft",  "area_min", "area_max"),
+            ("min_area",  "max_area",  "area_min", "area_max"),
+        ])
+
+    if _SOLO_CHECKS:
+        _AREA_TOLERANCE = 0.15
+        for solo_key, max_key, lo_key, hi_key in _SOLO_CHECKS:
+            if solo_key not in params:
+                continue
+            if max_key and max_key in params:
+                continue  # LLM already gave both bounds — respect it
+            if lo_key in params and hi_key in params:
+                continue  # Already patched
+            val = params[solo_key]
+            if not isinstance(val, (int, float)):
+                continue
+            lo = round(val * (1 - _AREA_TOLERANCE), 2)
+            hi = round(val * (1 + _AREA_TOLERANCE), 2)
+            params[lo_key] = lo
+            params[hi_key] = hi
+            # Rewrite '>= toFloat($solo_key)' → '>= toFloat($lo_key) AND ... <= toFloat($hi_key)'
+            cypher = re.sub(
+                r'(toFloat\([^)]+\))\s*>=\s*toFloat\(\$' + re.escape(solo_key) + r'\)',
+                rf'\1 >= toFloat(${lo_key}) AND \1 <= toFloat(${hi_key})',
+                cypher,
+            )
+            # Rewrite '= toFloat($solo_key)' (exact match) → >= AND <=
+            cypher = re.sub(
+                r'(toFloat\([^)]+\))\s*=\s*toFloat\(\$' + re.escape(solo_key) + r'\)',
+                rf'\1 >= toFloat(${lo_key}) AND \1 <= toFloat(${hi_key})',
+                cypher,
+            )
+            if solo_key in params:
+                del params[solo_key]
+            logger.debug(
+                f"[Post-process] 'Around' safety net: ${solo_key}={val} "
+                f"→ >= {lo} AND <= {hi}"
+            )
+            break  # Only patch the first matching solo param
 
     return cypher
 
