@@ -1,0 +1,144 @@
+D:\Rerachatbot\graphrag\graphrag_cypher.py:21: FutureWarning: 
+
+All support for the `google.generativeai` package has ended. It will no longer be receiving 
+updates or bug fixes. Please switch to the `google.genai` package as soon as possible.
+See README for more details:
+
+https://github.com/google-gemini/deprecated-generative-ai-python/blob/main/README.md
+
+  import google.generativeai as genai
+2026-03-31 13:59:28.610 | INFO     | graphrag_cypher:generate_cypher:893 - [Text-to-Cypher] Gemini key slot 1/4 (retry attempt 1)
+2026-03-31 13:59:38.186 | INFO     | graphrag_cypher:_parse_llm_response:859 - Intent parsed (Gemini (gemini-2.5-flash)): bhk=None, location=None, amenities=[], type=GLOBAL
+2026-03-31 13:59:38.189 | INFO     | graphrag_cypher:_parse_llm_response:873 - [Text-to-Cypher] Engine: Gemini (gemini-2.5-flash) | type=GLOBAL | params=['limit'] | answer_cols=[] | vector_query='properties featuring Toto Fittings, Jaquar Fittings, or Video Door Phones'
+2026-03-31 13:59:38.189 | DEBUG    | graphrag_cypher:_parse_llm_response:878 - [Text-to-Cypher] Cypher:
+MATCH (p:Project)-[:LOCATED_IN]->(n:Neighbourhood)-[:IN_CITY]->(c:City)
+OPTIONAL MATCH (p)-[:BUILT_BY]->(dev:Developer)
+CALL {
+  WITH p
+  OPTIONAL MATCH (p)-[:HAS_UNIT]->(u:Unit)
+  WITH u WHERE u IS NOT NULL
+  RETURN collect(u { .*, rooms: [(u)-[:HAS_ROOM]->(r:Room) | properties(r)] }) AS units
+}
+CALL {
+  WITH p
+  OPTIONAL MATCH (p)-[:HAS_AMENITY]->(am:Amenity)
+  WITH am WHERE am IS NOT NULL
+  RETURN collect(am.name) AS amenities
+}
+CALL {
+  WITH p
+  OPTIONAL MATCH (p)-[:NEAR]->(lm:Landmark)
+  WITH lm WHERE lm IS NOT NULL
+  RETURN collect(lm.name) AS landmarks
+}
+WITH p, n, c, dev, units, amenities, landmarks
+RETURN p, n.name AS neighbourhood, c.name AS city, dev.name AS developer,
+       units, amenities, landmarks
+LIMIT $limit
+2026-03-31 13:59:38.190 | DEBUG    | graphrag_retriever:__init__:212 - GraphRetriever connected to Neo4j.
+INFO:chromadb.telemetry.product.posthog:Anonymized telemetry enabled. See                     https://docs.trychroma.com/telemetry for more information.
+INFO:sentence_transformers.SentenceTransformer:Load pretrained SentenceTransformer: all-MiniLM-L6-v2
+INFO:httpx:HTTP Request: HEAD https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/main/modules.json "HTTP/1.1 307 Temporary Redirect"
+INFO:httpx:HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/sentence-transformers/all-MiniLM-L6-v2/c9745ed1d9f207416be6d2e6f8de32d1f16199bf/modules.json "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: HEAD https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/main/config_sentence_transformers.json "HTTP/1.1 307 Temporary Redirect"
+INFO:httpx:HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/sentence-transformers/all-MiniLM-L6-v2/c9745ed1d9f207416be6d2e6f8de32d1f16199bf/config_sentence_transformers.json "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: HEAD https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/main/config_sentence_transformers.json "HTTP/1.1 307 Temporary Redirect"
+INFO:httpx:HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/sentence-transformers/all-MiniLM-L6-v2/c9745ed1d9f207416be6d2e6f8de32d1f16199bf/config_sentence_transformers.json "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: HEAD https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/main/README.md "HTTP/1.1 307 Temporary Redirect"
+INFO:httpx:HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/sentence-transformers/all-MiniLM-L6-v2/c9745ed1d9f207416be6d2e6f8de32d1f16199bf/README.md "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: HEAD https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/main/modules.json "HTTP/1.1 307 Temporary Redirect"
+INFO:httpx:HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/sentence-transformers/all-MiniLM-L6-v2/c9745ed1d9f207416be6d2e6f8de32d1f16199bf/modules.json "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: HEAD https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/main/sentence_bert_config.json "HTTP/1.1 307 Temporary Redirect"
+INFO:httpx:HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/sentence-transformers/all-MiniLM-L6-v2/c9745ed1d9f207416be6d2e6f8de32d1f16199bf/sentence_bert_config.json "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: HEAD https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/main/adapter_config.json "HTTP/1.1 404 Not Found"
+INFO:httpx:HTTP Request: HEAD https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/main/config.json "HTTP/1.1 307 Temporary Redirect"
+INFO:httpx:HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/sentence-transformers/all-MiniLM-L6-v2/c9745ed1d9f207416be6d2e6f8de32d1f16199bf/config.json "HTTP/1.1 200 OK"
+Testing query...
+
+==================================================
+INTENT:
+query_type='GLOBAL' bhk=None property_type=None city=None neighbourhood=None zone=None amenities=[] landmark_types=[] specific_landmarks=[] min_sqft=None max_sqft=None min_price_lakhs=None max_price_lakhs=None has_balcony=None has_parking=None entrance_facing=None developer=None project_names=[] semantic_keywords=['Toto Fittings', 'Jaquar Fittings', 'Video Door Phones'] min_units_per_floor=None max_units_per_floor=None area_qualifier=None around_area=None
+
+CYPHER:
+MATCH (p:Project)-[:LOCATED_IN]->(n:Neighbourhood)-[:IN_CITY]->(c:City)
+OPTIONAL MATCH (p)-[:BUILT_BY]->(dev:Developer)
+CALL {
+  WITH p
+  OPTIONAL MATCH (p)-[:HAS_UNIT]->(u:Unit)
+  WITH u WHERE u IS NOT NULL
+  RETURN collect(u { .*, rooms: [(u)-[:HAS_ROOM]->(r:Room) | properties(r)] }) AS units
+}
+CALL {
+  WITH p
+  OPTIONAL MATCH (p)-[:HAS_AMENITY]->(am:Amenity)
+  WITH am WHERE am IS NOT NULL
+  RETURN collect(am.name) AS amenities
+}
+CALL {
+  WITH p
+  OPTIONAL MATCH (p)-[:NEAR]->(lm:Landmark)
+  WITH lm WHERE lm IS NOT NULL
+  RETURN collect(lm.name) AS landmarks
+}
+WITH p, n, c, dev, units, amenities, landmarks
+RETURN p, n.name AS neighbourhood, c.name AS city, dev.name AS developer,
+       units, amenities, landmarks
+LIMIT $limit
+==================================================
+
+Loading weights:   0%|          | 0/103 [00:00<?, ?it/s]
+Loading weights: 100%|##########| 103/103 [00:00<00:00, 3561.32it/s]
+BertModel LOAD REPORT from: sentence-transformers/all-MiniLM-L6-v2
+Key                     | Status     |  | 
+------------------------+------------+--+-
+embeddings.position_ids | UNEXPECTED |  | 
+
+Notes:
+- UNEXPECTED	:can be ignored when loading from different task/architecture; not ok if you expect identical arch.
+INFO:httpx:HTTP Request: HEAD https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/main/config.json "HTTP/1.1 307 Temporary Redirect"
+INFO:httpx:HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/sentence-transformers/all-MiniLM-L6-v2/c9745ed1d9f207416be6d2e6f8de32d1f16199bf/config.json "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: HEAD https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/main/tokenizer_config.json "HTTP/1.1 307 Temporary Redirect"
+INFO:httpx:HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/sentence-transformers/all-MiniLM-L6-v2/c9745ed1d9f207416be6d2e6f8de32d1f16199bf/tokenizer_config.json "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://huggingface.co/api/models/sentence-transformers/all-MiniLM-L6-v2/tree/main/additional_chat_templates?recursive=false&expand=false "HTTP/1.1 404 Not Found"
+INFO:httpx:HTTP Request: GET https://huggingface.co/api/models/sentence-transformers/all-MiniLM-L6-v2/tree/main?recursive=true&expand=false "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: HEAD https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/main/1_Pooling/config.json "HTTP/1.1 307 Temporary Redirect"
+INFO:httpx:HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/sentence-transformers/all-MiniLM-L6-v2/c9745ed1d9f207416be6d2e6f8de32d1f16199bf/1_Pooling%2Fconfig.json "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://huggingface.co/api/models/sentence-transformers/all-MiniLM-L6-v2 "HTTP/1.1 200 OK"
+2026-03-31 14:00:00.811 | DEBUG    | graphrag_retriever:__init__:701 - VectorRetriever: ChromaDB collection has 90 docs.
+2026-03-31 14:00:00.811 | INFO     | graphrag_retriever:__init__:717 - Cross-encoder re-ranker DISABLED (ENABLE_RERANKER=false). Using distance-sorted ChromaDB ranking + RERANK_TOP_K cap instead.
+2026-03-31 14:00:00.813 | INFO     | graphrag_retriever:retrieve:832 - Vector query text: 'properties featuring Toto Fittings, Jaquar Fittings, or Video Door Phones'
+
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]
+Batches: 100%|##########| 1/1 [00:00<00:00,  7.37it/s]
+Batches: 100%|##########| 1/1 [00:00<00:00,  7.34it/s]
+
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]
+Batches: 100%|##########| 1/1 [00:00<00:00, 41.42it/s]
+2026-03-31 14:00:01.026 | INFO     | graphrag_retriever:retrieve:924 - Distance-ranked: kept top 10 candidates (RERANK_TOP_K=10, threshold=1.3)
+2026-03-31 14:00:01.026 | INFO     | graphrag_retriever:retrieve:978 - Vector retrieval \u2192 4 project(s)
+2026-03-31 14:00:03.755 | INFO     | graphrag_retriever:retrieve:290 - Graph retrieval \u2192 20 project(s)
+2026-03-31 14:00:03.758 | SUCCESS  | graphrag_retriever:retrieve_and_assemble:1497 - Context assembled: 20 projects, 79396 chars, direct_answer=no
+2026-03-31 14:00:03.758 | INFO     | graphrag_retriever:retrieve_and_assemble:1509 - [Cache] STORED query: 'Find me properties featuring Toto Fittings, Jaquar Fittings, or Video Door Phones.' (cache size: 1)
+
+==================================================
+Projects Found: 20
+ - Gandhi Galaxy (Source: both)
+ - OUM ORBIT (Source: both)
+ - RATNAAKAR 6 beaumonde (Source: both)
+ - SATYAMEV ELYSIUM (Source: both)
+ - Devnandan Sankalp City (Source: graph)
+ - NEELKANTH STATUS (Source: graph)
+ - Dwarkesh Greens (Source: graph)
+ - Elysium at Shantigram (Source: graph)
+ - AMBER 2 BHK RESIDENCY (Source: graph)
+ - Sunflower Enclave (Source: graph)
+ - NIVAAN GREENS (Source: graph)
+ - KP Villas (Source: graph)
+ - PALAK ELINA (Source: graph)
+ - Satyesh Residency (Source: graph)
+ - Sitaram City (Source: graph)
+ - Sky Avenue (Source: graph)
+ - Sudama Homes (Source: graph)
+ - SURYA KUTIR (Source: graph)
+ - svasaar pravesh (Source: graph)
+ - Swastik Harmony (Source: graph)

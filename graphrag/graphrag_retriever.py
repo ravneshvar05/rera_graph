@@ -219,6 +219,7 @@ class GraphRetriever:
         Execute a Text-to-Cypher generated query against Neo4j.
 
         Strategy:
+          - Purely semantic → return empty graph results, let vector search take over.
           - GLOBAL → return all projects.
           - SPECIFIC → run LLM Cypher, then ALWAYS supplement with intent-driven
             results for multi-location queries (LLM often drops locations).
@@ -233,6 +234,12 @@ class GraphRetriever:
             (project_results, answer_data)
             - answer_data is non-empty only for LOOKUP / AGGREGATE queries
         """
+        # Block "dump all projects" behavior for purely semantic queries
+        intent = cypher_result.intent
+        if intent and intent.semantic_keywords and not self._intent_has_graph_filters(intent):
+            logger.info("Purely semantic query detected (no graph filters). Skipping graph retrieval.")
+            return [], []
+
         if cypher_result.query_type == "GLOBAL":
             results = self._get_all_projects()
             answer_data: list[dict] = []

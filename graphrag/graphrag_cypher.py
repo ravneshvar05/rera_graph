@@ -362,7 +362,7 @@ RELATIONSHIPS:
 - area_sqft → FLOAT. Always: toFloat(r.area_sqft) > toFloat($val). Fence with IS NOT NULL.
 - carpet_sqft, super_builtup_sqft → FLOAT/NULL. Use toFloat() + IS NOT NULL check.
 - bhk → INTEGER. Direct compare: u.bhk = $bhk
-- Boolean flags (has_clubhouse etc.) → INTEGER 0/1: p.has_pool = 1
+- Boolean flags (has_clubhouse etc.) → INTEGER 0/1. For positive check: p.has_pool = 1. For negative check: (p.has_commercial_shops = 0 OR p.has_commercial_shops IS NULL).
 - road_widths is a list of mixed strings (e.g., ["30.00 MT.", "12.00M ROAD"]). Extract integer safely: ANY(x IN p.road_widths WHERE toInteger(split(x, '.')[0]) >= toInteger($min_width))
 - String comparisons → toLower() both sides: toLower(p.project_name) CONTAINS toLower($name)
 - NEVER apply toLower/toFloat/toInteger to a list. Use comprehension: [x IN $list | toLower(x)]
@@ -493,7 +493,7 @@ Common filters:
   Status:        toLower(p.project_status) CONTAINS toLower($status)
   Room existence (single room): EXISTS {{ MATCH (p)-[:HAS_UNIT]->(u2)-[:HAS_ROOM]->(r) WHERE r.name = $room_name }}
   Amenity tag:   EXISTS {{ MATCH (p)-[:HAS_AMENITY]->(am2) WHERE $tag IN am2.canonical_tags }}
-  Amenity flags: p.has_pool = 1, p.has_clubhouse = 1, p.has_park = 1, p.has_parking = 1
+  Amenity flags: p.has_pool = 1, p.has_clubhouse = 1, (p.has_commercial_shops = 0 OR p.has_commercial_shops IS NULL)
 
   EMBEDDED ROOMS PATTERN (PREFERRED — use when filtering inside ANY(u IN units WHERE ...)):
   The CALL subquery already embeds rooms into each unit: u.rooms is a list of room property maps.
