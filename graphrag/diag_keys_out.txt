@@ -1,0 +1,55 @@
+d:\Rerachatbot\graphrag\graphrag_cypher.py:21: FutureWarning: 
+
+All support for the `google.generativeai` package has ended. It will no longer be receiving 
+updates or bug fixes. Please switch to the `google.genai` package as soon as possible.
+See README for more details:
+
+https://github.com/google-gemini/deprecated-generative-ai-python/blob/main/README.md
+
+  import google.generativeai as genai
+2026-04-01 11:30:14.651 | INFO     | graphrag_cypher:generate_cypher:893 - [Text-to-Cypher] Gemini key slot 1/4 (retry attempt 1)
+2026-04-01 11:30:20.698 | INFO     | graphrag_cypher:_parse_llm_response:859 - Intent parsed (Gemini (gemini-2.5-flash)): bhk=None, location=['Sarkhej', 'Vinzol'], amenities=[], type=SPECIFIC
+2026-04-01 11:30:20.704 | INFO     | graphrag_cypher:_parse_llm_response:873 - [Text-to-Cypher] Engine: Gemini (gemini-2.5-flash) | type=SPECIFIC | params=['property_type', 'neighbourhoods', 'limit'] | answer_cols=[] | vector_query='house in Sarkhej and Vinzol'
+2026-04-01 11:30:20.704 | DEBUG    | graphrag_cypher:_parse_llm_response:878 - [Text-to-Cypher] Cypher:
+MATCH (p:Project)-[:LOCATED_IN]->(n:Neighbourhood)-[:IN_CITY]->(c:City)
+OPTIONAL MATCH (p)-[:BUILT_BY]->(dev:Developer)
+CALL {
+  WITH p
+  OPTIONAL MATCH (p)-[:HAS_UNIT]->(u:Unit)
+  WITH u WHERE u IS NOT NULL
+  RETURN collect(u { .*, rooms: [(u)-[:HAS_ROOM]->(r:Room) | properties(r)] }) AS units
+}
+CALL {
+  WITH p
+  OPTIONAL MATCH (p)-[:HAS_AMENITY]->(am:Amenity)
+  WITH am WHERE am IS NOT NULL
+  RETURN collect(am.name) AS amenities
+}
+CALL {
+  WITH p
+  OPTIONAL MATCH (p)-[:NEAR]->(lm:Landmark)
+  WITH lm WHERE lm IS NOT NULL
+  RETURN collect(lm.name) AS landmarks
+}
+WITH p, n, c, dev, units, amenities, landmarks
+WHERE ANY(u IN units WHERE toLower(u.property_type) = toLower($property_type))
+AND ANY(x IN $neighbourhoods WHERE toLower(n.name) CONTAINS toLower(x) OR REPLACE(toLower(n.name), ' - ', '-') CONTAINS toLower(x) OR toLower(p.address) CONTAINS toLower(x))
+RETURN p, n.name AS neighbourhood, c.name AS city, dev.name AS developer,
+       units, amenities, landmarks
+LIMIT $limit
+=== user_settings keys ===
+  GROQ_API_KEY: 'gsk_QrgcztpABReH1RmIfHXDWGdyb3...'
+  GEMINI_API_KEY: 'AIzaSyDbgiUMHhf9IvpKUn1D1k5iHl...'
+  GEMINI_API_KEYS: 'AIzaSyAG4hxNwsm6Fi8Hrdlk0-IMoX...'
+  GROQ_API_KEYS: 'gsk_FSK9T7132ws4UkJraskuWGdyb3...'
+
+Gemini pool size: 4
+Groq pool size: 1
+
+=== generate_cypher with user_settings ===
+  Engine: Gemini (gemini-2.5-flash)
+  Query type: SPECIFIC
+  Intent neighbourhood: ['Sarkhej', 'Vinzol']
+  Intent city: None
+  Vector query: house in Sarkhej and Vinzol
+  Params: {'property_type': 'VILLA', 'neighbourhoods': ['sarkhej', 'vinzol'], 'limit': 50}

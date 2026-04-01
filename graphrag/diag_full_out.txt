@@ -1,0 +1,92 @@
+d:\Rerachatbot\graphrag\graphrag_cypher.py:21: FutureWarning: 
+
+All support for the `google.generativeai` package has ended. It will no longer be receiving 
+updates or bug fixes. Please switch to the `google.genai` package as soon as possible.
+See README for more details:
+
+https://github.com/google-gemini/deprecated-generative-ai-python/blob/main/README.md
+
+  import google.generativeai as genai
+2026-04-01 11:24:14.988 | INFO     | graphrag_cypher:generate_cypher:893 - [Text-to-Cypher] Gemini key slot 1/1 (retry attempt 1)
+2026-04-01 11:24:15.812 | WARNING  | graphrag_cypher:generate_cypher:912 - [Text-to-Cypher] Gemini slot 1 failed (400 API key expired. Please renew the API key. [reason: "API_KEY_INVALID"
+domain: "googleapis.com"
+metadata {
+  key: "service"
+  value: "generativelanguage.googleapis.com"
+}
+, locale: "en-US"
+message: "API key expired. Please renew the API key."
+]). All Gemini keys exhausted.
+2026-04-01 11:24:15.813 | WARNING  | graphrag_cypher:generate_cypher:920 - [Text-to-Cypher] Falling back to Groq pool.
+2026-04-01 11:24:15.813 | INFO     | graphrag_cypher:generate_cypher:926 - [Text-to-Cypher] Groq key slot 1/1 (retry attempt 1)
+2026-04-01 11:24:20.374 | WARNING  | graphrag_cypher:generate_cypher:946 - [Text-to-Cypher] Groq slot 1 failed (Error code: 401 - {'error': {'message': 'Invalid API Key', 'type': 'invalid_request_error', 'code': 'invalid_api_key'}}). All Groq keys exhausted.
+2026-04-01 11:24:20.374 | WARNING  | graphrag_cypher:generate_cypher:951 - [Text-to-Cypher] All LLM keys exhausted. Using rule-based fallback.
+2026-04-01 11:24:32.980 | DEBUG    | graphrag_retriever:__init__:212 - GraphRetriever connected to Neo4j.
+2026-04-01 11:24:34.482 | INFO     | graphrag_retriever:retrieve:297 - Graph retrieval \u2192 20 project(s)
+============================================================
+TEST QUERY: find me house in sarkhej and vinzol
+============================================================
+
+--- Step 1: generate_cypher ---
+  Engine: Fallback Rule-based
+  Query type: GLOBAL
+  Intent neighbourhood: ['Sarkhej', 'Vinzol']
+  Intent city: None
+  Intent bhk: None
+  Intent semantic_keywords: []
+  Cypher (first 300 chars): MATCH (p:Project)-[:LOCATED_IN]->(n:Neighbourhood)-[:IN_CITY]->(c:City)
+OPTIONAL MATCH (p)-[:BUILT_BY]->(dev:Developer)
+CALL (p) {
+  OPTIONAL MATCH (p)-[:HAS_UNIT]->(u:Unit)
+  WITH u WHERE u IS NOT NULL
+  RETURN collect(u { .*, rooms: [(u)-[:HAS_ROOM]->(r:Room) | properties(r)] }) AS units
+}
+CALL (p
+  Params: {'limit': 50}
+  Vector query: None BHK
+
+--- Step 2: Graph retriever ---
+  Graph results: 20
+    - Gandhi Galaxy | Paldi, Ahmedabad | source=graph
+    - Devnandan Sankalp City | Naroda, Hanspura Road, Ahmedabad | source=graph
+    - NEELKANTH STATUS | Kubernagar, Ahmedabad | source=graph
+    - Dwarkesh Greens | Thaltej, Ahmedabad | source=graph
+    - Elysium at Shantigram | Shantigram, Ahmedabad | source=graph
+    - AMBER 2 BHK RESIDENCY | Sarkhej, Ahmedabad | source=graph
+    - Sunflower Enclave | Sarkhej, Ahmedabad | source=graph
+    - NIVAAN GREENS | Isanpur, Ghodasar, Ahmedabad | source=graph
+    - KP Villas | Gokuldham, Ahmedabad | source=graph
+    - OUM ORBIT | Vinzol, Ahmedabad | source=graph
+    - PALAK ELINA | Iscon-Ambli Road, Ahmedabad | source=graph
+    - RATNAAKAR 6 beaumonde | Jodhpur, Satellite, Ahmedabad | source=graph
+    - SATYAMEV ELYSIUM | Science City Road, Ahmedabad | source=graph
+    - Satyesh Residency | Shantipura Cross Roads, Bopal, Iscon-Ambli Road, Sardar Patel Ring Road, Ahmedabad | source=graph
+    - Sitaram City | Vastral Road, Ahmedabad | source=graph
+    - Sky Avenue | Ahmedabad, Ahmedabad | source=graph
+    - Sudama Homes | Chiloda-Kotarpur, Ahmedabad | source=graph
+    - SURYA KUTIR | NARANPURA, Ahmedabad | source=graph
+    - svasaar pravesh | Vatva, Ahmedabad | source=graph
+    - Swastik Harmony | New Nikol - Naroda Road, Ahmedabad | source=graph
+
+--- Step 3: Vector retriever ---
+
+Loading weights:   0%|          | 0/103 [00:00<?, ?it/s]
+Loading weights: 100%|##########| 103/103 [00:00<00:00, 2161.34it/s]
+BertModel LOAD REPORT from: sentence-transformers/all-MiniLM-L6-v2
+Key                     | Status     |  | 
+------------------------+------------+--+-
+embeddings.position_ids | UNEXPECTED |  | 
+
+Notes:
+- UNEXPECTED	:can be ignored when loading from different task/architecture; not ok if you expect identical arch.
+2026-04-01 11:25:40.758 | DEBUG    | graphrag_retriever:__init__:708 - VectorRetriever: ChromaDB collection has 90 docs.
+2026-04-01 11:25:40.758 | INFO     | graphrag_retriever:__init__:724 - Cross-encoder re-ranker DISABLED (ENABLE_RERANKER=false). Using distance-sorted ChromaDB ranking + RERANK_TOP_K cap instead.
+2026-04-01 11:25:40.758 | INFO     | graphrag_retriever:retrieve:839 - Vector query text: 'None BHK'
+2026-04-01 11:25:41.160 | INFO     | graphrag_retriever:retrieve:931 - Distance-ranked: kept top 10 candidates (RERANK_TOP_K=10, threshold=1.3)
+2026-04-01 11:25:41.160 | INFO     | graphrag_retriever:retrieve:985 - Vector retrieval \u2192 3 project(s)
+  Vector results: 3
+    - AMBER 2 BHK RESIDENCY | Sarkhej, Ahmedabad | score=0.577
+    - Devnandan Sankalp City | Naroda, Hanspura Road, Ahmedabad | score=0.585
+    - Gandhi Galaxy | Paldi, Ahmedabad | score=0.603
+
+--- DONE ---

@@ -14,13 +14,11 @@ import json
 import re
 from typing import Optional, Union, List
 from groq import Groq
+import google.generativeai as genai
 from pydantic import BaseModel, Field
 from loguru import logger
 
-from graphrag_config import settings
-
-# ── Configure Groq client ───────────────────────────────────────────────────
-_groq_client = Groq(api_key=settings.GROQ_API_KEY)
+from graphrag_config import settings, build_gemini_pool, build_groq_pool
 
 
 # ── Intent Schema ─────────────────────────────────────────────────────────────
@@ -139,52 +137,97 @@ Rules:
 
 # ── Parser ────────────────────────────────────────────────────────────────────
 
-def parse_intent(user_query: str) -> QueryIntent:
+def _parse_raw_intent(raw: str) -> QueryIntent:
+    """Parse raw JSON string into a QueryIntent."""
+    raw = re.sub(r"^```(?:json)?\s*", "", raw.strip())
+    raw = re.sub(r"\s*```$", "", raw)
+    data = json.loads(raw)
+    intent = QueryIntent(**data)
+    logger.info(
+        f"Intent parsed: bhk={intent.bhk}, "
+        f"location={intent.neighbourhood or intent.city}, "
+        f"amenities={intent.amenities}, type={intent.query_type}"
+    )
+    return intent
+
+
+def parse_intent(user_query: str, api_keys: dict = None) -> QueryIntent:
     """
     Parse a natural language query into a structured QueryIntent.
 
-    Falls back to a minimal intent (just semantic keywords) if the LLM fails
-    so the system always produces some result.
+    Tries Groq pool first, then Gemini pool as fallback.
+    Falls back to minimal keyword-based intent if all LLMs fail.
     """
-    try:
-        response = _groq_client.chat.completions.create(
-            model=settings.GROQ_MODEL,
-            response_format={"type": "json_object"},
-            messages=[
-                {"role": "system", "content": _INTENT_SYSTEM_PROMPT},
-                {"role": "user", "content": user_query},
-            ],
-            temperature=0.0,
-        )
-        raw = response.choices[0].message.content.strip()
+    groq_pool   = build_groq_pool(api_keys)
+    gemini_pool = build_gemini_pool(api_keys)
 
-        # Strip markdown code fences if model added them
-        raw = re.sub(r"^```(?:json)?\s*", "", raw)
-        raw = re.sub(r"\s*```$", "", raw)
+    # ── Primary: Groq pool ────────────────────────────────────────────────
+    for attempt in range(len(groq_pool)):
+        key = groq_pool.next()
+        if not key:
+            break
+        try:
+            groq_client = Groq(api_key=key)
+            response = groq_client.chat.completions.create(
+                model=settings.GROQ_MODEL,
+                response_format={"type": "json_object"},
+                messages=[
+                    {"role": "system", "content": _INTENT_SYSTEM_PROMPT},
+                    {"role": "user", "content": user_query},
+                ],
+                temperature=0.0,
+            )
+            return _parse_raw_intent(response.choices[0].message.content)
+        except Exception as e:
+            logger.warning(f"[IntentParser] Groq slot {groq_pool.last_slot} failed ({e}).")
 
-        data = json.loads(raw)
-        intent = QueryIntent(**data)
-        logger.info(f"Intent parsed: bhk={intent.bhk}, location={intent.neighbourhood or intent.city}, "
-                    f"amenities={intent.amenities}, type={intent.query_type}")
-        return intent
+    # ── Fallback: Gemini pool ─────────────────────────────────────────────
+    for attempt in range(len(gemini_pool)):
+        key = gemini_pool.next()
+        if not key:
+            break
+        try:
+            genai.configure(api_key=key)
+            model = genai.GenerativeModel(
+                model_name=settings.GEMINI_MODEL,
+                system_instruction=_INTENT_SYSTEM_PROMPT,
+                generation_config=genai.GenerationConfig(
+                    temperature=0.0,
+                    response_mime_type="application/json",
+                ),
+            )
+            response = model.generate_content(user_query)
+            return _parse_raw_intent(response.text)
+        except Exception as e:
+            logger.warning(f"[IntentParser] Gemini slot {gemini_pool.last_slot} failed ({e}).")
 
-    except Exception as e:
-        logger.warning(f"Intent parsing failed ({e}), using simple keyword extraction.")
-        
-        # Simple fallback parsing to avoid dropping location context entirely
-        fallback_city = None
-        lower_query = user_query.lower()
-        common_cities = ["ahmedabad", "surat", "vadodara", "rajkot", "gandhinagar"]
-        for c in common_cities:
-            if c in lower_query:
-                fallback_city = c.title()
-                break
-                
-        return QueryIntent(
-            query_type="SPECIFIC",
-            city=fallback_city,
-            semantic_keywords=user_query.split() if not fallback_city else []
-        )
+    # ── Last-resort: simple keyword extraction ────────────────────────────
+    logger.warning("[IntentParser] All LLM keys exhausted. Using keyword fallback.")
+    lower_query = user_query.lower()
+
+    # Detect known Gujarat localities so location context is never lost
+    _KNOWN_LOCALITIES = [
+        "vinzol", "sarkhej", "bopal", "nikol", "naroda", "vatva", "gamdi",
+        "satellite", "chandkheda", "thaltej", "vastrapur", "hanspura", "paldi",
+        "isanpur", "ghodasar", "kotarpur", "chiloda", "kubernagar", "naranpura",
+        "vastral", "shantigram", "gokuldham",
+    ]
+    found_localities = [loc.title() for loc in _KNOWN_LOCALITIES if loc in lower_query]
+    neighbourhood = found_localities if found_localities else None
+
+    fallback_city = None
+    common_cities = ["ahmedabad", "surat", "vadodara", "rajkot", "gandhinagar"]
+    for c in common_cities:
+        if c in lower_query:
+            fallback_city = c.title()
+            break
+
+    return QueryIntent(
+        query_type="SPECIFIC",
+        neighbourhood=neighbourhood if neighbourhood else None,
+        city=fallback_city,
+        semantic_keywords=[] if (neighbourhood or fallback_city) else user_query.split(),
+    )
 
 
 if __name__ == "__main__":

@@ -1507,12 +1507,22 @@ class DualRetriever:
         )
 
         # ── Cache store ───────────────────────────────────────────────────────
-        result_tuple = (context_text, final, direct_answer_text)
-        if len(_QUERY_CACHE) >= _CACHE_MAX_SIZE:
-            # Evict the oldest entry
-            oldest_key = min(_QUERY_CACHE, key=lambda k: _QUERY_CACHE[k][0])
-            del _QUERY_CACHE[oldest_key]
-        _QUERY_CACHE[cache_key] = (time.time(), result_tuple)
-        logger.info(f"[Cache] STORED query: {raw_query!r} (cache size: {len(_QUERY_CACHE)})")
+        # Only cache genuine LLM-generated results that returned at least 1 project.
+        # Rule-based fallback results (engine="Fallback Rule-based") and
+        # empty-result runs are NOT cached so the next attempt re-runs the full
+        # pipeline instead of serving a stale failure.
+        cypher_engine = getattr(cypher_result, "engine_used", "") if cypher_result else ""
+        is_fallback = "Rule-based" in (cypher_engine or "")
+        if final and not is_fallback:
+            result_tuple = (context_text, final, direct_answer_text)
+            if len(_QUERY_CACHE) >= _CACHE_MAX_SIZE:
+                oldest_key = min(_QUERY_CACHE, key=lambda k: _QUERY_CACHE[k][0])
+                del _QUERY_CACHE[oldest_key]
+            _QUERY_CACHE[cache_key] = (time.time(), result_tuple)
+            logger.info(f"[Cache] STORED query: {raw_query!r} (cache size: {len(_QUERY_CACHE)})")
+        elif is_fallback:
+            logger.info("[Cache] Skipping store — rule-based fallback result not cached.")
+        else:
+            logger.info("[Cache] Skipping store — 0 results returned, not caching.")
 
         return context_text, final, direct_answer_text

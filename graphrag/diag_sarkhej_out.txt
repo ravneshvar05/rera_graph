@@ -1,0 +1,36 @@
+=== NEIGHBOURHOODS IN DB ===
+  Ahmedabad
+  Chiloda-Kotarpur
+  Gokuldham
+  Isanpur, Ghodasar
+  Iscon-Ambli Road
+  Jodhpur, Satellite
+  Kubernagar
+  NARANPURA
+  Naroda, Hanspura Road
+  New Nikol - Naroda Road
+  Paldi
+  Sarkhej
+  Science City Road
+  Shantigram
+  Shantipura Cross Roads, Bopal, Iscon-Ambli Road, Sardar Patel Ring Road
+  Thaltej
+  Vastral Road
+  Vatva
+  Vinzol
+
+=== SARKHEJ/VINZOL PROJECTS ===
+  AMBER 2 BHK RESIDENCY | Sarkhej | Opp. Amber Tower, B/h. Kadri Party Plot, TP 85-FP7, Subplot 2, Sarkhej Highway Road, Ahmedabad-55.
+  Sunflower Enclave | Sarkhej | Near Emaad, T.P. 85, 100 Feet Road, Sarkhej, Ahmedabad-380055
+  OUM ORBIT | Vinzol | Towards 200 ft. S.P.Ring Road, Opp. Karnavati APMC Market, Behind MADHAV school, Ropda Cross Road, Vinzol, Ahmedabad.
+
+Total projects in DB: 20
+
+=== INTENT PARSE TEST ===
+  neighbourhood: None
+  city: None
+  bhk: None
+  property_type: None
+  query_type: SPECIFIC
+  semantic_keywords: ['find', 'me', 'house', 'in', 'sarkhej', 'and', 'vinzol']
+2026-04-01 11:21:10.255 | WARNING  | graphrag_intent:parse_intent:172 - Intent parsing failed (Error code: 401 - {'error': {'message': 'Invalid API Key', 'type': 'invalid_request_error', 'code': 'invalid_api_key'}}), using simple keyword extraction.

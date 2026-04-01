@@ -561,7 +561,9 @@ Common filters:
     - "penthouse" / "pent house" / "sky villa" → $property_type = "PENTHOUSE"
     - "row house" / "rowhouse" → $property_type = "ROW_HOUSE"
     - "tenement" → $property_type = "TENEMENT"
+    - "house" / "homes" / "property" / "properties" / "residence" / "unit" → GENERIC — do NOT set property_type. These mean "any residential property".
     NEVER treat apartment/villa/penthouse/tenement as a semantic_keyword. Always use property_type filter.
+    NEVER map "house", "homes", "property", "residence" to a property_type — they are generic, not structural filters.
   Landmark type: EXISTS {{ MATCH (p)-[:NEAR]->(lm2:Landmark) WHERE lm2.landmark_type = $landmark_type }}
   Specific landmark: (EXISTS {{ MATCH (p)-[:NEAR]->(lm2:Landmark) WHERE toLower(lm2.name) CONTAINS toLower($landmark_name) }} OR toLower(p.address) CONTAINS toLower($landmark_name))
   Total buildings: p.total_buildings IS NOT NULL AND toInteger(p.total_buildings) >= toInteger($min_buildings)
@@ -750,6 +752,7 @@ answer_data includes list of matching room details for each unit.
     "row house" / "rowhouse" → property_type="ROW_HOUSE"
     "tenement" → property_type="TENEMENT"
     "bungalow" → property_type="BUNGALOW"
+    "house" / "houses" / "homes" / "home" / "property" / "properties" / "residence" / "unit" → GENERIC — set property_type=null. These are informal synonyms for ANY residential property. Do NOT map to VILLA or any other type.
   Whenever property_type is set in intent, the Cypher WHERE clause MUST include:
     ANY(u IN units WHERE toLower(u.property_type) = toLower($property_type))
 - If a field is not mentioned, use null or empty list.
