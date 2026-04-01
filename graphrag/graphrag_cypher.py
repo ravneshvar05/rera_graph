@@ -344,7 +344,7 @@ NODES:
 - Zone {name}
 - Developer {name}
 - Unit {unit_id, project_id, unit_type, property_type (APARTMENT/VILLA/ROW_HOUSE/TENEMENT/PENTHOUSE), bhk (integer), entrance_facing (East/West/North/South), carpet_sqft, super_builtup_sqft, balcony_sqft, wash_sqft, applicable_buildings, description}
-- Room {room_type, name (canonical string), length, width, area_sqft (FLOAT), floor_level, attached_bathroom (0/1), has_balcony_access (0/1)}
+- Room {room_type, name (canonical string), length (RAW STRING — e.g. "10'0\"", "12'-6\"", NOT a number), width (RAW STRING — e.g. "8'-0\"", NOT a number), area_sqft (FLOAT — pre-computed numeric area, the ONLY field you can filter on for room size), floor_level, attached_bathroom (0/1), has_balcony_access (0/1)}
 - Amenity {name, category (SPORTS/WELLNESS/SECURITY/NATURE/SOCIAL/INFRASTRUCTURE), canonical_tags (list of strings)}
 - Landmark {name, landmark_type (EDUCATION/HEALTHCARE/COMMERCIAL/TRANSPORT/RELIGIOUS/RECREATION)}
 - FloorLayout {layout_id, layout_name, total_units_on_floor, has_lifts (0/1/null), has_staircases (0/1/null), corridor_width (string or null), has_refuge_area (0/1/null)}
@@ -361,6 +361,7 @@ RELATIONSHIPS:
 
 === DATA-TYPE RULES ===
 - area_sqft → FLOAT. Always: toFloat(r.area_sqft) > toFloat($val). Fence with IS NOT NULL.
+- Room.length, Room.width → RAW STRINGS (e.g. "10'0\"", "12'-6\""). NEVER compare numerically. NEVER filter on them in Cypher. Use area_sqft for ALL room size filtering.
 - carpet_sqft, super_builtup_sqft → FLOAT/NULL. Use toFloat() + IS NOT NULL check.
 - bhk → INTEGER. Direct compare: u.bhk = $bhk
 - Boolean flags (has_clubhouse etc.) → INTEGER 0/1. For positive check: p.has_pool = 1. For negative check: (p.has_commercial_shops = 0 OR p.has_commercial_shops IS NULL).
@@ -641,13 +642,41 @@ then add a second WITH to compute answer_data. Include answer_data in RETURN.
 ── TEMPLATE 4: AGGREGATE (numeric comparisons, counts, statistics) ──
 
 4a. ROOM SIZE COMPARISON ("hall > 100 sqft", "bedroom around 150 sqft", "kitchen exactly 80 sqft",
-                         "2 BHK with Kitchen around 70 sqft", "master bedroom larger than 120 sqft"):
+                         "2 BHK with Kitchen around 70 sqft", "master bedroom larger than 120 sqft",
+                         "bedroom 10 x 12", "room size 10 by 10", "toilet 4x7", "kitchen length 8 width 9"):
+
+--- ROOM DIMENSION QUERIES ("10 x 12", "10 by 10", "length 10 width 20") ---
+When the user gives room dimensions instead of sqft:
+  Step 1 — Identify the room type (bedroom, kitchen, toilet, bathroom, hall, etc.) and the two numbers.
+  Step 2 — Multiply: area_sqft = length_ft * width_ft.  (e.g. "10 x 12" → 10*12 = 120 sqft)
+  Step 3 — Treat as an "around" query with ±15% window:
+             area_min = computed_area * 0.85,  area_max = computed_area * 1.15
+  Step 4 — Use Template 4a with area_min / area_max — EXACTLY like any other room area query.
+  Dimension formats to detect (ALL map to the same conversion):
+    "10x12", "10 x 12", "10 by 12", "10*12", "10'x12'", "10 ft by 12 ft"
+    "length 10 width 12", "10 length 12 width", "size 10 by 12"
+  Assume FEET unless user explicitly says meters/cm/mm.
+  Coverage: any room name that appears in the ROOM NAMES table:
+    bedroom, master bedroom, kitchen, toilet, bathroom, WC, hall, dining, balcony, terrace,
+    wash area, pooja room, store room, study room, servant room, dressing room, lobby, passage, courtyard.
+
+CRITICAL DISTINCTION — DO NOT MIX UP:
+  "10 x 12 bedroom"  →  ROOM dimension  →  multiply → r.area_sqft filter (Template 4a)
+                         query_type=AGGREGATE, answer_columns=["answer_data"]
+                         DO NOT touch u.carpet_sqft or u.super_builtup_sqft
+  "2 BHK 900 sqft"   →  UNIT area       →  u.carpet_sqft / u.super_builtup_sqft (Template 2 SPECIFIC)
+                         query_type=SPECIFIC, answer_columns=[]
+                         DO NOT touch r.area_sqft
+  "house 10 x 12"    →  AMBIGUOUS — treat as UNIT area (10*12=120 sqft) → Template 2 SPECIFIC.
+                         Only use Template 4a when a specific room type is named.
+
 Room comparison rules (applied to r2.area_sqft in WHERE EXISTS, and to r_item.area_sqft in RETURN):
-  "around/~" / plain N → >= toFloat($area_min) AND toFloat(r2.area_sqft) <= toFloat($area_max)  [area_min=val*0.85, area_max=val*1.15]
+  "around/~" / plain N / DIMENSION QUERY → >= toFloat($area_min) AND toFloat(r2.area_sqft) <= toFloat($area_max)  [area_min=val*0.85, area_max=val*1.15]
   "exactly N" → = toFloat($area_sqft)
   "at least/bigger/larger/>=" → >= toFloat($min_area)
   "less than/<" → <= toFloat($max_area)
 (Room has only ONE area field: area_sqft. No carpet/super distinction for rooms.)
+(Room.length and Room.width are STRINGS — NEVER compare them numerically in Cypher.)
 
 CRITICAL: The area filter in the RETURN list comprehension MUST use the SAME
 parameters and comparison operator as in the WHERE EXISTS clause.
@@ -774,6 +803,22 @@ answer_data includes list of matching room details for each unit.
       EXISTS {{ MATCH (p)-[:HAS_UNIT]->(u2)-[:HAS_ROOM]->(r2) WHERE r2.name IN ['Bedroom','Master Bedroom'] AND toInteger(r2.floor_level) = 0 }}
     Combined with property_type if user specified one (villa, tenement, etc.).
     Also set intent.semantic_keywords=["ground floor bedroom", "senior-friendly"] for vector fallback.
+20. ROOM DIMENSION QUERIES ("bedroom 10 x 12", "toilet 4 by 7", "kitchen 8x10", "room size 10 by 10",
+    "length 10 width 20", "10'x12' bedroom", "washroom 4 ft by 6 ft"):
+    a) Identify the ROOM TYPE from the room name (use ROOM NAMES table to get canonical name).
+    b) Multiply the two numbers to get area_sqft: e.g. 10x12 = 120, 4x7 = 28, 8x10 = 80.
+    c) Apply ±15% window: area_min = area_sqft * 0.85, area_max = area_sqft * 1.15.
+    d) Use Template 4a with $room_name, $area_min, $area_max. query_type=AGGREGATE.
+    e) NEVER filter r.length or r.width (they are raw strings, not numbers).
+    f) NEVER put dimension values into u.carpet_sqft / u.super_builtup_sqft filters.
+    g) Applies to ALL room types: bedroom, bathroom, toilet, WC, kitchen, hall, dining, balcony,
+       terrace, wash area, pooja room, store room, study room, servant room, dressing room, courtyard.
+    h) If user mentions BOTH a room dimension AND a unit area (e.g. "2 BHK 900 sqft with bedroom 10x12"):
+       Generate a SPECIFIC query with the unit area filter (Template 2) combined with:
+       EXISTS {{ MATCH (p)-[:HAS_UNIT]->(u2)-[:HAS_ROOM]->(r2) WHERE r2.name IN $room_names
+         AND r2.area_sqft IS NOT NULL
+         AND toFloat(r2.area_sqft) >= toFloat($area_min) AND toFloat(r2.area_sqft) <= toFloat($area_max) }}
+       Set query_type=SPECIFIC and answer_columns=[].
 
 === INTENT EXTRACTION ===
 - "all projects"/"show all" → query_type="GLOBAL". Filtered → "SPECIFIC".
