@@ -347,7 +347,8 @@ NODES:
 - Room {room_type, name (canonical string), length, width, area_sqft (FLOAT), floor_level, attached_bathroom (0/1), has_balcony_access (0/1)}
 - Amenity {name, category (SPORTS/WELLNESS/SECURITY/NATURE/SOCIAL/INFRASTRUCTURE), canonical_tags (list of strings)}
 - Landmark {name, landmark_type (EDUCATION/HEALTHCARE/COMMERCIAL/TRANSPORT/RELIGIOUS/RECREATION)}
-- FloorLayout {layout_id, layout_name, total_units_on_floor, has_lifts (0/1), has_staircases (0/1)}
+- FloorLayout {layout_id, layout_name, total_units_on_floor, has_lifts (0/1/null), has_staircases (0/1/null), corridor_width (string or null), has_refuge_area (0/1/null)}
+  NOTE: FloorLayout booleans use 1=confirmed true, null=unknown/not mentioned (treat as not confirmed). Value 0 (explicit false) is rare. For positive checks use = 1. For "does NOT have" checks use (f.field = 0 OR f.field IS NULL).
 
 RELATIONSHIPS:
 (Project)-[:LOCATED_IN]->(Neighbourhood)-[:IN_CITY]->(City)
@@ -491,6 +492,10 @@ Common filters:
   Neighbourhood: (toLower(n.name) CONTAINS toLower($neighbourhood) OR REPLACE(toLower(n.name), ' - ', '-') CONTAINS toLower($neighbourhood) OR toLower(p.address) CONTAINS toLower($neighbourhood))
   Multi-neighbourhood: ANY(x IN $neighbourhoods WHERE toLower(n.name) CONTAINS toLower(x) OR REPLACE(toLower(n.name), ' - ', '-') CONTAINS toLower(x) OR toLower(p.address) CONTAINS toLower(x))
   Status:        toLower(p.project_status) CONTAINS toLower($status)
+  Pin code (single):   p.pin_code IS NOT NULL AND p.pin_code = $pin_code
+  Pin code (multiple): p.pin_code IS NOT NULL AND p.pin_code IN $pin_codes
+  (When user gives ONE pin code → use = $pin_code with params: {{ "pin_code": "380007" }})
+  (When user gives MULTIPLE pin codes → use IN $pin_codes with params: {{ "pin_codes": ["380007", "380015"] }})
   Room existence (single room): EXISTS {{ MATCH (p)-[:HAS_UNIT]->(u2)-[:HAS_ROOM]->(r) WHERE r.name = $room_name }}
   Amenity tag:   EXISTS {{ MATCH (p)-[:HAS_AMENITY]->(am2) WHERE $tag IN am2.canonical_tags }}
   Amenity flags: p.has_pool = 1, p.has_clubhouse = 1, (p.has_commercial_shops = 0 OR p.has_commercial_shops IS NULL)
@@ -532,6 +537,23 @@ Common filters:
     NEVER split conditions onto separate top-level AND clauses — always keep them inside ONE ANY(u IN units WHERE ...).
     For room checks, ALWAYS use ANY(r IN u.rooms WHERE r.name IN [...]) — do NOT use correlated EXISTS with id().
 
+  Attached bathroom filter (CRITICAL — r.attached_bathroom is stored as 0/1 on each Room node):
+  Use ONLY inside the embedded rooms pattern (ANY(r IN u.rooms WHERE ...)), NOT with EXISTS.
+  "2 BHK with attached bathroom" — bedroom(s) that have attached_bathroom = 1:
+    ANY(u IN units WHERE
+      u.bhk = 2
+      AND ANY(r IN u.rooms WHERE r.name IN ['Bedroom', 'Master Bedroom'] AND r.attached_bathroom = 1)
+    )
+  "3 BHK with all bedrooms having attached bathroom" — every bedroom must have one:
+    ANY(u IN units WHERE
+      u.bhk = 3
+      AND ALL(r IN [x IN u.rooms WHERE x.name IN ['Bedroom', 'Master Bedroom']] WHERE r.attached_bathroom = 1)
+    )
+  "bedroom with balcony access" — similarly uses r.has_balcony_access = 1:
+    ANY(u IN units WHERE ANY(r IN u.rooms WHERE r.name IN ['Bedroom', 'Master Bedroom'] AND r.has_balcony_access = 1))
+  NOTE: r.attached_bathroom and r.has_balcony_access values: 1 = confirmed yes, 0 or null = no/unknown.
+  For "has attached bathroom" always use = 1. For "no attached bathroom" use (r.attached_bathroom = 0 OR r.attached_bathroom IS NULL).
+
   Floor-level / accessibility filter (for "ground floor bedroom", "senior-friendly", "aging parents"):
     Room.floor_level stores the floor number (0 = ground floor, 1 = first floor, etc.).
     "ground floor bedroom" = a bedroom room at floor_level = 0:
@@ -567,6 +589,19 @@ Common filters:
   Landmark type: EXISTS {{ MATCH (p)-[:NEAR]->(lm2:Landmark) WHERE lm2.landmark_type = $landmark_type }}
   Specific landmark: (EXISTS {{ MATCH (p)-[:NEAR]->(lm2:Landmark) WHERE toLower(lm2.name) CONTAINS toLower($landmark_name) }} OR toLower(p.address) CONTAINS toLower($landmark_name))
   Total buildings: p.total_buildings IS NOT NULL AND toInteger(p.total_buildings) >= toInteger($min_buildings)
+
+  Floor layout filters (use when user asks about lifts/elevators in building, staircase, refuge area, units per floor):
+  IMPORTANT: "lift" queries should PREFER Amenity match (already in amenity tags). Use FloorLayout ONLY when user specifically asks about the building's floor plan having lifts/no-lifts.
+  Has lifts in building:     EXISTS {{ MATCH (p)-[:HAS_FLOOR_LAYOUT]->(f:FloorLayout) WHERE f.has_lifts = 1 }}
+  Has staircase in building: EXISTS {{ MATCH (p)-[:HAS_FLOOR_LAYOUT]->(f:FloorLayout) WHERE f.has_staircases = 1 }}
+  Has refuge area:           EXISTS {{ MATCH (p)-[:HAS_FLOOR_LAYOUT]->(f:FloorLayout) WHERE f.has_refuge_area = 1 }}
+  Units per floor (e.g. max 4 units per floor): EXISTS {{ MATCH (p)-[:HAS_FLOOR_LAYOUT]->(f:FloorLayout) WHERE f.total_units_on_floor IS NOT NULL AND toInteger(f.total_units_on_floor) <= $max_units_per_floor }}
+  No lifts (explicit or null treated as no): EXISTS {{ MATCH (p)-[:HAS_FLOOR_LAYOUT]->(f:FloorLayout) WHERE (f.has_lifts = 0 OR f.has_lifts IS NULL) }}
+
+  Project-level count filters:
+  Total apartment blocks (>= N): p.total_buildings IS NOT NULL AND toInteger(p.total_buildings) >= toInteger($min_buildings)
+  Total villas (>= N):           p.total_villas IS NOT NULL AND toInteger(p.total_villas) >= toInteger($min_villas)
+  (Use these when user asks: "projects with more than 50 villas", "large township with many blocks", etc.)
 
   Combine multiple filters with AND.
 
