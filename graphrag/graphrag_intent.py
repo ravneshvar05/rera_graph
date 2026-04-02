@@ -84,6 +84,15 @@ class QueryIntent(BaseModel):
         None,
         description="True if user says 'around', 'approximately', 'roughly', 'about', '~', 'close to', 'approx'. Null/False otherwise."
     )
+    room_dimensions: Optional[List[dict]] = Field(
+        default_factory=list,
+        description=(
+            "List of room dimension constraints the user specified. "
+            "Each entry: {\"room\": \"Bedroom\", \"d1\": 10.6, \"d2\": 12.4}. "
+            "d1/d2 are the two dimensions in feet (feet.inches notation: 12'6\" → 12.6). "
+            "Only populate when user gives explicit NxM / N by M / N x M dimensions for a named room."
+        )
+    )
 
 
 # ── Prompt ────────────────────────────────────────────────────────────────────
@@ -118,7 +127,11 @@ Schema:
   "project_names": [<list of specific project names> or null],
   "min_units_per_floor": <integer or null>,
   "max_units_per_floor": <integer or null>,
-  "semantic_keywords": [<subjective keywords like "spacious", "luxury", "affordable"> or null]
+  "semantic_keywords": [<subjective keywords like "spacious", "luxury", "affordable"> or null],
+  "room_dimensions": [
+    {"room": "<canonical room name>", "d1": <float feet>, "d2": <float feet>},
+    ...
+  ]
 }
 
 Rules:
@@ -132,6 +145,12 @@ Rules:
 - Locality names in Gujarat: Vinzol, Bopal, Nikol, Naroda, Vatva, Gamdi, Satellite, Chandkheda, Thaltej, Vastrapur, etc.
 - area_qualifier: Set "carpet" if user says "carpet area", "carpet sqft", "by carpet". Set "super_builtup" if user says "super built-up area", "super builtup", "built-up area", "SBA". Leave null if user just says "area" or "sqft" with no such qualifier.
 - around_area: Set true if user says "around", "approximately", "roughly", "about", "~", "close to", "near about", "approx". Leave null/false for "at least", "minimum", "more than", "less than", "exactly", or a plain numeric mention with no qualifier word.
+- room_dimensions: Extract ONLY when user gives explicit dimensions (NxM, N by M, N x M, length N width M) for a named room.
+  - Map the room name to its canonical name (bedroom→"Bedroom", kitchen→"Kitchen", etc.).
+  - d1 and d2 are the two numeric values in feet, using feet.inches notation (12'6" → 12.6, 10'0" → 10.0).
+  - Example: "bedroom 10.6 by 12.4" → [{"room": "Bedroom", "d1": 10.6, "d2": 12.4}]
+  - Example: "bedroom 10x10, toilet 4x6" → [{"room": "Bedroom", "d1": 10.0, "d2": 10.0}, {"room": "Toilet", "d1": 4.0, "d2": 6.0}]
+  - Leave empty list [] if no room dimensions mentioned.
 """
 
 

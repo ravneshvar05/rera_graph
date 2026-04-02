@@ -344,7 +344,14 @@ NODES:
 - Zone {name}
 - Developer {name}
 - Unit {unit_id, project_id, unit_type, property_type (APARTMENT/VILLA/ROW_HOUSE/TENEMENT/PENTHOUSE), bhk (integer), entrance_facing (East/West/North/South), carpet_sqft, super_builtup_sqft, balcony_sqft, wash_sqft, applicable_buildings, description}
-- Room {room_type, name (canonical string), length (RAW STRING — e.g. "10'0\"", "12'-6\"", NOT a number), width (RAW STRING — e.g. "8'-0\"", NOT a number), area_sqft (FLOAT — pre-computed numeric area, the ONLY field you can filter on for room size), floor_level, attached_bathroom (0/1), has_balcony_access (0/1)}
+- Room {room_type, name (canonical string),
+           length (RAW STRING — e.g. "10'0\"", "12'-6\"" — NEVER filter on this),
+           width  (RAW STRING — NEVER filter on this),
+           area_sqft (FLOAT — pre-computed area; use for sqft-based queries: "N sqft", "around N sqft", "> N sqft"),
+           length_ft (FLOAT — numeric feet using feet.inches notation: 12'6" → 12.6, 10'0" → 10.0;
+                       use ONLY for explicit dimension queries like "10 by 12", "10 x 10"),
+           width_ft  (FLOAT — same notation as length_ft; use ONLY for dimension queries),
+           floor_level, attached_bathroom (0/1), has_balcony_access (0/1)}
 - Amenity {name, category (SPORTS/WELLNESS/SECURITY/NATURE/SOCIAL/INFRASTRUCTURE), canonical_tags (list of strings)}
 - Landmark {name, landmark_type (EDUCATION/HEALTHCARE/COMMERCIAL/TRANSPORT/RELIGIOUS/RECREATION)}
 - FloorLayout {layout_id, layout_name, total_units_on_floor, has_lifts (0/1/null), has_staircases (0/1/null), corridor_width (string or null), has_refuge_area (0/1/null)}
@@ -361,7 +368,15 @@ RELATIONSHIPS:
 
 === DATA-TYPE RULES ===
 - area_sqft → FLOAT. Always: toFloat(r.area_sqft) > toFloat($val). Fence with IS NOT NULL.
-- Room.length, Room.width → RAW STRINGS (e.g. "10'0\"", "12'-6\""). NEVER compare numerically. NEVER filter on them in Cypher. Use area_sqft for ALL room size filtering.
+- Room.length, Room.width → RAW STRINGS. NEVER filter on these in Cypher.
+- Room.area_sqft → FLOAT. Use for area queries: "N sqft", "around N sqft", "> N sqft". Always toFloat() + IS NOT NULL.
+- Room.length_ft, Room.width_ft → FLOAT in feet.inches notation (12'6" → 12.6, 10'0" → 10.0).
+  Use ONLY for explicit dimension queries ("10 by 10", "10 x 12", "length 10 width 12").
+  Filter: toFloat(r.length_ft) = toFloat($d1) AND toFloat(r.width_ft) = toFloat($d2)
+  Always use orientation-agnostic match (10x12 same as 12x10):
+    (toFloat(r.length_ft) = toFloat($d1) AND toFloat(r.width_ft) = toFloat($d2))
+    OR (toFloat(r.length_ft) = toFloat($d2) AND toFloat(r.width_ft) = toFloat($d1))
+  Always fence with IS NOT NULL on both fields.
 - carpet_sqft, super_builtup_sqft → FLOAT/NULL. Use toFloat() + IS NOT NULL check.
 - bhk → INTEGER. Direct compare: u.bhk = $bhk
 - Boolean flags (has_clubhouse etc.) → INTEGER 0/1. For positive check: p.has_pool = 1. For negative check: (p.has_commercial_shops = 0 OR p.has_commercial_shops IS NULL).
@@ -395,7 +410,6 @@ garden/park/green→["Garden","Park","Lawn","Green Space"],
 security/cctv/gated→["Security","CCTV","Gated Community"],
 kids/play area→["Children Play Area"], jogging→["Jogging Track"],
 yoga/meditation→["Yoga","Meditation"], clubhouse→["Clubhouse"], parking→["Parking"]
-System auto-expands tags in post-processing.
 """
 
 
@@ -425,13 +439,19 @@ Return a JSON object:
     "landmark_types": [<EDUCATION|HEALTHCARE|COMMERCIAL|TRANSPORT|RELIGIOUS|RECREATION>],
     "specific_landmarks": [<place names>],
     "min_sqft": <number or null>, "max_sqft": <number or null>,
+    "area_qualifier": <"carpet"|"super_builtup"|null>,
+    "around_area": <true|false|null>,
     "min_price_lakhs": <number or null>, "max_price_lakhs": <number or null>,
     "has_balcony": <bool or null>, "has_parking": <bool or null>,
     "entrance_facing": <"East"|"West"|"North"|"South"|null>,
     "developer": <string, list, or null>,
     "project_names": [<project names>],
     "semantic_keywords": [<PUT VAGUE/SUBJECTIVE ADJECTIVES HERE: e.g., 'peaceful', 'luxurious', 'affordable', 'premium'>],
-    "min_units_per_floor": <int or null>, "max_units_per_floor": <int or null>
+    "min_units_per_floor": <int or null>, "max_units_per_floor": <int or null>,
+    "room_dimensions": [
+      {{"room": "<canonical room name (Bedroom/Kitchen/Hall/etc.)>", "d1": <float feet>, "d2": <float feet>}},
+      ...
+    ]
   }}
 }}
 
@@ -564,14 +584,18 @@ Common filters:
       AND EXISTS {{ MATCH (p)-[:HAS_UNIT]->(u2)-[:HAS_ROOM]->(r2) WHERE r2.name IN ['Bedroom','Master Bedroom'] AND toInteger(r2.floor_level) = 0 }}
     "aging parents" / "senior-friendly" / "elderly" + villas -> always include ground-floor bedroom check.
 
-  Unit area — NO qualifier ("area N sqft", user did not say carpet or super built-up):
+  Unit area — ALWAYS search BOTH fields with OR (CRITICAL — many projects store only one field):
+  *** MANDATORY RULE: Regardless of whether user says 'carpet' or 'super built-up', ALWAYS use: ***
     ANY(u IN units WHERE
       (u.carpet_sqft IS NOT NULL AND <comparison on toFloat(u.carpet_sqft)>)
       OR (u.super_builtup_sqft IS NOT NULL AND <comparison on toFloat(u.super_builtup_sqft)>))
-  Unit area — "carpet area" explicitly: ANY(u IN units WHERE u.carpet_sqft IS NOT NULL AND <comparison on toFloat(u.carpet_sqft)>)
-  Unit area — "super built-up" explicitly: ANY(u IN units WHERE u.super_builtup_sqft IS NOT NULL AND <comparison on toFloat(u.super_builtup_sqft)>)
+  This is REQUIRED because many projects only populate one of the two area fields. If you filter
+  only on carpet_sqft and the project stores 1372 in super_builtup_sqft (carpet_sqft=null), the
+  project will be incorrectly excluded.
+  The area_qualifier in intent carries user preference for display only — the Cypher MUST always
+  check both fields.
   Area comparisons:
-    "around/approximately/roughly/about/~" → BETWEEN toFloat($area_min) AND toFloat($area_max)  [params: area_min=val*0.85, area_max=val*1.15]
+    "around/approximately/roughly/about/~" → >= toFloat($area_min) AND <= toFloat($area_max)  [params: area_min=val*0.85, area_max=val*1.15]
     "exactly N sqft" / plain "N sqft" (no qualifier word) → = toFloat($area_sqft)
     "at least/minimum/>=" → >= toFloat($min_sqft)
     "less than/<" → <= toFloat($max_sqft)
@@ -646,37 +670,79 @@ then add a second WITH to compute answer_data. Include answer_data in RETURN.
                          "bedroom 10 x 12", "room size 10 by 10", "toilet 4x7", "kitchen length 8 width 9"):
 
 --- ROOM DIMENSION QUERIES ("10 x 12", "10 by 10", "length 10 width 20") ---
-When the user gives room dimensions instead of sqft:
-  Step 1 — Identify the room type (bedroom, kitchen, toilet, bathroom, hall, etc.) and the two numbers.
-  Step 2 — Multiply: area_sqft = length_ft * width_ft.  (e.g. "10 x 12" → 10*12 = 120 sqft)
-  Step 3 — Treat as an "around" query with ±15% window:
-             area_min = computed_area * 0.85,  area_max = computed_area * 1.15
-  Step 4 — Use Template 4a with area_min / area_max — EXACTLY like any other room area query.
-  Dimension formats to detect (ALL map to the same conversion):
-    "10x12", "10 x 12", "10 by 12", "10*12", "10'x12'", "10 ft by 12 ft"
+When the user gives room DIMENSIONS (not sqft area), use length_ft / width_ft for EXACT matching:
+
+  Step 1 — Identify the room type and the two numbers (in feet).
+  Step 2 — DO NOT multiply. DO NOT convert to area. DO NOT use area_sqft.
+  Step 3 — Set params d1 and d2 as float values: "10 by 12" → d1=10.0, d2=12.0
+  Step 4 — Generate orientation-agnostic EXACT filter on length_ft / width_ft:
+    WHERE EXISTS {{
+      MATCH (p)-[:HAS_UNIT]->(u2:Unit)-[:HAS_ROOM]->(r2:Room)
+      WHERE r2.name IN $room_names
+      AND r2.length_ft IS NOT NULL AND r2.width_ft IS NOT NULL
+      AND (
+        (toFloat(r2.length_ft) = toFloat($d1) AND toFloat(r2.width_ft) = toFloat($d2))
+        OR (toFloat(r2.length_ft) = toFloat($d2) AND toFloat(r2.width_ft) = toFloat($d1))
+      )
+    }}
+  Step 5 — query_type=AGGREGATE. Include answer_data with matching_rooms.
+
+  Dimension formats to detect (all handled identically):
+    "10x12", "10 x 12", "10 by 12", "10*12", "10\'x12\'", "10 ft by 12 ft"
     "length 10 width 12", "10 length 12 width", "size 10 by 12"
   Assume FEET unless user explicitly says meters/cm/mm.
-  Coverage: any room name that appears in the ROOM NAMES table:
-    bedroom, master bedroom, kitchen, toilet, bathroom, WC, hall, dining, balcony, terrace,
-    wash area, pooja room, store room, study room, servant room, dressing room, lobby, passage, courtyard.
+  Applies to ALL room types: bedroom, master bedroom, kitchen, toilet, bathroom, WC, hall,
+    dining, balcony, terrace, wash area, pooja room, store room, study room, servant room,
+    dressing room, lobby, passage, courtyard.
+
+  MULTI-ROOM DIMENSION QUERY ("bedroom 10x10, toilet 3x6, balcony 7x4"):
+  When user specifies dimensions for MULTIPLE rooms simultaneously, use the EMBEDDED ROOMS
+  pattern to ensure ALL rooms are within the SAME unit:
+    WHERE ANY(u IN units WHERE
+      ANY(r IN u.rooms WHERE r.name IN $room_names_0
+        AND r.length_ft IS NOT NULL AND r.width_ft IS NOT NULL
+        AND ((toFloat(r.length_ft) = toFloat($d1_0) AND toFloat(r.width_ft) = toFloat($d2_0))
+          OR (toFloat(r.length_ft) = toFloat($d2_0) AND toFloat(r.width_ft) = toFloat($d1_0))))
+      AND ANY(r IN u.rooms WHERE r.name IN $room_names_1
+        AND r.length_ft IS NOT NULL AND r.width_ft IS NOT NULL
+        AND ((toFloat(r.length_ft) = toFloat($d1_1) AND toFloat(r.width_ft) = toFloat($d2_1))
+          OR (toFloat(r.length_ft) = toFloat($d2_1) AND toFloat(r.width_ft) = toFloat($d1_1))))
+    )
+  For 3+ rooms, add further AND ANY(...) clauses inside the same ANY(u IN units WHERE ...).
+  Params naming: room_names_0, d1_0, d2_0, room_names_1, d1_1, d2_1, room_names_2, d1_2, d2_2 ...
+  query_type=SPECIFIC for multi-room dimension queries. answer_columns=[].
 
 CRITICAL DISTINCTION — DO NOT MIX UP:
-  "10 x 12 bedroom"  →  ROOM dimension  →  multiply → r.area_sqft filter (Template 4a)
-                         query_type=AGGREGATE, answer_columns=["answer_data"]
-                         DO NOT touch u.carpet_sqft or u.super_builtup_sqft
-  "2 BHK 900 sqft"   →  UNIT area       →  u.carpet_sqft / u.super_builtup_sqft (Template 2 SPECIFIC)
-                         query_type=SPECIFIC, answer_columns=[]
-                         DO NOT touch r.area_sqft
+  "10 x 12 bedroom"  →  DIMENSION query  →  length_ft/width_ft EXACT filter (this section)
+                         params: {{d1:10.0, d2:12.0, room_names:[...]}}
+                         DO NOT use area_sqft, area_min, area_max
+  "bedroom 120 sqft" →  AREA query      →  area_sqft filter (room comparison rules below)
+  "bedroom around 120 sqft" → AREA with ±15% → area_min, area_max params
+  "2 BHK 900 sqft"   →  UNIT area       →  u.carpet_sqft / u.super_builtup_sqft (Template 2)
+                         DO NOT touch r.area_sqft or r.length_ft
   "house 10 x 12"    →  AMBIGUOUS — treat as UNIT area (10*12=120 sqft) → Template 2 SPECIFIC.
-                         Only use Template 4a when a specific room type is named.
+                         Only use dimension filter when a specific room type is named.
+
+  The RETURN answer_data matching_rooms comprehension for single-room dimension queries:
+    [u_item IN units WHERE u_item IS NOT NULL |
+      [r_item IN u_item.rooms WHERE r_item.name IN $room_names
+         AND r_item.length_ft IS NOT NULL AND r_item.width_ft IS NOT NULL
+         AND ((toFloat(r_item.length_ft) = toFloat($d1) AND toFloat(r_item.width_ft) = toFloat($d2))
+           OR (toFloat(r_item.length_ft) = toFloat($d2) AND toFloat(r_item.width_ft) = toFloat($d1)))
+       | {{unit_type: u_item.unit_type, bhk: u_item.bhk, room_name: r_item.name,
+            area_sqft: r_item.area_sqft, length: r_item.length, width: r_item.width,
+            length_ft: r_item.length_ft, width_ft: r_item.width_ft}}]][0]
+    }} AS answer_data
 
 Room comparison rules (applied to r2.area_sqft in WHERE EXISTS, and to r_item.area_sqft in RETURN):
-  "around/~" / plain N / DIMENSION QUERY → >= toFloat($area_min) AND toFloat(r2.area_sqft) <= toFloat($area_max)  [area_min=val*0.85, area_max=val*1.15]
+  "around/~" / plain N sqft → >= toFloat($area_min) AND toFloat(r2.area_sqft) <= toFloat($area_max)  [area_min=val*0.85, area_max=val*1.15]
+  DIMENSION "NxM" / "N by M" → USE length_ft/width_ft exact filter (see DIMENSION section above) — NOT area_sqft
   "exactly N" → = toFloat($area_sqft)
   "at least/bigger/larger/>=" → >= toFloat($min_area)
   "less than/<" → <= toFloat($max_area)
 (Room has only ONE area field: area_sqft. No carpet/super distinction for rooms.)
-(Room.length and Room.width are STRINGS — NEVER compare them numerically in Cypher.)
+(Room.length and Room.width are STRINGS — NEVER compare them numerically in Cypher.
+ Room.length_ft and Room.width_ft are FLOATS — use ONLY for explicit dimension queries, NOT for sqft area filtering.)
 
 CRITICAL: The area filter in the RETURN list comprehension MUST use the SAME
 parameters and comparison operator as in the WHERE EXISTS clause.
@@ -786,9 +852,9 @@ answer_data includes list of matching room details for each unit.
 17. AREA FIELD SELECTION (unit level):
     - No qualifier (user says just "area" or "sqft") → match EITHER field with OR:
       (u.carpet_sqft IS NOT NULL AND ...) OR (u.super_builtup_sqft IS NOT NULL AND ...)
-    - "carpet area" / "carpet sqft" / "by carpet" → carpet_sqft ONLY.
-    - "super built-up" / "super builtup" / "built-up area" / "SBA" → super_builtup_sqft ONLY.
-    - "exactly N sqft" → = toFloat($area_sqft), still apply field selection.
+    - "carpet area" / "carpet sqft" / "by carpet" → STILL use both fields with OR (carpet_sqft OR super_builtup_sqft). Record area_qualifier=carpet in intent for display.
+    - "super built-up" / "super builtup" / "built-up area" / "SBA" → STILL use both fields with OR. Record area_qualifier=super_builtup in intent for display.
+    - "exactly N sqft" → = toFloat($area_sqft), still apply both fields with OR.
     - Rooms only have area_sqft — field selection does not apply to rooms, only comparison logic.
 18. SAME-UNIT CORRELATION (CRITICAL): When user wants a unit that has MULTIPLE features simultaneously
     (e.g. BHK + room type + balcony), ALL conditions MUST be in ONE ANY(u IN units WHERE ...) clause.
@@ -804,21 +870,49 @@ answer_data includes list of matching room details for each unit.
     Combined with property_type if user specified one (villa, tenement, etc.).
     Also set intent.semantic_keywords=["ground floor bedroom", "senior-friendly"] for vector fallback.
 20. ROOM DIMENSION QUERIES ("bedroom 10 x 12", "toilet 4 by 7", "kitchen 8x10", "room size 10 by 10",
-    "length 10 width 20", "10'x12' bedroom", "washroom 4 ft by 6 ft"):
-    a) Identify the ROOM TYPE from the room name (use ROOM NAMES table to get canonical name).
-    b) Multiply the two numbers to get area_sqft: e.g. 10x12 = 120, 4x7 = 28, 8x10 = 80.
-    c) Apply ±15% window: area_min = area_sqft * 0.85, area_max = area_sqft * 1.15.
-    d) Use Template 4a with $room_name, $area_min, $area_max. query_type=AGGREGATE.
-    e) NEVER filter r.length or r.width (they are raw strings, not numbers).
-    f) NEVER put dimension values into u.carpet_sqft / u.super_builtup_sqft filters.
-    g) Applies to ALL room types: bedroom, bathroom, toilet, WC, kitchen, hall, dining, balcony,
-       terrace, wash area, pooja room, store room, study room, servant room, dressing room, courtyard.
-    h) If user mentions BOTH a room dimension AND a unit area (e.g. "2 BHK 900 sqft with bedroom 10x12"):
-       Generate a SPECIFIC query with the unit area filter (Template 2) combined with:
-       EXISTS {{ MATCH (p)-[:HAS_UNIT]->(u2)-[:HAS_ROOM]->(r2) WHERE r2.name IN $room_names
-         AND r2.area_sqft IS NOT NULL
-         AND toFloat(r2.area_sqft) >= toFloat($area_min) AND toFloat(r2.area_sqft) <= toFloat($area_max) }}
-       Set query_type=SPECIFIC and answer_columns=[].
+    "length 10 width 20", "10'x12' bedroom", "washroom 4 ft by 6 ft",
+    "bedroom 10x10, toilet 3x6, balcony 7x4"):
+    a) Identify the ROOM TYPE(S) from room names (use ROOM NAMES table for canonical names).
+    b) Extract the dimension numbers as d1 and d2 (in feet). DO NOT multiply. DO NOT compute area.
+    c) Use Room.length_ft and Room.width_ft with EXACT orientation-agnostic match (see DIMENSION section).
+       Single room:  params {{d1, d2, room_names}}  with EXISTS subquery on length_ft/width_ft.
+       Multi-room:   params {{d1_0, d2_0, room_names_0, d1_1, d2_1, room_names_1, ...}}
+                     with ANY(u IN units WHERE ...) embedded rooms pattern (same-unit guarantee).
+    d) NEVER use area_sqft, area_min, area_max for dimension queries.
+    e) NEVER filter r.length or r.width (raw strings, not numbers).
+    f) NEVER put dimension values into u.carpet_sqft / u.super_builtup_sqft.
+    g) Single room dimension  → query_type=AGGREGATE, answer_columns=["answer_data"].
+       Multi-room dimensions  → query_type=SPECIFIC, answer_columns=[].
+    h) *** COMBINED: unit area + room dimension (MOST COMMON REAL-WORLD CASE) ***
+       If user mentions BOTH a unit area (carpet sqft, super built-up) AND a room dimension:
+       Examples: "1372 carpet sqft with bedroom 10.6 by 12.4"
+                 "2 BHK around 900 sqft, bedroom 10x12"
+                 "flat 1200 sqft with kitchen 8 by 10 and gym"
+       MANDATORY rules:
+         i)  query_type = "SPECIFIC"  (NEVER AGGREGATE for these)
+         ii) answer_columns = []
+         iii) Use Template 2 (BASE MATCH + WHERE after WITH) with:
+              - Unit area filter using BOTH fields with OR (see rule 17 above).
+              - PLUS room dimension: AND EXISTS {{ MATCH (p)-[:HAS_UNIT]->(u2:Unit)-[:HAS_ROOM]->(r2:Room)
+                                       WHERE r2.name IN $room_names
+                                       AND r2.length_ft IS NOT NULL AND r2.width_ft IS NOT NULL
+                                       AND ((toFloat(r2.length_ft) = toFloat($d1) AND toFloat(r2.width_ft) = toFloat($d2))
+                                         OR (toFloat(r2.length_ft) = toFloat($d2) AND toFloat(r2.width_ft) = toFloat($d1))) }}
+              - Any other filters (BHK, amenity, location, landmark) are added as AND clauses too.
+         iv) DO NOT use answer_data, matching_rooms, or any AGGREGATE RETURN structure.
+         v)  The full WHERE block example:
+             WHERE ANY(u IN units WHERE
+               (u.carpet_sqft IS NOT NULL AND toFloat(u.carpet_sqft) >= toFloat($area_min) AND toFloat(u.carpet_sqft) <= toFloat($area_max))
+               OR (u.super_builtup_sqft IS NOT NULL AND toFloat(u.super_builtup_sqft) >= toFloat($area_min) AND toFloat(u.super_builtup_sqft) <= toFloat($area_max)))
+             AND EXISTS {{ MATCH (p)-[:HAS_UNIT]->(u2:Unit)-[:HAS_ROOM]->(r2:Room)
+               WHERE r2.name IN $room_names
+               AND r2.length_ft IS NOT NULL AND r2.width_ft IS NOT NULL
+               AND ((toFloat(r2.length_ft) = toFloat($d1) AND toFloat(r2.width_ft) = toFloat($d2))
+                 OR (toFloat(r2.length_ft) = toFloat($d2) AND toFloat(r2.width_ft) = toFloat($d1))) }}
+         INTENT fields for this case:
+           intent.min_sqft = <target value>  (if "around" → also set intent.around_area=true)
+           intent.area_qualifier = "carpet" | "super_builtup" | null  (display only)
+           intent.room_dimensions = [{{"room": "Bedroom", "d1": 10.6, "d2": 12.4}}]
 
 === INTENT EXTRACTION ===
 - "all projects"/"show all" → query_type="GLOBAL". Filtered → "SPECIFIC".
@@ -1070,7 +1164,8 @@ def _extract_fallback_intent(user_query: str, query_type: str = "SPECIFIC") -> Q
     """Extract a robust intent from the raw query when LLM intent parsing fails.
 
     Scans the query for known neighbourhood names, amenity keywords, BHK numbers,
-    and city names so the intent-driven fallback retriever has real filters.
+    city names, sqft area, and room dimensions so the intent-driven fallback retriever
+    has real filters even when the LLM is unavailable.
     """
     lower_query = user_query.lower()
 
@@ -1121,6 +1216,95 @@ def _extract_fallback_intent(user_query: str, query_type: str = "SPECIFIC") -> Q
         if word in lower_query:
             semantic.append(word)
 
+    # ── Sqft area ──
+    min_sqft = None
+    max_sqft = None
+    area_qualifier = None
+    around_area = None
+
+    # Detect area qualifier
+    if any(w in lower_query for w in ("carpet area", "carpet sqft", "carpet")):
+        area_qualifier = "carpet"
+    elif any(w in lower_query for w in ("super built-up", "super builtup", "built-up area", "sba")):
+        area_qualifier = "super_builtup"
+
+    # Detect "around" / approximate marker
+    if any(w in lower_query for w in ("around", "approximately", "roughly", "about", "approx", "close to", "near about")):
+        around_area = True
+
+    # Extract sqft value  e.g. "1372 sqft", "1372 carpet sqft", "1372 super builtup sqft"
+    # Allow 0-3 words between number and sqft keyword
+    sqft_match = re.search(
+        r'(\d[\d,\.]*)(?:\s+\w+){0,3}?\s*(?:sq\.?\s*ft|sqft|sq\.ft)',
+        lower_query
+    )
+
+    if sqft_match:
+        try:
+            val = float(sqft_match.group(1).replace(",", ""))
+            if around_area:
+                min_sqft = round(val * 0.85, 2)
+                max_sqft = round(val * 1.15, 2)
+            else:
+                min_sqft = val
+        except ValueError:
+            pass
+
+    # ── Room dimensions ──
+    # Regex patterns: "bedroom 10.6 by 12.4", "kitchen 8x10", "hall 10 x 10", "toilet 4*7"
+    # Map common room keywords to canonical names
+    _ROOM_KEYWORD_MAP = [
+        (r"master\s+bed(?:room)?", "Master Bedroom"),
+        (r"bed\s*room|bedroom",    "Bedroom"),
+        (r"kitchen|kitchenette",   "Kitchen"),
+        (r"hall|living|drawing\s*room|lounge", "Hall"),
+        (r"dining(?:\s*room)?",    "Dining"),
+        (r"toilet|wash\s*room|bathroom|wc|restroom", "Toilet"),
+        (r"balcony",               "Balcony"),
+        (r"terrace|rooftop",       "Terrace"),
+        (r"wash\s*area|utility|laundry", "Wash Area"),
+        (r"pooja\s*room|puja(?:\s*room)?|mandir|prayer\s*room", "Pooja Room"),
+        (r"store\s*room|storage(?:\s*room)?", "Store Room"),
+        (r"study\s*room|study",    "Study Room"),
+        (r"servant\s*room|maid\s*room", "Servant Room"),
+        (r"dressing\s*room|walk-in\s*closet", "Dressing Room"),
+        (r"lobby|foyer",           "Lobby"),
+        (r"passage|corridor|hallway", "Passage"),
+    ]
+    _DIM_PATTERN = r'(\d+\.?\d*)\s*(?:by|x|\*|×|ft\s*x|ft\s*by)\s*(\d+\.?\d*)'
+
+    room_dimensions: list[dict] = []
+    seen_canonicals: set[str] = set()
+    for room_pat, canonical in _ROOM_KEYWORD_MAP:
+        if canonical in seen_canonicals:
+            continue
+        # Forward: "<room keyword> ... <d1> by/x <d2>"
+        fwd = re.search(
+            r'(?:' + room_pat + r')(?:\s+\w+){0,4}?\s+' + _DIM_PATTERN,
+            lower_query
+        )
+        # Backward: "<d1> by/x <d2> ... <room keyword>"
+        bwd = re.search(
+            _DIM_PATTERN + r'\s+(?:\w+\s+){0,3}?' + r'(?:' + room_pat + r')',
+            lower_query
+        )
+        match = fwd or bwd
+        if match:
+            try:
+                if fwd:
+                    d1_str, d2_str = fwd.group(1), fwd.group(2)
+                else:
+                    d1_str, d2_str = bwd.group(1), bwd.group(2)
+                if d1_str is None or d2_str is None:
+                    continue
+                d1, d2 = float(d1_str), float(d2_str)
+                # Sanity check: room dimensions should be reasonable (1–100 ft)
+                if 1.0 <= d1 <= 100.0 and 1.0 <= d2 <= 100.0:
+                    room_dimensions.append({"room": canonical, "d1": d1, "d2": d2})
+                    seen_canonicals.add(canonical)
+            except (ValueError, IndexError, TypeError):
+                pass
+
     return QueryIntent(
         query_type=query_type,
         city=fallback_city,
@@ -1129,7 +1313,13 @@ def _extract_fallback_intent(user_query: str, query_type: str = "SPECIFIC") -> Q
         property_type=property_type,
         amenities=found_amenities if found_amenities else [],
         semantic_keywords=semantic if semantic else [],
+        min_sqft=min_sqft,
+        max_sqft=max_sqft,
+        area_qualifier=area_qualifier,
+        around_area=around_area,
+        room_dimensions=room_dimensions if room_dimensions else [],
     )
+
 
 
 

@@ -337,6 +337,9 @@ class GraphRetriever:
             return True
         if intent.entrance_facing:
             return True
+        # Room dimensions are a strict structural filter
+        if getattr(intent, "room_dimensions", None):
+            return True
         # property_type alone counts as a graph filter ONLY for specific types
         # (VILLA, TENEMENT, PENTHOUSE, ROW_HOUSE, BUNGALOW) — these are narrow enough
         # to be useful as a sole filter.  APARTMENT alone is too broad.
@@ -577,18 +580,47 @@ class GraphRetriever:
                     parts.append(f"toFloat(u.{field}) <= $area_hi")
                 return " AND ".join(parts)
 
-            carpet_cond      = _field_cond("carpet_sqft")
+            carpet_cond        = _field_cond("carpet_sqft")
             super_builtup_cond = _field_cond("super_builtup_sqft")
 
-            if area_qualifier == "carpet":
-                where_clauses.append(f"ANY(u IN units WHERE {carpet_cond})")
-            elif area_qualifier == "super_builtup":
-                where_clauses.append(f"ANY(u IN units WHERE {super_builtup_cond})")
-            else:
-                # No qualifier — match if EITHER area field satisfies the range
-                where_clauses.append(
-                    f"ANY(u IN units WHERE ({carpet_cond}) OR ({super_builtup_cond}))"
-                )
+            # ALWAYS check both fields with OR — many projects only populate one of the two
+            # area fields (e.g. carpet_sqft=null, super_builtup_sqft=1372).  Filtering only
+            # on carpet_sqft would miss such projects.  area_qualifier is preserved in intent
+            # for display purposes only; it does NOT restrict which DB field we query.
+            where_clauses.append(
+                f"ANY(u IN units WHERE ({carpet_cond}) OR ({super_builtup_cond}))"
+            )
+
+        # ── Room dimensions — added as EXISTS subqueries (one per room) ────────
+        room_dims = getattr(intent, "room_dimensions", None) or []
+        for i, rd in enumerate(room_dims):
+            raw_room = rd.get("room", "")
+            d1 = rd.get("d1")
+            d2 = rd.get("d2")
+            if not raw_room or d1 is None or d2 is None:
+                continue
+            # Expand room name to canonical synonyms
+            from graphrag_cypher import _expand_room_name
+            canonical_names = _expand_room_name(raw_room)
+            rnames_key = f"dim_room_names_{i}"
+            d1_key = f"dim_d1_{i}"
+            d2_key = f"dim_d2_{i}"
+            params[rnames_key] = canonical_names
+            params[d1_key] = float(d1)
+            params[d2_key] = float(d2)
+            # We can't use $list in a WHERE with IN easily via the fallback Cypher
+            # build it as: r2.name IN ['Bedroom', 'Master Bedroom']
+            names_literal = json.dumps(canonical_names)
+            where_clauses.append(
+                f"EXISTS {{ MATCH (p)-[:HAS_UNIT]->(u_dim_{i}:Unit)-[:HAS_ROOM]->(r_dim_{i}:Room) "
+                f"WHERE r_dim_{i}.name IN {names_literal} "
+                f"AND r_dim_{i}.length_ft IS NOT NULL AND r_dim_{i}.width_ft IS NOT NULL "
+                f"AND ((toFloat(r_dim_{i}.length_ft) = toFloat(${d1_key}) AND toFloat(r_dim_{i}.width_ft) = toFloat(${d2_key})) "
+                f"OR (toFloat(r_dim_{i}.length_ft) = toFloat(${d2_key}) AND toFloat(r_dim_{i}.width_ft) = toFloat(${d1_key}))) }}"
+            )
+            logger.debug(
+                f"[Fallback] Added room-dimension filter: {canonical_names} {d1}x{d2}"
+            )
 
         # Units per floor filtering
         if intent.min_units_per_floor is not None:

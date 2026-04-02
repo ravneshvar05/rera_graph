@@ -101,6 +101,95 @@ def _bool_int(val: Any) -> Optional[int]:
     return None
 
 
+
+
+
+
+
+def _parse_dim_to_feet(raw: Any) -> Optional[float]:
+    """
+    Parse a raw room dimension string to a float using Indian real-estate
+    'feet.inches' decimal notation.
+
+    Storage convention:
+      12'6"  ->  12.6   (12 feet 6 inches -- NOT 12.5)
+      10'0"  ->  10.0
+      10'9"  ->  10.9
+       5'3"  ->   5.3
+      3.05 m ->  10.0066  (meter values converted to feet precisely)
+
+    When user asks 'bedroom 10 by 10', system queries length_ft=10.0,
+    width_ft=10.0 -- matches 10'0" x 10'0" rooms exactly.
+    When user asks 'bedroom 12.6 by 10', matches 12'6" x 10'0".
+
+    All raw dimension formats found across the 20 project JSONs:
+      N'M"      10'0"  12'6"               apostrophe + inches + quote
+      N'-M"     10'-0" 12'-6"              apostrophe-dash + inches
+      N' M"     3' 5"                      space between feet and inches
+      N-M"      10-0"  10-6"               dash-based, no apostrophe
+      N-M       10-3   12-9                dash-based, no closing quote
+      N-M%      5-7%   4-10%               percent as double-quote OCR artefact
+      N'        10'    19'                 feet only
+      M"        3"                         inches only -> stored as 0.M
+      N.NN      3.05   1.83               decimal meters when val < 8
+      TN'M"     T4'0"                     leading-letter OCR typo (stripped)
+    """
+    v = _clean(raw)
+    if v is None:
+        return None
+    s = str(v).strip()
+
+    # Strip trailing descriptors ("WIDE", "W.")
+    s = _re.sub(r'\s+(?:wide|w\.?)\s*$', '', s, flags=_re.IGNORECASE).strip()
+    # Strip leading letter OCR typos: "T4'0\"" -> "4'0\""
+    s = _re.sub(r'^[A-Za-z]+(?=\d)', '', s).strip()
+
+    # Normalise unicode fractions and quote chars
+    s = (s.replace('\u00bd', '.5').replace('\u00bc', '.25').replace('\u00be', '.75')
+          .replace('\u2018', "'").replace('\u2019', "'").replace('\u02bc', "'")
+          .replace('\u2033', '"').replace('\u201d', '"')
+          .replace('%', '"'))          # % used as " OCR artefact
+    if not s:
+        return None
+
+    # Pattern 1: apostrophe-based  N'M"  N'-M"  N' M"
+    m = _re.match(r"^(\d+(?:\.\d+)?)\s*'\s*-?\s*(\d+(?:\.\d+)?)\s*\"?$", s)
+    if m:
+        feet   = int(float(m.group(1)))
+        inches = round(float(m.group(2)))
+        return float(f"{feet}.{inches}")
+
+    # Pattern 2: dash-based  N-M"  N-M
+    m = _re.match(r"^(\d+)-(\d+(?:\.\d+)?)\s*\"?$", s)
+    if m:
+        feet   = int(m.group(1))
+        inches = round(float(m.group(2)))
+        return float(f"{feet}.{inches}")
+
+    # Pattern 3: feet only  N'
+    m = _re.match(r"^(\d+(?:\.\d+)?)\s*'$", s)
+    if m:
+        return float(m.group(1))
+
+    # Pattern 4: inches only  N"  -> 0.N
+    m = _re.match(r'^(\d+)\s*"$', s)
+    if m:
+        return float(f"0.{int(m.group(1))}")
+
+    # Pattern 5: pure decimal   (meters if < 8.0, otherwise bare feet)
+    m = _re.match(r'^(\d+(?:\.\d+)?)$', s)
+    if m:
+        val = float(m.group(1))
+        if val < 8.0:
+            # Treat as METERS, convert to feet precisely
+            return round(val * 3.28084, 4)
+        return val
+
+    return None   # unparsable -> None stored in Neo4j
+
+
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 #  PROJECT ID NORMALISATION
 # ══════════════════════════════════════════════════════════════════════════════
@@ -680,6 +769,8 @@ CREATE (r:Room {
     length:             $length,
     width:              $width,
     area_sqft:          $area_sqft,
+    length_ft:          $length_ft,
+    width_ft:           $width_ft,
     floor_level:        $floor_level,
     attached_bathroom:  $attached_bathroom,
     has_balcony_access: $has_balcony_access
@@ -947,6 +1038,8 @@ def ingest_one(
                     "length":           _str(room.get("length")),
                     "width":            _str(room.get("width")),
                     "area_sqft":        _float(room.get("area_sqft")),
+                    "length_ft":        _parse_dim_to_feet(room.get("length")),
+                    "width_ft":         _parse_dim_to_feet(room.get("width")),
                     "floor_level":      _str(room.get("floor_level")),
                     "attached_bathroom":_bool_int(room.get("attached_bathroom")),
                     "has_balcony_access":_bool_int(room.get("has_balcony_access")),

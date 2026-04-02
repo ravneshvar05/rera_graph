@@ -47,6 +47,8 @@ INDEXES = [
     ("idx_room_name",         "Room",    ["name"]),
     ("idx_room_type",         "Room",    ["room_type"]),
     ("idx_room_area",         "Room",    ["area_sqft"]),
+    ("idx_room_length_ft",    "Room",    ["length_ft"]),
+    ("idx_room_width_ft",     "Room",    ["width_ft"]),
     ("idx_unit_carpet",       "Unit",    ["carpet_sqft"]),
     ("idx_unit_facing",       "Unit",    ["entrance_facing"]),
     ("idx_amenity_tags",      "Amenity", ["canonical_tags"]),
