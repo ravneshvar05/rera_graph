@@ -1,0 +1,732 @@
+[
+  {
+    "id": "TC-01",
+    "category": "BHK_BASIC",
+    "description": "Simple 1 BHK search — most entry-level query type",
+    "query": "show me 1 BHK flats",
+    "expected_intent": {
+      "query_type": "SPECIFIC",
+      "bhk": 1,
+      "property_type": "APARTMENT"
+    },
+    "expected_projects_include": [
+      "Vardhman Greens",
+      "Devnandan Sankalp City",
+      "Satyesh Residency",
+      "Sitaram City",
+      "svasaar pravesh",
+      "Pushpak City"
+    ],
+    "expected_projects_exclude": [
+      "KP Villas",
+      "POONAM PRIDE",
+      "SATYAMEV ELYSIUM"
+    ],
+    "retrieval_type": ["GRAPH", "VECTOR"],
+    "notes": "Should return all projects with 1 BHK apartment units. Basic BHK filter test."
+  },
+  {
+    "id": "TC-02",
+    "category": "BHK_LOCATION",
+    "description": "2 BHK in specific neighbourhood — common pinpointed query",
+    "query": "2 BHK apartment in Sarkhej",
+    "expected_intent": {
+      "query_type": "SPECIFIC",
+      "bhk": 2,
+      "property_type": "APARTMENT",
+      "neighbourhood": "Sarkhej"
+    },
+    "expected_projects_include": [
+      "AMBER 2 BHK RESIDENCY",
+      "Sunflower Enclave"
+    ],
+    "expected_projects_exclude": [
+      "The Legend",
+      "Vardhman Greens",
+      "ICON green"
+    ],
+    "retrieval_type": ["GRAPH"],
+    "notes": "Tests neighbourhood filtering combined with BHK. Both Sarkhej projects are 2 BHK."
+  },
+  {
+    "id": "TC-03",
+    "category": "BHK_AMENITY",
+    "description": "2 BHK with swimming pool — amenity filter test",
+    "query": "2 BHK flat with swimming pool",
+    "expected_intent": {
+      "query_type": "SPECIFIC",
+      "bhk": 2,
+      "amenities": ["swimming pool"]
+    },
+    "expected_projects_include": [
+      "Mukhi Residency",
+      "Elysium at Shantigram"
+    ],
+    "expected_projects_exclude": [
+      "AMBER 2 BHK RESIDENCY",
+      "Advait Residency",
+      "Sunflower Enclave"
+    ],
+    "retrieval_type": ["GRAPH"],
+    "notes": "Only Mukhi Residency and Elysium at Shantigram have pool=True AND offer 2 BHK."
+  },
+  {
+    "id": "TC-04",
+    "category": "CITY_FILTER",
+    "description": "All projects in Surat — city-level filter",
+    "query": "residential projects in Surat",
+    "expected_intent": {
+      "query_type": "SPECIFIC",
+      "city": "Surat"
+    },
+    "expected_projects_include": [
+      "Shikhar Avenue",
+      "The Legend"
+    ],
+    "expected_projects_exclude": [
+      "Vardhman Greens",
+      "ICON green",
+      "KP Villas"
+    ],
+    "retrieval_type": ["GRAPH"],
+    "notes": "Only 2 projects are in Surat (Shikhar Avenue, The Legend). Tests city isolation."
+  },
+  {
+    "id": "TC-05",
+    "category": "CITY_FILTER",
+    "description": "Projects in Vadodara — non-Ahmedabad city",
+    "query": "show me flats in Vadodara",
+    "expected_intent": {
+      "query_type": "SPECIFIC",
+      "city": "Vadodara"
+    },
+    "expected_projects_include": [
+      "ICON green",
+      "Pushpa Residency"
+    ],
+    "expected_projects_exclude": [
+      "Shikhar Avenue",
+      "Vardhman Greens",
+      "KP Villas"
+    ],
+    "retrieval_type": ["GRAPH"],
+    "notes": "Only 2 projects in Vadodara. Tests multi-city corpus handling."
+  },
+  {
+    "id": "TC-06",
+    "category": "CITY_FILTER",
+    "description": "Projects in Rajkot — tests least common city",
+    "query": "housing projects in Rajkot",
+    "expected_intent": {
+      "query_type": "SPECIFIC",
+      "city": "Rajkot"
+    },
+    "expected_projects_include": [
+      "Vardhman Greens",
+      "Copper CLASSIC"
+    ],
+    "expected_projects_exclude": [
+      "ICON green",
+      "Shikhar Avenue"
+    ],
+    "retrieval_type": ["GRAPH"],
+    "notes": "Only 2 projects in Rajkot. Must verify city case-insensitivity."
+  },
+  {
+    "id": "TC-07",
+    "category": "PROPERTY_TYPE",
+    "description": "Villa search — property type filter",
+    "query": "I want a villa",
+    "expected_intent": {
+      "query_type": "SPECIFIC",
+      "property_type": "VILLA"
+    },
+    "expected_projects_include": [
+      "KP Villas",
+      "NIVAAN GREENS",
+      "POONAM PRIDE",
+      "Shivalik Lake View",
+      "Sudama Homes",
+      "Pushpa Residency"
+    ],
+    "expected_projects_exclude": [
+      "Vardhman Greens",
+      "AMBER 2 BHK RESIDENCY",
+      "SATYAMEV ELYSIUM"
+    ],
+    "retrieval_type": ["GRAPH"],
+    "notes": "Should retrieve all VILLA property_type units only."
+  },
+  {
+    "id": "TC-08",
+    "category": "PROPERTY_TYPE",
+    "description": "Penthouse search — rare property type test",
+    "query": "penthouse apartment in Ahmedabad",
+    "expected_intent": {
+      "query_type": "SPECIFIC",
+      "property_type": "PENTHOUSE",
+      "city": "Ahmedabad"
+    },
+    "expected_projects_include": [
+      "SATYAMEV ELYSIUM"
+    ],
+    "expected_projects_exclude": [
+      "KP Villas",
+      "Vardhman Greens",
+      "POONAM PRIDE"
+    ],
+    "retrieval_type": ["GRAPH", "VECTOR"],
+    "notes": "Only SATYAMEV ELYSIUM has PENTHOUSE units. Tests rare type retrieval."
+  },
+  {
+    "id": "TC-09",
+    "category": "PROPERTY_TYPE_AMBIGUOUS",
+    "description": "Independent house search — ambiguous type that maps to multiple types",
+    "query": "independent house in Ahmedabad",
+    "expected_intent": {
+      "query_type": "SPECIFIC",
+      "property_type": ["TENEMENT", "VILLA", "BUNGALOW", "ROW_HOUSE"],
+      "city": "Ahmedabad"
+    },
+    "expected_projects_include": [
+      "KP Villas",
+      "NIVAAN GREENS",
+      "POONAM PRIDE",
+      "Shivalik Lake View",
+      "Sudama Homes",
+      "Pushpak City"
+    ],
+    "expected_projects_exclude": [
+      "AMBER 2 BHK RESIDENCY",
+      "Vardhman Greens",
+      "ICON green"
+    ],
+    "retrieval_type": ["GRAPH"],
+    "notes": "The term 'independent house' should trigger multi-type property_type list per intent rules."
+  },
+  {
+    "id": "TC-10",
+    "category": "MULTI_AMENITY",
+    "description": "3 BHK with gym and clubhouse — multi-amenity filter",
+    "query": "3 BHK flat with gym and clubhouse",
+    "expected_intent": {
+      "query_type": "SPECIFIC",
+      "bhk": 3,
+      "amenities": ["gym", "clubhouse"]
+    },
+    "expected_projects_include": [
+      "Aman Residency",
+      "Dwarkesh Greens",
+      "Swastik Harmony"
+    ],
+    "expected_projects_exclude": [
+      "SURYA KUTIR",
+      "Gandhi Galaxy",
+      "Vardhman Greens"
+    ],
+    "retrieval_type": ["GRAPH", "VECTOR"],
+    "notes": "Tests multi-amenity conjunction. Projects must have 3 BHK AND gym AND clubhouse."
+  },
+  {
+    "id": "TC-11",
+    "category": "LANDMARK_TYPE",
+    "description": "Near school — landmark type inference",
+    "query": "2 BHK flat near school for family",
+    "expected_intent": {
+      "query_type": "SPECIFIC",
+      "bhk": 2,
+      "landmark_types": ["EDUCATION"],
+      "semantic_keywords": ["family"]
+    },
+    "expected_projects_include": [],
+    "expected_projects_exclude": [],
+    "retrieval_type": ["GRAPH", "VECTOR"],
+    "notes": "Tests landmark type extraction. Projects near schools may vary; focus on intent parsing correctness. Should pass semantic 'family' to vector."
+  },
+  {
+    "id": "TC-12",
+    "category": "AREA_FILTER",
+    "description": "Carpet area range query — area constraint test",
+    "query": "2 BHK flat with carpet area between 500 and 700 sqft",
+    "expected_intent": {
+      "query_type": "SPECIFIC",
+      "bhk": 2,
+      "min_sqft": 500,
+      "max_sqft": 700,
+      "area_qualifier": "carpet"
+    },
+    "expected_projects_include": [
+      "Advait Residency",
+      "AMBER 2 BHK RESIDENCY",
+      "Aman Residency"
+    ],
+    "expected_projects_exclude": [],
+    "retrieval_type": ["GRAPH"],
+    "notes": "Tests carpet area qualifier + min/max sqft parsing. Advait Residency units range 520-543 sqft carpet."
+  },
+  {
+    "id": "TC-13",
+    "category": "AREA_FILTER_APPROX",
+    "description": "Around 1000 sqft — approximate area test",
+    "query": "3 BHK apartment around 1000 sqft",
+    "expected_intent": {
+      "query_type": "SPECIFIC",
+      "bhk": 3,
+      "min_sqft": 1000,
+      "around_area": true
+    },
+    "expected_projects_include": [],
+    "expected_projects_exclude": [],
+    "retrieval_type": ["GRAPH"],
+    "notes": "Tests 'around' fuzzy area flag. System should apply tolerance band (e.g. ±15%) around 1000 sqft."
+  },
+  {
+    "id": "TC-14",
+    "category": "ROOM_DIMENSION",
+    "description": "Specific bedroom dimension query",
+    "query": "2 BHK flat with bedroom at least 10x12",
+    "expected_intent": {
+      "query_type": "SPECIFIC",
+      "bhk": 2,
+      "room_dimensions": [{"room": "Bedroom", "d1": 10.0, "d2": 12.0}]
+    },
+    "expected_projects_include": [
+      "AMBER 2 BHK RESIDENCY",
+      "Aman Residency"
+    ],
+    "expected_projects_exclude": [],
+    "retrieval_type": ["GRAPH"],
+    "notes": "Tests room_dimensions extraction. Bedroom 10x12 = 120 sqft; filters on actual room dimensions in Neo4j."
+  },
+  {
+    "id": "TC-15",
+    "category": "ROOM_DIMENSION_MULTI",
+    "description": "Multiple room dimension constraints",
+    "query": "flat with bedroom 10x11 and kitchen 8x10",
+    "expected_intent": {
+      "query_type": "SPECIFIC",
+      "room_dimensions": [
+        {"room": "Bedroom", "d1": 10.0, "d2": 11.0},
+        {"room": "Kitchen", "d1": 8.0, "d2": 10.0}
+      ]
+    },
+    "expected_projects_include": [],
+    "expected_projects_exclude": [],
+    "retrieval_type": ["GRAPH"],
+    "notes": "Tests multi-room dimension parsing. Both bedroom AND kitchen must satisfy the constraint simultaneously."
+  },
+  {
+    "id": "TC-16",
+    "category": "SPECIAL_ROOM",
+    "description": "Pooja room requirement — special room existence filter",
+    "query": "flat with pooja room",
+    "expected_intent": {
+      "query_type": "SPECIFIC",
+      "semantic_keywords": ["pooja room"]
+    },
+    "expected_projects_include": [
+      "Advait Residency",
+      "KP Villas",
+      "POONAM PRIDE",
+      "RATNAAKAR 6 beaumonde",
+      "Swastik Harmony",
+      "The Legend",
+      "UMA VIHAR ELYSIUM",
+      "PALAK ELINA",
+      "NIVAAN GREENS"
+    ],
+    "expected_projects_exclude": [
+      "AMBER 2 BHK RESIDENCY",
+      "Vardhman Greens",
+      "Sunflower Enclave"
+    ],
+    "retrieval_type": ["GRAPH", "VECTOR"],
+    "notes": "Tests filtering on POOJA_ROOM room_type. Multiple projects have this room type."
+  },
+  {
+    "id": "TC-17",
+    "category": "SPECIAL_ROOM",
+    "description": "Study room requirement",
+    "query": "show me projects that have a study room",
+    "expected_intent": {
+      "query_type": "SPECIFIC",
+      "semantic_keywords": ["study room"]
+    },
+    "expected_projects_include": [
+      "KP Villas",
+      "Pushpa Residency",
+      "RATNAAKAR 6 beaumonde",
+      "Elysium at Shantigram"
+    ],
+    "expected_projects_exclude": [
+      "Gandhi Galaxy",
+      "Vardhman Greens",
+      "AMBER 2 BHK RESIDENCY"
+    ],
+    "retrieval_type": ["GRAPH", "VECTOR"],
+    "notes": "Tests STUDY_ROOM filtering. Only 4 projects in corpus have study rooms."
+  },
+  {
+    "id": "TC-18",
+    "category": "ZONE_FILTER",
+    "description": "West Ahmedabad zone query — zone-based retrieval",
+    "query": "projects in west Ahmedabad",
+    "expected_intent": {
+      "query_type": "SPECIFIC",
+      "zone": "West Ahmedabad"
+    },
+    "expected_projects_include": [
+      "TREZURE ENCLAVE-I",
+      "Dwarkesh Greens",
+      "KP Villas",
+      "PALAK ELINA",
+      "POONAM PRIDE"
+    ],
+    "expected_projects_exclude": [
+      "Advait Residency",
+      "Mukhi Residency",
+      "Vardhman Greens"
+    ],
+    "retrieval_type": ["GRAPH"],
+    "notes": "Zone mapping for 'west Ahmedabad' should match Thaltej, Bopal, Shela, Gokuldham, Satellite, Iscon-Ambli areas."
+  },
+  {
+    "id": "TC-19",
+    "category": "STATUS_FILTER",
+    "description": "Ready to move property — status filter test",
+    "query": "ready to move 2 BHK flat in Ahmedabad",
+    "expected_intent": {
+      "query_type": "SPECIFIC",
+      "bhk": 2,
+      "city": "Ahmedabad",
+      "semantic_keywords": ["ready to move"]
+    },
+    "expected_projects_include": [
+      "Sunflower Enclave"
+    ],
+    "expected_projects_exclude": [
+      "Vardhman Greens",
+      "Elysium at Shantigram",
+      "Shikhar Avenue"
+    ],
+    "retrieval_type": ["GRAPH", "VECTOR"],
+    "notes": "Sunflower Enclave is READY_TO_MOVE with 2 BHK in Ahmedabad (Sarkhej) — should surface via vector semantic match."
+  },
+  {
+    "id": "TC-20",
+    "category": "LUXURY_SEMANTIC",
+    "description": "Luxury high-end property — semantic/fuzzy query",
+    "query": "luxury 4 BHK or 5 BHK apartment in Ahmedabad with all amenities",
+    "expected_intent": {
+      "query_type": "SPECIFIC",
+      "bhk": [4, 5],
+      "city": "Ahmedabad",
+      "semantic_keywords": ["luxury", "all amenities"]
+    },
+    "expected_projects_include": [
+      "SATYAMEV ELYSIUM",
+      "PALAK ELINA",
+      "RATNAAKAR 6 beaumonde"
+    ],
+    "expected_projects_exclude": [
+      "Vardhman Greens",
+      "Advait Residency"
+    ],
+    "retrieval_type": ["VECTOR"],
+    "notes": "Multi-BHK list [4,5] + semantic fuzzy. Vector retrieval should rank high-amenity count projects higher."
+  },
+  {
+    "id": "TC-21",
+    "category": "GLOBAL_QUERY",
+    "description": "All projects overview — GLOBAL query type test",
+    "query": "show me all available residential projects",
+    "expected_intent": {
+      "query_type": "GLOBAL"
+    },
+    "expected_projects_include": [
+      "Vardhman Greens",
+      "SATYAMEV ELYSIUM",
+      "KP Villas",
+      "Shikhar Avenue",
+      "ICON green"
+    ],
+    "expected_projects_exclude": [],
+    "retrieval_type": ["GRAPH"],
+    "notes": "Should return all 35 projects. Tests GLOBAL query_type routing and result count."
+  },
+  {
+    "id": "TC-22",
+    "category": "LOOKUP",
+    "description": "Specific project details lookup — named project query",
+    "query": "tell me about Elysium at Shantigram",
+    "expected_intent": {
+      "query_type": "SPECIFIC",
+      "project_names": ["Elysium at Shantigram"]
+    },
+    "expected_projects_include": [
+      "Elysium at Shantigram"
+    ],
+    "expected_projects_exclude": [
+      "SATYAMEV ELYSIUM",
+      "POONAM PRIDE"
+    ],
+    "retrieval_type": ["GRAPH", "VECTOR"],
+    "notes": "Named project lookup. Should match 'Elysium at Shantigram' specifically, not just 'elysium' substring."
+  },
+  {
+    "id": "TC-23",
+    "category": "LOOKUP",
+    "description": "Room size lookup in specific project — AGGREGATE/LOOKUP type",
+    "query": "what is the hall size in OUM Orbit Ahmedabad",
+    "expected_intent": {
+      "query_type": "SPECIFIC",
+      "project_names": ["Oum Orbit", "OUM Orbit"]
+    },
+    "expected_projects_include": [
+      "ORBIT OF HAPPINESS"
+    ],
+    "expected_projects_exclude": [],
+    "retrieval_type": ["GRAPH"],
+    "notes": "AGGREGATE query asking for specific room data in named project. Hall in Orbit project should have dimensions."
+  },
+  {
+    "id": "TC-24",
+    "category": "MULTI_CITY",
+    "description": "Multi-city search — list of cities",
+    "query": "2 or 3 BHK flat in Surat or Vadodara",
+    "expected_intent": {
+      "query_type": "SPECIFIC",
+      "bhk": [2, 3],
+      "city": ["Surat", "Vadodara"]
+    },
+    "expected_projects_include": [
+      "Shikhar Avenue",
+      "ICON green"
+    ],
+    "expected_projects_exclude": [
+      "Vardhman Greens",
+      "KP Villas",
+      "Elysium at Shantigram"
+    ],
+    "retrieval_type": ["GRAPH"],
+    "notes": "Tests multi-city + multi-BHK list. Shikhar Avenue (Surat, 2+3 BHK), ICON green (Vadodara, 2+3 BHK) should match."
+  },
+  {
+    "id": "TC-25",
+    "category": "EDGE_NEGATIVE",
+    "description": "Edge case — no matching projects for very specific constraint",
+    "query": "1 BHK villa in Surat with swimming pool",
+    "expected_intent": {
+      "query_type": "SPECIFIC",
+      "bhk": 1,
+      "property_type": "VILLA",
+      "city": "Surat",
+      "amenities": ["swimming pool"]
+    },
+    "expected_projects_include": [],
+    "expected_projects_exclude": [],
+    "retrieval_type": ["GRAPH", "VECTOR"],
+    "notes": "No project satisfies all 3 constraints simultaneously. System should return empty or graceful 'no exact match' response with partial suggestions."
+  },
+  {
+    "id": "TC-26",
+    "category": "EDGE_NEGATIVE",
+    "description": "Edge case — non-existent neighbourhood",
+    "query": "3 BHK flat in Maninagar",
+    "expected_intent": {
+      "query_type": "SPECIFIC",
+      "bhk": 3,
+      "neighbourhood": "Maninagar"
+    },
+    "expected_projects_include": [],
+    "expected_projects_exclude": [],
+    "retrieval_type": ["GRAPH", "VECTOR"],
+    "notes": "Maninagar is a real Ahmedabad area but not in our corpus. System should gracefully return no results or fallback to broader 3 BHK results."
+  },
+  {
+    "id": "TC-27",
+    "category": "DEVELOPER_LOOKUP",
+    "description": "Developer-specific search",
+    "query": "projects by Satyamev Developers",
+    "expected_intent": {
+      "query_type": "SPECIFIC",
+      "developer": "Satyamev Developers"
+    },
+    "expected_projects_include": [
+      "SATYAMEV ELYSIUM"
+    ],
+    "expected_projects_exclude": [
+      "KP Villas",
+      "POONAM PRIDE"
+    ],
+    "retrieval_type": ["GRAPH", "VECTOR"],
+    "notes": "Tests developer name filtering. Should surface only projects by Satyamev Developers."
+  },
+  {
+    "id": "TC-28",
+    "category": "AREA_QUALIFIER",
+    "description": "Super built-up area qualifier test",
+    "query": "4 BHK with super built-up area above 1500 sqft",
+    "expected_intent": {
+      "query_type": "SPECIFIC",
+      "bhk": 4,
+      "min_sqft": 1500,
+      "area_qualifier": "super_builtup"
+    },
+    "expected_projects_include": [
+      "KP Villas",
+      "SATYAMEV ELYSIUM",
+      "POONAM PRIDE",
+      "Shivalik Lake View"
+    ],
+    "expected_projects_exclude": [
+      "Vardhman Greens",
+      "Advait Residency"
+    ],
+    "retrieval_type": ["GRAPH"],
+    "notes": "Tests super_builtup area qualifier specifically. KP Villas units have SBA > 1800 sqft."
+  },
+  {
+    "id": "TC-29",
+    "category": "FLOOR_COUNT",
+    "description": "Multi-floor house — num_floors extraction",
+    "query": "2 floor house in Ahmedabad",
+    "expected_intent": {
+      "query_type": "SPECIFIC",
+      "num_floors": 2,
+      "property_type": ["TENEMENT", "VILLA", "BUNGALOW"],
+      "city": "Ahmedabad"
+    },
+    "expected_projects_include": [
+      "KP Villas"
+    ],
+    "expected_projects_exclude": [
+      "AMBER 2 BHK RESIDENCY",
+      "Vardhman Greens"
+    ],
+    "retrieval_type": ["GRAPH"],
+    "notes": "KP Villas Variant 1B has num_floors=2. Tests num_floors intent extraction for independent housing context."
+  },
+  {
+    "id": "TC-30",
+    "category": "FLOOR_COUNT",
+    "description": "Duplex property — special floor count term",
+    "query": "duplex house Ahmedabad",
+    "expected_intent": {
+      "query_type": "SPECIFIC",
+      "num_floors": 2,
+      "property_type": ["TENEMENT", "VILLA", "BUNGALOW"],
+      "city": "Ahmedabad"
+    },
+    "expected_projects_include": [
+      "KP Villas"
+    ],
+    "expected_projects_exclude": [
+      "Elysium at Shantigram",
+      "SATYAMEV ELYSIUM"
+    ],
+    "retrieval_type": ["GRAPH", "VECTOR"],
+    "notes": "'Duplex' should parse to num_floors=2 + independent property types per intent rules."
+  },
+  {
+    "id": "TC-31",
+    "category": "FACING_DIRECTION",
+    "description": "East-facing unit preference",
+    "query": "east facing 4 BHK apartment in Ahmedabad",
+    "expected_intent": {
+      "query_type": "SPECIFIC",
+      "bhk": 4,
+      "city": "Ahmedabad",
+      "entrance_facing": "East"
+    },
+    "expected_projects_include": [
+      "KP Villas",
+      "SATYAMEV ELYSIUM"
+    ],
+    "expected_projects_exclude": [],
+    "retrieval_type": ["GRAPH"],
+    "notes": "Tests entrance_facing filter. KP Villas variants are East-facing. SATYAMEV ELYSIUM UNIT-101 and UNIT-102 are East-facing."
+  },
+  {
+    "id": "TC-32",
+    "category": "MULTI_AMENITY_COMPLEX",
+    "description": "Complex multi-amenity with location — real-world buyer scenario",
+    "query": "3 BHK apartment in Thaltej with swimming pool, gym and jogging track",
+    "expected_intent": {
+      "query_type": "SPECIFIC",
+      "bhk": 3,
+      "neighbourhood": "Thaltej",
+      "amenities": ["swimming pool", "gym", "jogging track"]
+    },
+    "expected_projects_include": [
+      "TREZURE ENCLAVE-I"
+    ],
+    "expected_projects_exclude": [
+      "Dwarkesh Greens",
+      "AMBER 2 BHK RESIDENCY"
+    ],
+    "retrieval_type": ["GRAPH"],
+    "notes": "Thaltej-Shilaj area. TREZURE ENCLAVE-I has 3+4 BHK and swimming pool. Tests complex compound query."
+  },
+  {
+    "id": "TC-33",
+    "category": "SEMANTIC_FAMILY",
+    "description": "Family-friendly query — semantic keyword driven",
+    "query": "family friendly project with children play area and senior citizen area",
+    "expected_intent": {
+      "query_type": "SPECIFIC",
+      "amenities": ["children play area", "senior citizen area"],
+      "semantic_keywords": ["family friendly"]
+    },
+    "expected_projects_include": [
+      "SATYAMEV ELYSIUM",
+      "Vardhman Greens",
+      "Aman Residency"
+    ],
+    "expected_projects_exclude": [],
+    "retrieval_type": ["GRAPH", "VECTOR"],
+    "notes": "Tests multi-amenity + semantic keyword combo. Vector retrieval should augment graph results for 'family friendly'."
+  },
+  {
+    "id": "TC-34",
+    "category": "GULATI_TERM",
+    "description": "Gujarati property term — pandhut = tenement",
+    "query": "pandhut in Ahmedabad",
+    "expected_intent": {
+      "query_type": "SPECIFIC",
+      "property_type": "TENEMENT",
+      "city": "Ahmedabad"
+    },
+    "expected_projects_include": [
+      "Pushpak City"
+    ],
+    "expected_projects_exclude": [
+      "KP Villas",
+      "AMBER 2 BHK RESIDENCY"
+    ],
+    "retrieval_type": ["GRAPH"],
+    "notes": "Tests Gujarati term 'pandhut' → TENEMENT mapping per intent rules. Pushpak City has TENEMENT units."
+  },
+  {
+    "id": "TC-35",
+    "category": "NEW_LAUNCH",
+    "description": "New launch project — semantic status query",
+    "query": "newly launched residential projects in Ahmedabad",
+    "expected_intent": {
+      "query_type": "SPECIFIC",
+      "city": "Ahmedabad",
+      "semantic_keywords": ["new launch", "newly launched"]
+    },
+    "expected_projects_include": [
+      "Shivalik Lake View",
+      "Sudama Homes",
+      "RASHMI AANGAN"
+    ],
+    "expected_projects_exclude": [
+      "Sunflower Enclave",
+      "ICON green"
+    ],
+    "retrieval_type": ["VECTOR"],
+    "notes": "NEW_LAUNCH status projects: Shivalik Lake View, Sudama Homes in Ahmedabad. Primarily vector retrieval scenario."
+  }
+]

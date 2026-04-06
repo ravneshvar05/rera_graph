@@ -88,8 +88,12 @@ class QueryIntent(BaseModel):
         default_factory=list,
         description=(
             "List of room dimension constraints the user specified. "
-            "Each entry: {\"room\": \"Bedroom\", \"d1\": 10.6, \"d2\": 12.4}. "
-            "d1/d2 are the two dimensions in feet (feet.inches notation: 12'6\" → 12.6). "
+            "Each entry: {\"room\": \"Bedroom\", \"d1\": 10.6, \"d2\": 12.4, \"dim_qualifier\": null}. "
+            "d1/d2 are the two dimensions in feet (feet.inches notation: 12'6\" \u2192 12.6). "
+            "dim_qualifier: null/\"exact\" = exact match (default, no tolerance); "
+            "\"around\" = ±15%% on each dimension independently (NOT area multiplication); "
+            "\"gte\" = both dimensions >= given values (at least / bigger than / minimum); "
+            "\"lte\" = both dimensions <= given values (less than / smaller than / under). "
             "Only populate when user gives explicit NxM / N by M / N x M dimensions for a named room."
         )
     )

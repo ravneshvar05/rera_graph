@@ -35,32 +35,70 @@ from kg_config import settings
 
 CITY_ZONES: dict[str, dict[str, list[str]]] = {
     "Ahmedabad": {
-        "West Ahmedabad":    [
-            "Bopal", "South Bopal", "New Bopal", "Shela", "Ambli",
+        "West Ahmedabad": [
+            # Canonical names
+            "Bopal", "South Bopal", "New Bopal", "Ambli",
             "Satellite", "Prahlad Nagar", "Anand Nagar", "Vastrapur",
             "Bodakdev", "Thaltej", "Gokuldham", "Shilaj", "Science City Road",
+            # Exact DB neighbourhood names
+            "SHELA", "Shela",
+            "Thaltej - Shilaj Road",
+            "Iscon-Ambli Road",
+            "Shantigram",
+            "Jodhpur, Satellite",
+            "Jodhpur Satellite",
+            "Sola",
+            "Shantipura Cross Roads, Bopal, Iscon-Ambli Road, Sardar Patel Ring Road",
         ],
-        "East Ahmedabad":    [
+        "East Ahmedabad": [
             "Nikol", "New Nikol", "Naroda", "New Naroda", "Vastral",
-            "Kathwada", "Odhav", "Hathijan", "Vastral Road",
+            "Kathwada", "Odhav", "Vastral Road",
+            # Exact DB neighbourhood names
+            "New Nikol - Naroda Road",
+            "Naroda, Hanspura Road",
+            "Ramol Village",
+            "New Vatva",
+            "Hathijan",
+            "Kubernagar",
         ],
-        "North Ahmedabad":   [
+        "North Ahmedabad": [
             "Chandkheda", "Ranip", "New Ranip", "Gota", "Motera",
             "Chiloda", "Kotarpur", "Chiloda-Kotarpur",
+            # Exact DB neighbourhood names
+            "Manipur",
         ],
-        "South Ahmedabad":   [
+        "South Ahmedabad": [
             "Sarkhej", "Vejalpur", "Juhapura", "Narol", "Vatva",
             "Isanpur", "Gamdi Gaam", "Gamdi", "Vinzol", "Vizol",
             "Hanspur", "Hanspura",
+            # Exact DB neighbourhood names
+            "Vatva", "New Vatva",
+            "Danteshwar",
+            "Vishala Circle",
+            "Vardhman Nagar",
         ],
         "Central Ahmedabad": [
             "Maninagar", "Paldi", "Navrangpura", "Ellisbridge", "Ghatlodia",
+            # Exact DB neighbourhood names
+            "NARANPURA", "Naranpura",
+            "Race Course",
         ],
     },
     "Surat": {
-        "West Surat":  ["Adajan", "Pal", "Vesu", "Piplod"],
+        "West Surat":  [
+            "Adajan", "Pal", "Vesu", "Piplod",
+            # Exact DB neighbourhood names
+            "Vesu, Udhana Magdalla Road",
+        ],
         "East Surat":  ["Sarthana", "Katargam", "Varachha"],
-        "North Surat": ["Jahangirpura"],
+        "North Surat": [
+            "Jahangirpura",
+        ],
+    },
+    "Vadodara": {
+        "Vadodara": [
+            "Vasna-Bhayli Road, Bhyali", "Vasna-Bhayli Road", "Bhyali",
+        ],
     },
 }
 

@@ -591,36 +591,90 @@ class GraphRetriever:
                 f"ANY(u IN units WHERE ({carpet_cond}) OR ({super_builtup_cond}))"
             )
 
-        # ── Room dimensions — added as EXISTS subqueries (one per room) ────────
+        # ── Room dimensions — EXISTS subqueries, qualifier-aware ──────────────
+        # dim_qualifier: None/"exact" → exact match (default)
+        #                "around"     → ±15% on each dim individually (NOT area)
+        #                "gte"        → both dims >= values (at least / bigger than)
+        #                "lte"        → both dims <= values (less than / smaller than)
+        _DIM_TOLERANCE = 0.15
         room_dims = getattr(intent, "room_dimensions", None) or []
         for i, rd in enumerate(room_dims):
             raw_room = rd.get("room", "")
             d1 = rd.get("d1")
             d2 = rd.get("d2")
+            dim_qualifier = rd.get("dim_qualifier") or None   # None/"exact" → exact
             if not raw_room or d1 is None or d2 is None:
                 continue
-            # Expand room name to canonical synonyms
             from graphrag_cypher import _expand_room_name
             canonical_names = _expand_room_name(raw_room)
-            rnames_key = f"dim_room_names_{i}"
-            d1_key = f"dim_d1_{i}"
-            d2_key = f"dim_d2_{i}"
-            params[rnames_key] = canonical_names
-            params[d1_key] = float(d1)
-            params[d2_key] = float(d2)
-            # We can't use $list in a WHERE with IN easily via the fallback Cypher
-            # build it as: r2.name IN ['Bedroom', 'Master Bedroom']
             names_literal = json.dumps(canonical_names)
-            where_clauses.append(
-                f"EXISTS {{ MATCH (p)-[:HAS_UNIT]->(u_dim_{i}:Unit)-[:HAS_ROOM]->(r_dim_{i}:Room) "
-                f"WHERE r_dim_{i}.name IN {names_literal} "
-                f"AND r_dim_{i}.length_ft IS NOT NULL AND r_dim_{i}.width_ft IS NOT NULL "
-                f"AND ((toFloat(r_dim_{i}.length_ft) = toFloat(${d1_key}) AND toFloat(r_dim_{i}.width_ft) = toFloat(${d2_key})) "
-                f"OR (toFloat(r_dim_{i}.length_ft) = toFloat(${d2_key}) AND toFloat(r_dim_{i}.width_ft) = toFloat(${d1_key}))) }}"
-            )
-            logger.debug(
-                f"[Fallback] Added room-dimension filter: {canonical_names} {d1}x{d2}"
-            )
+            d1_f, d2_f = float(d1), float(d2)
+
+            if dim_qualifier == "around":
+                # ±15% on each dimension independently — NOT area multiplication
+                d1_lo = round(d1_f * (1 - _DIM_TOLERANCE), 4)
+                d1_hi = round(d1_f * (1 + _DIM_TOLERANCE), 4)
+                d2_lo = round(d2_f * (1 - _DIM_TOLERANCE), 4)
+                d2_hi = round(d2_f * (1 + _DIM_TOLERANCE), 4)
+                k = {
+                    "d1_lo": f"dim_d1_lo_{i}", "d1_hi": f"dim_d1_hi_{i}",
+                    "d2_lo": f"dim_d2_lo_{i}", "d2_hi": f"dim_d2_hi_{i}",
+                }
+                params[k["d1_lo"]] = d1_lo; params[k["d1_hi"]] = d1_hi
+                params[k["d2_lo"]] = d2_lo; params[k["d2_hi"]] = d2_hi
+                where_clauses.append(
+                    f"EXISTS {{ MATCH (p)-[:HAS_UNIT]->(u_dim_{i}:Unit)-[:HAS_ROOM]->(r_dim_{i}:Room) "
+                    f"WHERE r_dim_{i}.name IN {names_literal} "
+                    f"AND r_dim_{i}.length_ft IS NOT NULL AND r_dim_{i}.width_ft IS NOT NULL "
+                    f"AND ("
+                    f"(toFloat(r_dim_{i}.length_ft) >= toFloat(${k['d1_lo']}) AND toFloat(r_dim_{i}.length_ft) <= toFloat(${k['d1_hi']}) "
+                    f"AND toFloat(r_dim_{i}.width_ft) >= toFloat(${k['d2_lo']}) AND toFloat(r_dim_{i}.width_ft) <= toFloat(${k['d2_hi']})) "
+                    f"OR "
+                    f"(toFloat(r_dim_{i}.length_ft) >= toFloat(${k['d2_lo']}) AND toFloat(r_dim_{i}.length_ft) <= toFloat(${k['d2_hi']}) "
+                    f"AND toFloat(r_dim_{i}.width_ft) >= toFloat(${k['d1_lo']}) AND toFloat(r_dim_{i}.width_ft) <= toFloat(${k['d1_hi']}))) }}"
+                )
+                logger.debug(f"[Fallback] Dim filter AROUND: {canonical_names} {d1}x{d2} (±{int(_DIM_TOLERANCE*100)}%)")
+
+            elif dim_qualifier == "gte":
+                # Both dims >= given values, orientation-agnostic
+                d1_k, d2_k = f"dim_d1_{i}", f"dim_d2_{i}"
+                params[d1_k] = d1_f; params[d2_k] = d2_f
+                where_clauses.append(
+                    f"EXISTS {{ MATCH (p)-[:HAS_UNIT]->(u_dim_{i}:Unit)-[:HAS_ROOM]->(r_dim_{i}:Room) "
+                    f"WHERE r_dim_{i}.name IN {names_literal} "
+                    f"AND r_dim_{i}.length_ft IS NOT NULL AND r_dim_{i}.width_ft IS NOT NULL "
+                    f"AND ("
+                    f"(toFloat(r_dim_{i}.length_ft) >= toFloat(${d1_k}) AND toFloat(r_dim_{i}.width_ft) >= toFloat(${d2_k})) "
+                    f"OR (toFloat(r_dim_{i}.length_ft) >= toFloat(${d2_k}) AND toFloat(r_dim_{i}.width_ft) >= toFloat(${d1_k}))) }}"
+                )
+                logger.debug(f"[Fallback] Dim filter GTE: {canonical_names} >= {d1}x{d2}")
+
+            elif dim_qualifier == "lte":
+                # Both dims <= given values, orientation-agnostic
+                d1_k, d2_k = f"dim_d1_{i}", f"dim_d2_{i}"
+                params[d1_k] = d1_f; params[d2_k] = d2_f
+                where_clauses.append(
+                    f"EXISTS {{ MATCH (p)-[:HAS_UNIT]->(u_dim_{i}:Unit)-[:HAS_ROOM]->(r_dim_{i}:Room) "
+                    f"WHERE r_dim_{i}.name IN {names_literal} "
+                    f"AND r_dim_{i}.length_ft IS NOT NULL AND r_dim_{i}.width_ft IS NOT NULL "
+                    f"AND ("
+                    f"(toFloat(r_dim_{i}.length_ft) <= toFloat(${d1_k}) AND toFloat(r_dim_{i}.width_ft) <= toFloat(${d2_k})) "
+                    f"OR (toFloat(r_dim_{i}.length_ft) <= toFloat(${d2_k}) AND toFloat(r_dim_{i}.width_ft) <= toFloat(${d1_k}))) }}"
+                )
+                logger.debug(f"[Fallback] Dim filter LTE: {canonical_names} <= {d1}x{d2}")
+
+            else:
+                # EXACT match (default — no qualifier word, preserves original behavior)
+                d1_k, d2_k = f"dim_d1_{i}", f"dim_d2_{i}"
+                params[d1_k] = d1_f; params[d2_k] = d2_f
+                where_clauses.append(
+                    f"EXISTS {{ MATCH (p)-[:HAS_UNIT]->(u_dim_{i}:Unit)-[:HAS_ROOM]->(r_dim_{i}:Room) "
+                    f"WHERE r_dim_{i}.name IN {names_literal} "
+                    f"AND r_dim_{i}.length_ft IS NOT NULL AND r_dim_{i}.width_ft IS NOT NULL "
+                    f"AND ((toFloat(r_dim_{i}.length_ft) = toFloat(${d1_k}) AND toFloat(r_dim_{i}.width_ft) = toFloat(${d2_k})) "
+                    f"OR (toFloat(r_dim_{i}.length_ft) = toFloat(${d2_k}) AND toFloat(r_dim_{i}.width_ft) = toFloat(${d1_k}))) }}"
+                )
+                logger.debug(f"[Fallback] Dim filter EXACT: {canonical_names} {d1}x{d2}")
 
         # Units per floor filtering
         if intent.min_units_per_floor is not None:

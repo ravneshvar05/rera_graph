@@ -1,0 +1,32 @@
+D:\Rerachatbot\graphrag\graphrag_intent.py:17: FutureWarning: 
+
+All support for the `google.generativeai` package has ended. It will no longer be receiving 
+updates or bug fixes. Please switch to the `google.genai` package as soon as possible.
+See README for more details:
+
+https://github.com/google-gemini/deprecated-generative-ai-python/blob/main/README.md
+
+  import google.generativeai as genai
+2026-04-06 10:17:48.143 | DEBUG    | graphrag_retriever:__init__:212 - GraphRetriever connected to Neo4j.
+Intent: zone='West Ahmedabad'
+
+Projects in West Ahmedabad: 10
+  - Dwarkesh Greens | Thaltej
+  - Elysium at Shantigram | Shantigram
+  - KP Villas | Gokuldham
+  - PALAK ELINA | Iscon-Ambli Road
+  - POONAM PRIDE | SHELA
+  - RATNAAKAR 6 beaumonde | Jodhpur, Satellite
+  - SATYAMEV ELYSIUM | Science City Road
+  - Satyesh Residency | Shantipura Cross Roads, Bopal, Iscon-Ambli Road, Sardar Patel Ring Road
+  - TREZURE ENCLAVE-I | Thaltej - Shilaj Road
+  - UMA VIHAR ELYSIUM | Sola
+
+Projects in East Ahmedabad: 7
+  - Advait Residency | New Vatva
+  - Devnandan Sankalp City | Naroda, Hanspura Road
+  - Mukhi Residency | Ramol Village
+  - NEELKANTH STATUS | Kubernagar
+  - Pushpak City | Hathijan
+  - Sitaram City | Vastral Road
+  - Swastik Harmony | New Nikol - Naroda Road

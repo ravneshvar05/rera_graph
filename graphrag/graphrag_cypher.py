@@ -450,7 +450,8 @@ Return a JSON object:
     "min_units_per_floor": <int or null>, "max_units_per_floor": <int or null>,
     "num_floors": <int or null>,
     "room_dimensions": [
-      {{"room": "<canonical room name (Bedroom/Kitchen/Hall/etc.)>", "d1": <float feet>, "d2": <float feet>}},
+      {{"room": "<canonical room name (Bedroom/Kitchen/Hall/etc.)>", "d1": <float feet>, "d2": <float feet>,
+        "dim_qualifier": null | "exact" | "around" | "gte" | "lte"}},
       ...
     ]
   }}
@@ -702,8 +703,14 @@ When the user gives room DIMENSIONS (not sqft area), use length_ft / width_ft fo
 
   Step 1 — Identify the room type and the two numbers (in feet).
   Step 2 — DO NOT multiply. DO NOT convert to area. DO NOT use area_sqft.
-  Step 3 — Set params d1 and d2 as float values: "10 by 12" → d1=10.0, d2=12.0
-  Step 4 — Generate orientation-agnostic EXACT filter on length_ft / width_ft:
+  Step 3 — Detect qualifier word (if any) in the user query:
+    "around/approximately/roughly/about/~/close to/near about" → dim_qualifier="around"
+    "at least/minimum/bigger than/larger than/more than/atleast/>=" → dim_qualifier="gte"
+    "less than/smaller than/under/<=" → dim_qualifier="lte"
+    No qualifier word present → dim_qualifier=null  (exact match, DEFAULT)
+  Step 4 — Generate the WHERE clause based on dim_qualifier:
+
+  4a. EXACT (dim_qualifier=null, default — NO qualifier word in query):
     WHERE EXISTS {{
       MATCH (p)-[:HAS_UNIT]->(u2:Unit)-[:HAS_ROOM]->(r2:Room)
       WHERE r2.name IN $room_names
@@ -713,6 +720,49 @@ When the user gives room DIMENSIONS (not sqft area), use length_ft / width_ft fo
         OR (toFloat(r2.length_ft) = toFloat($d2) AND toFloat(r2.width_ft) = toFloat($d1))
       )
     }}
+    Params: {{d1, d2, room_names}}
+
+  4b. AROUND (dim_qualifier="around" — ±15%% on each dim independently, NOT area):
+    Compute: d1_lo=d1*0.85, d1_hi=d1*1.15, d2_lo=d2*0.85, d2_hi=d2*1.15
+    WHERE EXISTS {{
+      MATCH (p)-[:HAS_UNIT]->(u2:Unit)-[:HAS_ROOM]->(r2:Room)
+      WHERE r2.name IN $room_names
+      AND r2.length_ft IS NOT NULL AND r2.width_ft IS NOT NULL
+      AND (
+        (toFloat(r2.length_ft) >= toFloat($d1_lo) AND toFloat(r2.length_ft) <= toFloat($d1_hi)
+         AND toFloat(r2.width_ft) >= toFloat($d2_lo) AND toFloat(r2.width_ft) <= toFloat($d2_hi))
+        OR
+        (toFloat(r2.length_ft) >= toFloat($d2_lo) AND toFloat(r2.length_ft) <= toFloat($d2_hi)
+         AND toFloat(r2.width_ft) >= toFloat($d1_lo) AND toFloat(r2.width_ft) <= toFloat($d1_hi))
+      )
+    }}
+    Params: {{d1_lo, d1_hi, d2_lo, d2_hi, room_names}} (NO d1/d2 raw params for around)
+    CRITICAL: ±15%% applies to each dimension INDEPENDENTLY. NEVER multiply d1*d2 to get area.
+
+  4c. GTE (dim_qualifier="gte" — both dims >= given values, orientation-agnostic):
+    WHERE EXISTS {{
+      MATCH (p)-[:HAS_UNIT]->(u2:Unit)-[:HAS_ROOM]->(r2:Room)
+      WHERE r2.name IN $room_names
+      AND r2.length_ft IS NOT NULL AND r2.width_ft IS NOT NULL
+      AND (
+        (toFloat(r2.length_ft) >= toFloat($d1) AND toFloat(r2.width_ft) >= toFloat($d2))
+        OR (toFloat(r2.length_ft) >= toFloat($d2) AND toFloat(r2.width_ft) >= toFloat($d1))
+      )
+    }}
+    Params: {{d1, d2, room_names}}
+
+  4d. LTE (dim_qualifier="lte" — both dims <= given values, orientation-agnostic):
+    WHERE EXISTS {{
+      MATCH (p)-[:HAS_UNIT]->(u2:Unit)-[:HAS_ROOM]->(r2:Room)
+      WHERE r2.name IN $room_names
+      AND r2.length_ft IS NOT NULL AND r2.width_ft IS NOT NULL
+      AND (
+        (toFloat(r2.length_ft) <= toFloat($d1) AND toFloat(r2.width_ft) <= toFloat($d2))
+        OR (toFloat(r2.length_ft) <= toFloat($d2) AND toFloat(r2.width_ft) <= toFloat($d1))
+      )
+    }}
+    Params: {{d1, d2, room_names}}
+
   Step 5 — query_type=AGGREGATE. Include answer_data with matching_rooms.
 
   Dimension formats to detect (all handled identically):
@@ -940,7 +990,10 @@ answer_data includes list of matching room details for each unit.
          INTENT fields for this case:
            intent.min_sqft = <target value>  (if "around" → also set intent.around_area=true)
            intent.area_qualifier = "carpet" | "super_builtup" | null  (display only)
-           intent.room_dimensions = [{{"room": "Bedroom", "d1": 10.6, "d2": 12.4}}]
+           intent.room_dimensions = [{{"room": "Bedroom", "d1": 10.6, "d2": 12.4, "dim_qualifier": null}}]
+           # "around bedroom 10 by 12": dim_qualifier="around" → ±15%% on each dim
+           # "bedroom at least 10 by 12": dim_qualifier="gte"
+           # "bedroom less than 10 by 12": dim_qualifier="lte"
 
 === INTENT EXTRACTION ===
 - "all projects"/"show all" → query_type="GLOBAL". Filtered → "SPECIFIC".
@@ -1328,7 +1381,19 @@ def _extract_fallback_intent(user_query: str, query_type: str = "SPECIFIC") -> Q
                 d1, d2 = float(d1_str), float(d2_str)
                 # Sanity check: room dimensions should be reasonable (1–100 ft)
                 if 1.0 <= d1 <= 100.0 and 1.0 <= d2 <= 100.0:
-                    room_dimensions.append({"room": canonical, "d1": d1, "d2": d2})
+                    # Detect qualifier word near this dimension match
+                    _prefix = lower_query[:match.end()]
+                    _dim_qualifier = None
+                    _AROUND = ('around', 'approximately', 'roughly', 'about', 'approx', 'close to', 'near about', '~')
+                    _GTE    = ('at least', 'atleast', 'minimum', 'bigger than', 'larger than', 'more than', 'at-least')
+                    _LTE    = ('less than', 'smaller than', 'under', 'no more than')
+                    if any(w in _prefix for w in _AROUND):
+                        _dim_qualifier = 'around'
+                    elif any(w in _prefix for w in _GTE):
+                        _dim_qualifier = 'gte'
+                    elif any(w in _prefix for w in _LTE):
+                        _dim_qualifier = 'lte'
+                    room_dimensions.append({"room": canonical, "d1": d1, "d2": d2, "dim_qualifier": _dim_qualifier})
                     seen_canonicals.add(canonical)
             except (ValueError, IndexError, TypeError):
                 pass

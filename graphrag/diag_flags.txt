@@ -1,0 +1,89 @@
+Total projects: 35
+
+Project                                        park  club
+----------------------------------------------------------
+AMBER 2 BHK RESIDENCY                             1  None
+Advait Residency                                  1  None
+Aman Residency                                    1  None
+Copper CLASSIC                                    1     1 <-- both
+Devnandan Sankalp City                         None  None
+Dwarkesh Greens                                   1  None
+Elysium at Shantigram                             1     1 <-- both
+Gandhi Galaxy                                     0  None
+ICON green                                        1     1 <-- both
+KP Villas                                         1     1 <-- both
+Mukhi Residency                                   1     1 <-- both
+NEELKANTH STATUS                                  1  None
+NIVAAN GREENS                                     1     1 <-- both
+ORBIT OF HAPPINESS                                1     1 <-- both
+PALAK ELINA                                       1     1 <-- both
+POONAM PRIDE                                      1     1 <-- both
+Pushpa Residency                                  1     1 <-- both
+Pushpak City                                      1  None
+RASHMI AANGAN                                     1     1 <-- both
+RATNAAKAR 6 beaumonde                             1  None
+SATYAMEV ELYSIUM                                  1  None
+SURYA KUTIR                                       1  None
+Satyesh Residency                                 1     1 <-- both
+Shikhar Avenue                                    1  None
+Shivalik Lake View                                1     1 <-- both
+Sitaram City                                      1     1 <-- both
+Sky Avenue                                        1  None
+Sudama Homes                                      1  None
+Sunflower Enclave                                 1  None
+Swastik Harmony                                   1     1 <-- both
+TREZURE ENCLAVE-I                                 1     1 <-- both
+The Legend                                        1  None
+UMA VIHAR ELYSIUM                                 1  None
+Vardhman Greens                                   1     1 <-- both
+svasaar pravesh                                   1  None
+
+Projects with BOTH park=1 AND clubhouse=1: 17
+  - Copper CLASSIC
+  - Elysium at Shantigram
+  - ICON green
+  - KP Villas
+  - Mukhi Residency
+  - NIVAAN GREENS
+  - ORBIT OF HAPPINESS
+  - PALAK ELINA
+  - POONAM PRIDE
+  - Pushpa Residency
+  - RASHMI AANGAN
+  - Satyesh Residency
+  - Shivalik Lake View
+  - Sitaram City
+  - Swastik Harmony
+  - TREZURE ENCLAVE-I
+  - Vardhman Greens
+
+--- 3BHK check ---
+Projects with at least one 3BHK unit: 12
+  Aman Residency | park=1 | club=None
+  Dwarkesh Greens | park=1 | club=None
+  Gandhi Galaxy | park=0 | club=None
+  ICON green | park=1 | club=1
+  NEELKANTH STATUS | park=1 | club=None
+  Pushpak City | park=1 | club=None
+  SURYA KUTIR | park=1 | club=None
+  Shikhar Avenue | park=1 | club=None
+  Sudama Homes | park=1 | club=None
+  Swastik Harmony | park=1 | club=1
+  TREZURE ENCLAVE-I | park=1 | club=1
+  UMA VIHAR ELYSIUM | park=1 | club=None
+
+Projects with 3BHK + park=1 + clubhouse=1: 3
+  ICON green
+  Swastik Harmony
+  TREZURE ENCLAVE-I
+
+Projects with 3BHK but park/club NOT = 1 (potentially missed):
+  Aman Residency | park=1 | club=None
+  Dwarkesh Greens | park=1 | club=None
+  Gandhi Galaxy | park=0 | club=None
+  NEELKANTH STATUS | park=1 | club=None
+  Pushpak City | park=1 | club=None
+  SURYA KUTIR | park=1 | club=None
+  Shikhar Avenue | park=1 | club=None
+  Sudama Homes | park=1 | club=None
+  UMA VIHAR ELYSIUM | park=1 | club=None

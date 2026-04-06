@@ -1,0 +1,183 @@
+Received notification from DBMS server: <GqlStatusObject gql_status='01N52', status_description='warn: property key does not exist. The property `zone` does not exist in database `d00bd26c`. Verify that the spelling is correct.', position=<SummaryInputPosition line=1, column=50, offset=49>, raw_classification='UNRECOGNIZED', classification=<NotificationClassification.UNRECOGNIZED: 'UNRECOGNIZED'>, raw_severity='WARNING', severity=<NotificationSeverity.WARNING: 'WARNING'>, diagnostic_record={'_classification': 'UNRECOGNIZED', '_severity': 'WARNING', '_position': {'offset': 49, 'line': 1, 'column': 50}, 'OPERATION': '', 'OPERATION_CODE': '0', 'CURRENT_SCHEMA': '/'}> for query: 'MATCH (n:Neighbourhood) RETURN n.name AS name, n.zone AS zone ORDER BY name'
+=== Zone nodes (9) ===
+  Central Ahmedabad
+  East Ahmedabad
+  East Surat
+  North Ahmedabad
+  North Surat
+  South Ahmedabad
+  Vadodara
+  West Ahmedabad
+  West Surat
+
+=== Neighbourhood -[:PART_OF]-> Zone (81) ===
+  Ellisbridge --> Central Ahmedabad
+  Ghatlodia --> Central Ahmedabad
+  Maninagar --> Central Ahmedabad
+  NARANPURA --> Central Ahmedabad
+  Naranpura --> Central Ahmedabad
+  Navrangpura --> Central Ahmedabad
+  Paldi --> Central Ahmedabad
+  Race Course --> Central Ahmedabad
+  Hathijan --> East Ahmedabad
+  Kathwada --> East Ahmedabad
+  Kubernagar --> East Ahmedabad
+  Naroda --> East Ahmedabad
+  Naroda, Hanspura Road --> East Ahmedabad
+  New Naroda --> East Ahmedabad
+  New Nikol --> East Ahmedabad
+  New Nikol - Naroda Road --> East Ahmedabad
+  New Vatva --> East Ahmedabad
+  Nikol --> East Ahmedabad
+  Odhav --> East Ahmedabad
+  Ramol Village --> East Ahmedabad
+  Vastral --> East Ahmedabad
+  Vastral Road --> East Ahmedabad
+  Katargam --> East Surat
+  Sarthana --> East Surat
+  Varachha --> East Surat
+  Chandkheda --> North Ahmedabad
+  Chiloda --> North Ahmedabad
+  Chiloda-Kotarpur --> North Ahmedabad
+  Gota --> North Ahmedabad
+  Kotarpur --> North Ahmedabad
+  Manipur --> North Ahmedabad
+  Motera --> North Ahmedabad
+  New Ranip --> North Ahmedabad
+  Ranip --> North Ahmedabad
+  Jahangirpura --> North Surat
+  Danteshwar --> South Ahmedabad
+  Gamdi --> South Ahmedabad
+  Gamdi Gaam --> South Ahmedabad
+  Hanspur --> South Ahmedabad
+  Hanspura --> South Ahmedabad
+  Isanpur --> South Ahmedabad
+  Juhapura --> South Ahmedabad
+  Narol --> South Ahmedabad
+  New Vatva --> South Ahmedabad
+  Sarkhej --> South Ahmedabad
+  Vardhman Nagar --> South Ahmedabad
+  Vatva --> South Ahmedabad
+  Vejalpur --> South Ahmedabad
+  Vinzol --> South Ahmedabad
+  Vishala Circle --> South Ahmedabad
+  Vizol --> South Ahmedabad
+  Bhyali --> Vadodara
+  Vasna-Bhayli Road --> Vadodara
+  Vasna-Bhayli Road, Bhyali --> Vadodara
+  Ambli --> West Ahmedabad
+  Anand Nagar --> West Ahmedabad
+  Bodakdev --> West Ahmedabad
+  Bopal --> West Ahmedabad
+  Gokuldham --> West Ahmedabad
+  Iscon-Ambli Road --> West Ahmedabad
+  Jodhpur Satellite --> West Ahmedabad
+  Jodhpur, Satellite --> West Ahmedabad
+  New Bopal --> West Ahmedabad
+  Prahlad Nagar --> West Ahmedabad
+  SHELA --> West Ahmedabad
+  Satellite --> West Ahmedabad
+  Science City Road --> West Ahmedabad
+  Shantigram --> West Ahmedabad
+  Shantipura Cross Roads, Bopal, Iscon-Ambli Road, Sardar Patel Ring Road --> West Ahmedabad
+  Shela --> West Ahmedabad
+  Shilaj --> West Ahmedabad
+  Sola --> West Ahmedabad
+  South Bopal --> West Ahmedabad
+  Thaltej --> West Ahmedabad
+  Thaltej - Shilaj Road --> West Ahmedabad
+  Vastrapur --> West Ahmedabad
+  Adajan --> West Surat
+  Pal --> West Surat
+  Piplod --> West Surat
+  Vesu --> West Surat
+  Vesu, Udhana Magdalla Road --> West Surat
+
+=== All Neighbourhood nodes (87) ===
+  Adajan | zone_prop=None
+  Ahmedabad | zone_prop=None
+  Ambli | zone_prop=None
+  Anand Nagar | zone_prop=None
+  Bhyali | zone_prop=None
+  Bodakdev | zone_prop=None
+  Bopal | zone_prop=None
+  Chandkheda | zone_prop=None
+  Chiloda | zone_prop=None
+  Chiloda Kotarpur | zone_prop=None
+  Chiloda-Kotarpur | zone_prop=None
+  Danteshwar | zone_prop=None
+  Ellisbridge | zone_prop=None
+  Gamdi | zone_prop=None
+  Gamdi Gaam | zone_prop=None
+  Ghatlodia | zone_prop=None
+  Gokuldham | zone_prop=None
+  Gota | zone_prop=None
+  Hanspur | zone_prop=None
+  Hanspura | zone_prop=None
+  Hathijan | zone_prop=None
+  Isanpur | zone_prop=None
+  Iscon-Ambli Road | zone_prop=None
+  Jahangirpura | zone_prop=None
+  Jodhpur Satellite | zone_prop=None
+  Jodhpur, Satellite | zone_prop=None
+  Juhapura | zone_prop=None
+  Katargam | zone_prop=None
+  Kathwada | zone_prop=None
+  Kotarpur | zone_prop=None
+  Kubernagar | zone_prop=None
+  Maninagar | zone_prop=None
+  Manipur | zone_prop=None
+  Motera | zone_prop=None
+  NARANPURA | zone_prop=None
+  Nana Chiloda | zone_prop=None
+  Naranpura | zone_prop=None
+  Naroda | zone_prop=None
+  Naroda, Hanspura Road | zone_prop=None
+  Narol | zone_prop=None
+  Navrangpura | zone_prop=None
+  New Bopal | zone_prop=None
+  New Naroda | zone_prop=None
+  New Nikol | zone_prop=None
+  New Nikol - Naroda Road | zone_prop=None
+  New Ranip | zone_prop=None
+  New Vatva | zone_prop=None
+  Nikol | zone_prop=None
+  Odhav | zone_prop=None
+  Pal | zone_prop=None
+  Paldi | zone_prop=None
+  Piplod | zone_prop=None
+  Prahlad Nagar | zone_prop=None
+  Race Course | zone_prop=None
+  Ramol Village | zone_prop=None
+  Ranip | zone_prop=None
+  SG Highway | zone_prop=None
+  SG Road | zone_prop=None
+  SHELA | zone_prop=None
+  Sarkhej | zone_prop=None
+  Sarthana | zone_prop=None
+  Satellite | zone_prop=None
+  Science City | zone_prop=None
+  Science City Road | zone_prop=None
+  Shantigram | zone_prop=None
+  Shantipura Cross Roads, Bopal, Iscon-Ambli Road, Sardar Patel Ring Road | zone_prop=None
+  Shela | zone_prop=None
+  Shilaj | zone_prop=None
+  Sola | zone_prop=None
+  South Bopal | zone_prop=None
+  Thaltej | zone_prop=None
+  Thaltej - Shilaj Road | zone_prop=None
+  Varachha | zone_prop=None
+  Vardhman Nagar | zone_prop=None
+  Vasna-Bhayli Road | zone_prop=None
+  Vasna-Bhayli Road, Bhyali | zone_prop=None
+  Vastral | zone_prop=None
+  Vastral Road | zone_prop=None
+  Vastrapur | zone_prop=None
+  Vatva | zone_prop=None
+  Vejalpore | zone_prop=None
+  Vejalpur | zone_prop=None
+  Vesu | zone_prop=None
+  Vesu, Udhana Magdalla Road | zone_prop=None
+  Vinzol | zone_prop=None
+  Vishala Circle | zone_prop=None
+  Vizol | zone_prop=None
