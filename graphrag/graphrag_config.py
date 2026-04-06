@@ -57,8 +57,8 @@ class GraphRAGSettings(BaseSettings):
 
     # ── Retrieval tuning ──────────────────────────────────────────────────────
     VECTOR_TOP_K:      int  = Field(15,  description="How many ChromaDB results to retrieve per doc type")
-    GRAPH_MAX_RESULTS: int  = Field(20,  description="Max projects from Neo4j Cypher queries")
-    FINAL_TOP_N:       int  = Field(20,  description="Max projects to include in final answer")
+    GRAPH_MAX_RESULTS: int  = Field(50,  description="Max projects from Neo4j Cypher queries")
+    FINAL_TOP_N:       int  = Field(50,  description="Max projects to include in final answer")
     RERANK_MODEL:      str  = Field("cross-encoder/ms-marco-MiniLM-L-6-v2", description="Cross-encoder model for re-ranking vector results")
     RERANK_TOP_K:      int  = Field(10,   description="Hard cap on projects sent to LLM judge (controls judge token budget)")
     VECTOR_DISTANCE_THRESHOLD: float = Field(1.3,  description="Max L2 distance from ChromaDB; discard results beyond this (lower = stricter)")

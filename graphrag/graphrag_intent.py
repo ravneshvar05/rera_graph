@@ -93,6 +93,16 @@ class QueryIntent(BaseModel):
             "Only populate when user gives explicit NxM / N by M / N x M dimensions for a named room."
         )
     )
+    num_floors: Optional[int] = Field(
+        None,
+        description=(
+            "Number of floors the unit spans, extracted when user explicitly mentions "
+            "floor count (e.g. '3 floor house', '2 storey', 'duplex', 'single floor'). "
+            "Ground-only = 1, Ground+First = 2, Ground+First+Second = 3, etc. "
+            "Leave null if user says 'ground floor' without specifying total count, "
+            "or when no floor count information is present."
+        )
+    )
 
 
 # ── Prompt ────────────────────────────────────────────────────────────────────
@@ -127,6 +137,7 @@ Schema:
   "project_names": [<list of specific project names> or null],
   "min_units_per_floor": <integer or null>,
   "max_units_per_floor": <integer or null>,
+  "num_floors": <integer or null>,
   "semantic_keywords": [<subjective keywords like "spacious", "luxury", "affordable"> or null],
   "room_dimensions": [
     {"room": "<canonical room name>", "d1": <float feet>, "d2": <float feet>},
@@ -151,6 +162,59 @@ Rules:
   - Example: "bedroom 10.6 by 12.4" → [{"room": "Bedroom", "d1": 10.6, "d2": 12.4}]
   - Example: "bedroom 10x10, toilet 4x6" → [{"room": "Bedroom", "d1": 10.0, "d2": 10.0}, {"room": "Toilet", "d1": 4.0, "d2": 6.0}]
   - Leave empty list [] if no room dimensions mentioned.
+
+=== PROPERTY TYPE RULES (READ CAREFULLY) ===
+
+MAP these explicit terms to property_type:
+  "flat" / "flats" / "apartment" / "apartments" → "APARTMENT"
+  "villa" / "villas" / "villa type"              → "VILLA"
+  "bungalow" / "bungalows" / "banglow"          → "BUNGALOW"
+  "tenement" / "tenaments" / "tenement type"    → "TENEMENT"
+  "pandhout" / "pandhu" / "pandhut"             → "TENEMENT"  (Gujarati term for tenement)
+  "row house" / "rowhouse" / "row-house"        → "ROW_HOUSE"
+  "penthouse" / "pent house" / "sky villa"      → "PENTHOUSE"
+
+GENERIC terms — DO NOT set property_type (leave null):
+  "house" / "houses" / "ghar" / "makan" / "home" / "homes" /
+  "property" / "properties" / "residence" / "unit" / "units"
+  These mean any residential property — never convert them to a property_type filter.
+
+INDEPENDENT HOUSING context — set property_type as LIST ["TENEMENT","VILLA","BUNGALOW","ROW_HOUSE"]:
+  "independent house" / "independent property" / "standalone house" →
+    property_type = ["TENEMENT","VILLA","BUNGALOW","ROW_HOUSE"]
+  "house with ground floor" / "ground floor house" / "house on ground floor" →
+    property_type = ["TENEMENT","VILLA","BUNGALOW","ROW_HOUSE"], num_floors = null
+    REASON: apartments sit on ANY floor of a building; when a user says "house with
+    ground floor" they mean an independent property whose ground floor is part of
+    the unit — all such types have a ground floor regardless of total stories.
+  "ground floor flat" / "ground floor apartment" →
+    property_type = "APARTMENT" (explicit apartment context; ground floor = building floor 0)
+  "ground floor 2 BHK" / "ground floor unit" (no explicit flat/house) →
+    property_type = ["TENEMENT","VILLA","BUNGALOW","ROW_HOUSE"] (independent context assumed)
+
+FLOOR COUNT context — use num_floors + property_type list:
+  "N floor house" / "N storey house" / "N मजला घर" →
+    num_floors = N, property_type = ["TENEMENT","VILLA","BUNGALOW"] (multi-floor non-apt)
+  "duplex" →
+    num_floors = 2, property_type = ["TENEMENT","VILLA","BUNGALOW"]
+  "single floor house" / "one floor house" / "ground floor only house" →
+    num_floors = 1, property_type = ["TENEMENT","VILLA","BUNGALOW","ROW_HOUSE"]
+  "house with first floor" / "house up to first floor" →
+    num_floors = 2, property_type = ["TENEMENT","VILLA","BUNGALOW"]
+  "house with second floor" →
+    num_floors = 3, property_type = ["TENEMENT","VILLA","BUNGALOW"]
+  "N floor flat" / "N floor apartment" →
+    property_type = "APARTMENT", num_floors = null
+    (Apartments are single-floor units; "N floor" here means building floor level, not unit floors.
+     Do NOT set num_floors for apartments.)
+  "top floor apartment" / "top floor flat" →
+    property_type = "APARTMENT", num_floors = null
+  "N floor tenement" / "N floor villa" / "N floor bungalow" →
+    num_floors = N, property_type = <explicit type>
+
+num_floors should be null unless the user EXPLICITLY states a floor count.
+"House with ground floor" does NOT imply num_floors=1 — leave num_floors null.
+"House" alone does NOT imply any num_floors.
 """
 
 

@@ -1205,8 +1205,17 @@ def _format_answer_data(
                 continue
             # entry is the outer project dict: {project_name, matching_rooms: [...]}
             matching = entry.get("matching_rooms") or []
+            # Flatten one level: LLM sometimes returns [[{...}], [{...}]] when
+            # the [0] flattener is missing from the Cypher list comprehension.
+            flat_matching: list = []
             for item in matching:
-                if not item:
+                if isinstance(item, list):
+                    flat_matching.extend([x for x in item if x])
+                elif item:
+                    flat_matching.append(item)
+
+            for item in flat_matching:
+                if not item or not isinstance(item, dict):
                     continue
                 # Handle both formats LLM may generate:
                 # NEW flat:  {unit_type, bhk, room_name, area_sqft, length, width}

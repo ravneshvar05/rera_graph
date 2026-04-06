@@ -343,7 +343,7 @@ NODES:
 - Neighbourhood {name}
 - Zone {name}
 - Developer {name}
-- Unit {unit_id, project_id, unit_type, property_type (APARTMENT/VILLA/ROW_HOUSE/TENEMENT/PENTHOUSE), bhk (integer), entrance_facing (East/West/North/South), carpet_sqft, super_builtup_sqft, balcony_sqft, wash_sqft, applicable_buildings, description}
+- Unit {unit_id, project_id, unit_type, property_type (APARTMENT/VILLA/BUNGALOW/ROW_HOUSE/TENEMENT/PENTHOUSE), bhk (integer), entrance_facing (East/West/North/South), carpet_sqft, super_builtup_sqft, balcony_sqft, wash_sqft, num_floors (INTEGER or null — floors this unit spans: Ground-only=1, Ground+First=2, Ground+First+Second=3; null for apartments since floor_level is not set per-room in apartments), applicable_buildings, description}
 - Room {room_type, name (canonical string),
            length (RAW STRING — e.g. "10'0\"", "12'-6\"" — NEVER filter on this),
            width  (RAW STRING — NEVER filter on this),
@@ -448,6 +448,7 @@ Return a JSON object:
     "project_names": [<project names>],
     "semantic_keywords": [<PUT VAGUE/SUBJECTIVE ADJECTIVES HERE: e.g., 'peaceful', 'luxurious', 'affordable', 'premium'>],
     "min_units_per_floor": <int or null>, "max_units_per_floor": <int or null>,
+    "num_floors": <int or null>,
     "room_dimensions": [
       {{"room": "<canonical room name (Bedroom/Kitchen/Hall/etc.)>", "d1": <float feet>, "d2": <float feet>}},
       ...
@@ -601,16 +602,43 @@ Common filters:
     "less than/<" → <= toFloat($max_sqft)
   Facing:        ANY(u IN units WHERE toLower(u.entrance_facing) = toLower($facing))
   Developer:     toLower(dev.name) CONTAINS toLower($developer)
-  Property type [MANDATORY when user specifies a type]: ANY(u IN units WHERE toLower(u.property_type) = toLower($property_type))
-    Valid values: APARTMENT, VILLA, PENTHOUSE, TENEMENT, ROW_HOUSE, BUNGALOW
-    - "apartment" / "flat" / "flats" → $property_type = "APARTMENT"
-    - "villa" / "villas" / "bungalow" → $property_type = "VILLA" or "BUNGALOW"
-    - "penthouse" / "pent house" / "sky villa" → $property_type = "PENTHOUSE"
-    - "row house" / "rowhouse" → $property_type = "ROW_HOUSE"
-    - "tenement" → $property_type = "TENEMENT"
-    - "house" / "homes" / "property" / "properties" / "residence" / "unit" → GENERIC — do NOT set property_type. These mean "any residential property".
-    NEVER treat apartment/villa/penthouse/tenement as a semantic_keyword. Always use property_type filter.
-    NEVER map "house", "homes", "property", "residence" to a property_type — they are generic, not structural filters.
+  Property type — SINGLE VALUE (when user names one type explicitly):
+    ANY(u IN units WHERE toLower(u.property_type) = toLower($property_type))
+    Valid values: APARTMENT, VILLA, BUNGALOW, PENTHOUSE, TENEMENT, ROW_HOUSE
+    Synonym map (use this to set $property_type or $property_types):
+      "flat" / "flats" / "apartment" / "apartments"       → "APARTMENT"
+      "villa" / "villas" / "villa type"                   → "VILLA"
+      "bungalow" / "bungalows" / "banglow" / "bunglow"    → "BUNGALOW"
+      "tenement" / "tenaments" / "tenement type"          → "TENEMENT"
+      "pandhout" / "pandhu" / "pandhut"                   → "TENEMENT"  ← Gujarati term
+      "row house" / "rowhouse" / "row-house"              → "ROW_HOUSE"
+      "penthouse" / "pent house" / "sky villa"            → "PENTHOUSE"
+      "house" / "houses" / "ghar" / "makan" / "home" / "homes" /
+      "property" / "properties" / "residence" / "unit"   → GENERIC (null — do NOT filter)
+  Property type — LIST (when user implies a category of property types):
+    ANY(u IN units WHERE toLower(u.property_type) IN [x IN $property_types | toLower(x)])
+    Use $property_types (list param) instead of $property_type (string param) in these cases:
+      "independent house" / "standalone house" / "independent property"
+        → property_types = ["TENEMENT","VILLA","BUNGALOW","ROW_HOUSE"]
+      "house with ground floor" / "ground floor house" / "house on ground floor"
+        → property_types = ["TENEMENT","VILLA","BUNGALOW","ROW_HOUSE"], no num_floors filter
+        (Every independent property has a ground floor; do NOT restrict num_floors)
+      "ground floor flat" / "ground floor apartment"
+        → property_type = "APARTMENT" (single value; ground floor = building floor)
+      "ground floor 2 BHK" / "ground floor unit" (no flat/house keyword)
+        → property_types = ["TENEMENT","VILLA","BUNGALOW","ROW_HOUSE"]
+      "N floor house" / "N storey house" / "duplex" (duplex = 2 floors)
+        → property_types = ["TENEMENT","VILLA","BUNGALOW"], num_floors = N
+      "single floor house" / "one floor house"
+        → property_types = ["TENEMENT","VILLA","BUNGALOW","ROW_HOUSE"], num_floors = 1
+      "house with first floor" → property_types = ["TENEMENT","VILLA","BUNGALOW"], num_floors = 2
+      "house with second floor" → property_types = ["TENEMENT","VILLA","BUNGALOW"], num_floors = 3
+    NEVER set property_types/property_type for plain "house"/"ghar"/"home" — these are generic.
+    NEVER set num_floors for apartments — apartments are single-floor units in a multi-storey building.
+  num_floors filter (when user specifies floor count explicitly):
+    ANY(u IN units WHERE u.num_floors IS NOT NULL AND toInteger(u.num_floors) = toInteger($num_floors))
+    Only use when num_floors is extracted from the query. Do NOT apply for "ground floor" alone.
+    NEVER apply to APARTMENT queries.
   Landmark type: EXISTS {{ MATCH (p)-[:NEAR]->(lm2:Landmark) WHERE lm2.landmark_type = $landmark_type }}
   Specific landmark: (EXISTS {{ MATCH (p)-[:NEAR]->(lm2:Landmark) WHERE toLower(lm2.name) CONTAINS toLower($landmark_name) }} OR toLower(p.address) CONTAINS toLower($landmark_name))
   Total buildings: p.total_buildings IS NOT NULL AND toInteger(p.total_buildings) >= toInteger($min_buildings)

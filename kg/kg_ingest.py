@@ -755,6 +755,7 @@ SET u.project_id          = $project_id,
     u.super_builtup_sqft  = $super_builtup_sqft,
     u.balcony_sqft        = $balcony_sqft,
     u.wash_sqft           = $wash_sqft,
+    u.num_floors          = $num_floors,
     u.applicable_buildings= $applicable_buildings
 MERGE (p:Project {project_id: $project_id})
 MERGE (p)-[:HAS_UNIT]->(u)
@@ -1022,6 +1023,7 @@ def ingest_one(
                                            or unit.get("super_builtup_sqft")),
                 "balcony_sqft":      _float(unit.get("balcony_area_sqft")),
                 "wash_sqft":         _float(unit.get("wash_area_sqft")),
+                "num_floors":        _int(unit.get("num_floors")),
                 "applicable_buildings": appl,  # Pass directly as array
             })
 
