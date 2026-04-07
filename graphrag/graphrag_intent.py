@@ -32,7 +32,7 @@ class QueryIntent(BaseModel):
     )
     bhk: Optional[Union[int, List[int]]] = Field(None, description="Number of BHK rooms requested (1, 2, 3, 4, 5) or list of numbers")
     property_type: Optional[Union[str, List[str]]] = Field(
-        None, description="APARTMENT, VILLA, TENEMENT, BUNGALOW, PENTHOUSE, ROW_HOUSE, or None or list of types"
+        None, description="APARTMENT, VILLA, TENEMENT, BUNGALOW, PENTHOUSE, ROW_HOUSE, or None or list of types. IMPORTANT: If parsing a bungalow or row house query, you MUST output the exact array [\"VILLA\", \"BUNGALOW\", \"ROW_HOUSE\"]"
     )
     city: Optional[Union[str, List[str]]] = Field(None, description="City name or list of cities, e.g. Ahmedabad, Surat")
     neighbourhood: Optional[Union[str, List[str]]] = Field(
@@ -121,7 +121,7 @@ Schema:
 {
   "query_type": "SPECIFIC" or "GLOBAL",
   "bhk": <integer, list of integers, or null>,
-  "property_type": <"APARTMENT" | "VILLA" | "TENEMENT" | "BUNGALOW" | "PENTHOUSE" | "ROW_HOUSE" | list of types | null>,
+  "property_type": <"APARTMENT" | "VILLA" | "TENEMENT" | "PENTHOUSE" | "ROW_HOUSE" | list of types | null. WARNING: If bungalow, MUST output ["VILLA", "BUNGALOW", "ROW_HOUSE"]>,
   "city": <string, list of strings, or null>,
   "neighbourhood": <string, list of strings, or null>,
   "zone": <string, list of strings, or null, e.g. "West Ahmedabad">,
@@ -171,11 +171,11 @@ Rules:
 
 MAP these explicit terms to property_type:
   "flat" / "flats" / "apartment" / "apartments" → "APARTMENT"
-  "villa" / "villas" / "villa type"              → "VILLA"
-  "bungalow" / "bungalows" / "banglow"          → "BUNGALOW"
+  "villa" / "villas" / "villa type"             → "VILLA"
+  "bungalow" / "bungalows" / "banglow"          → ["VILLA", "BUNGALOW", "ROW_HOUSE"]
   "tenement" / "tenaments" / "tenement type"    → "TENEMENT"
   "pandhout" / "pandhu" / "pandhut"             → "TENEMENT"  (Gujarati term for tenement)
-  "row house" / "rowhouse" / "row-house"        → "ROW_HOUSE"
+  "row house" / "rowhouse" / "row-house"        → ["VILLA", "BUNGALOW", "ROW_HOUSE"]
   "penthouse" / "pent house" / "sky villa"      → "PENTHOUSE"
 
 GENERIC terms — DO NOT set property_type (leave null):

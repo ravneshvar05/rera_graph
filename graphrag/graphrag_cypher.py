@@ -431,7 +431,7 @@ Return a JSON object:
   "answer_columns": ["<RETURN columns with direct answer>"],
   "intent": {{
     "bhk": <int, list, or null>,
-    "property_type": <"APARTMENT"|"VILLA"|"TENEMENT"|"BUNGALOW"|"PENTHOUSE"|"ROW_HOUSE"|list|null>,
+    "property_type": <"APARTMENT"|"VILLA"|"TENEMENT"|"BUNGALOW"|"PENTHOUSE"|"ROW_HOUSE"|list|null. IMPORTANT: If user asks for 'bungalow', 'independent house', or 'row house', you MUST output ["VILLA", "BUNGALOW", "ROW_HOUSE"] to ensure results!>,
     "city": <string, list, or null>,
     "neighbourhood": <string, list, or null>,
     "zone": <string, list, or null>,
@@ -583,8 +583,8 @@ Common filters:
       EXISTS {{ MATCH (p)-[:HAS_UNIT]->(u2)-[:HAS_ROOM]->(r2) WHERE r2.name IN ['Bedroom','Master Bedroom'] AND toLower(r2.floor_level) = 'ground' }}
     Combine with property_type if user specifies (e.g. "ground floor bedroom villa"):
       ANY(u IN units WHERE toLower(u.property_type) = 'villa')
-      AND EXISTS {{ MATCH (p)-[:HAS_UNIT]->(u2)-[:HAS_ROOM]->(r2) WHERE r2.name IN ['Bedroom','Master Bedroom'] AND toInteger(r2.floor_level) = 0 }}
-    "aging parents" / "senior-friendly" / "elderly" + villas -> always include ground-floor bedroom check.
+      AND EXISTS {{ MATCH (p)-[:HAS_UNIT]->(u2)-[:HAS_ROOM]->(r2) WHERE r2.name IN ['Bedroom','Master Bedroom'] AND toLower(r2.floor_level) = 'ground' }}
+    IMPORTANT: Add a floor_level check ONLY if the user explicitly types the words "ground floor". NEVER infer a floor_level check purely from terms like "aging parents" / "senior-friendly".
 
   Unit area — ALWAYS search BOTH fields with OR (CRITICAL — many projects store only one field):
   *** MANDATORY RULE: Regardless of whether user says 'carpet' or 'super built-up', ALWAYS use: ***
@@ -603,19 +603,22 @@ Common filters:
     "less than/<" → <= toFloat($max_sqft)
   Facing:        ANY(u IN units WHERE toLower(u.entrance_facing) = toLower($facing))
   Developer:     toLower(dev.name) CONTAINS toLower($developer)
-  Property type — SINGLE VALUE (when user names one type explicitly):
+  Property type — SINGLE VALUE (when user names one explicit type):
     ANY(u IN units WHERE toLower(u.property_type) = toLower($property_type))
     Valid values: APARTMENT, VILLA, BUNGALOW, PENTHOUSE, TENEMENT, ROW_HOUSE
     Synonym map (use this to set $property_type or $property_types):
-      "flat" / "flats" / "apartment" / "apartments"       → "APARTMENT"
-      "villa" / "villas" / "villa type"                   → "VILLA"
-      "bungalow" / "bungalows" / "banglow" / "bunglow"    → "BUNGALOW"
-      "tenement" / "tenaments" / "tenement type"          → "TENEMENT"
+      "flat" / "flats" / "apartment" / "apartments"       → "APARTMENT"  (single $property_type)
+      "villa" / "villas" / "villa type"                   → "VILLA"      (single $property_type)
+      "tenement" / "tenaments" / "tenement type"          → "TENEMENT"   (single $property_type)
       "pandhout" / "pandhu" / "pandhut"                   → "TENEMENT"  ← Gujarati term
-      "row house" / "rowhouse" / "row-house"              → "ROW_HOUSE"
-      "penthouse" / "pent house" / "sky villa"            → "PENTHOUSE"
+      "penthouse" / "pent house" / "sky villa"            → "PENTHOUSE"  (single $property_type)
+      "bungalow" / "bungalows" / "banglow" / "bunglow"    → ["VILLA","BUNGALOW","ROW_HOUSE"]  (LIST — use $property_types)
+      "row house" / "rowhouse" / "row-house"              → ["VILLA","BUNGALOW","ROW_HOUSE"]  (LIST — use $property_types)
       "house" / "houses" / "ghar" / "makan" / "home" / "homes" /
       "property" / "properties" / "residence" / "unit"   → GENERIC (null — do NOT filter)
+  BUNGALOW / ROW_HOUSE → ALWAYS use the LIST form with $property_types because the DB may store these as VILLA, BUNGALOW, or ROW_HOUSE.
+    Cypher for bungalow/row-house: ANY(u IN units WHERE toLower(u.property_type) IN [x IN $property_types | toLower(x)])
+    params: property_types = ["VILLA", "BUNGALOW", "ROW_HOUSE"]
   Property type — LIST (when user implies a category of property types):
     ANY(u IN units WHERE toLower(u.property_type) IN [x IN $property_types | toLower(x)])
     Use $property_types (list param) instead of $property_type (string param) in these cases:
@@ -941,12 +944,11 @@ answer_data includes list of matching room details for each unit.
     Balcony check must be: (u.balcony_sqft IS NOT NULL AND toFloat(u.balcony_sqft) > 0) OR ANY(r IN u.rooms WHERE r.name IN ['Balcony','Terrace'])
     Wrong:  ANY(u IN units WHERE u.bhk=2) AND EXISTS{{...wash area...}} AND ANY(u IN units WHERE u.balcony_sqft>0)
     Correct: ANY(u IN units WHERE u.bhk=2 AND ANY(r IN u.rooms WHERE r.name IN ['Wash Area']) AND ((u.balcony_sqft IS NOT NULL AND toFloat(u.balcony_sqft)>0) OR ANY(r IN u.rooms WHERE r.name IN ['Balcony','Terrace'])))
-19. GROUND FLOOR / ACCESSIBILITY QUERIES: Phrases like "ground floor bedroom", "bedroom on ground floor",
-    "suitable for aging parents", "elderly", "senior-friendly villa" → the key structural signal is a bedroom
-    at floor_level=0. Always generate:
-      EXISTS {{ MATCH (p)-[:HAS_UNIT]->(u2)-[:HAS_ROOM]->(r2) WHERE r2.name IN ['Bedroom','Master Bedroom'] AND toInteger(r2.floor_level) = 0 }}
-    Combined with property_type if user specified one (villa, tenement, etc.).
-    Also set intent.semantic_keywords=["ground floor bedroom", "senior-friendly"] for vector fallback.
+ 19. GROUND FLOOR QUERIES: Phrases like "ground floor bedroom", "bedroom on ground floor".
+     Only if the user EXPLICITLY asks for a ground floor, filter for a bedroom at floor_level='ground':
+       EXISTS {{ MATCH (p)-[:HAS_UNIT]->(u2)-[:HAS_ROOM]->(r2) WHERE r2.name IN ['Bedroom','Master Bedroom'] AND toLower(r2.floor_level) = 'ground' }}
+     Combined with property_type if user specified one (villa, tenement, etc.).
+     IMPORTANT: For vague terms ("suitable for aging parents", "elderly", "senior-friendly"), DO NOT invent a floor_level check. Instead, set intent.semantic_keywords=["aging parents", "senior-friendly"] for vector fallback.
 20. ROOM DIMENSION QUERIES ("bedroom 10 x 12", "toilet 4 by 7", "kitchen 8x10", "room size 10 by 10",
     "length 10 width 20", "10'x12' bedroom", "washroom 4 ft by 6 ft",
     "bedroom 10x10, toilet 3x6, balcony 7x4"):
@@ -1001,15 +1003,18 @@ answer_data includes list of matching room details for each unit.
 - "school nearby" → landmark_types=["EDUCATION"]. "near hospital" → ["HEALTHCARE"].
 - Fuzzy words → semantic_keywords: "spacious", "luxury", "affordable", "family-friendly".
 - PROPERTY TYPE (hard structural filter, NEVER put in semantic_keywords):
-    "apartment" / "flat" / "flats" → property_type="APARTMENT"
-    "villa" / "villas" → property_type="VILLA"
-    "penthouse" / "pent house" / "sky villa" → property_type="PENTHOUSE"
-    "row house" / "rowhouse" → property_type="ROW_HOUSE"
-    "tenement" → property_type="TENEMENT"
-    "bungalow" → property_type="BUNGALOW"
+    "apartment" / "flat" / "flats" → property_type="APARTMENT"  (single string)
+    "villa" / "villas" → property_type="VILLA"  (single string)
+    "penthouse" / "pent house" / "sky villa" → property_type="PENTHOUSE"  (single string)
+    "tenement" → property_type="TENEMENT"  (single string)
+    "bungalow" / "bungalows" / "banglow" → property_type=["VILLA","BUNGALOW","ROW_HOUSE"]  (LIST — DB may store as any of these)
+    "row house" / "rowhouse" / "row-house" → property_type=["VILLA","BUNGALOW","ROW_HOUSE"]  (LIST)
     "house" / "houses" / "homes" / "home" / "property" / "properties" / "residence" / "unit" → GENERIC — set property_type=null. These are informal synonyms for ANY residential property. Do NOT map to VILLA or any other type.
-  Whenever property_type is set in intent, the Cypher WHERE clause MUST include:
+  When property_type is a single string:
     ANY(u IN units WHERE toLower(u.property_type) = toLower($property_type))
+  When property_type is a list (bungalow, row house):
+    ANY(u IN units WHERE toLower(u.property_type) IN [x IN $property_types | toLower(x)])
+    params: property_types = ["VILLA", "BUNGALOW", "ROW_HOUSE"]
 - If a field is not mentioned, use null or empty list.
 - Gujarat localities: Vinzol, Bopal, Nikol, Naroda, Vatva, Gamdi, Gamdi Gaam, Satellite, Chandkheda, Thaltej, Vastrapur, Hanspura, Paldi, Sarkhej, Isanpur, Ghodasar, Kotarpur, Chiloda.
 - Sub-locality/road names → neighbourhood. System searches both n.name and p.address.
@@ -1275,11 +1280,23 @@ def _extract_fallback_intent(user_query: str, query_type: str = "SPECIFIC") -> Q
         bhk = int(bhk_match.group(1))
 
     # ── Property type ──
+    # IMPORTANT: bungalow and row house must map to a LIST because the DB stores
+    # these units under multiple property_type values (VILLA, BUNGALOW, ROW_HOUSE).
+    # Using a single string like "BUNGALOW" will ALWAYS return 0 results.
     property_type = None
-    for pt_keyword, pt_value in [("villa", "VILLA"), ("apartment", "APARTMENT"),
-                                  ("flat", "APARTMENT"), ("tenement", "TENEMENT"),
-                                  ("bungalow", "BUNGALOW"), ("penthouse", "PENTHOUSE"),
-                                  ("row house", "ROW_HOUSE"), ("rowhouse", "ROW_HOUSE")]:
+    for pt_keyword, pt_value in [
+        ("penthouse", "PENTHOUSE"),
+        ("apartment", "APARTMENT"),
+        ("flat", "APARTMENT"),
+        ("tenement", "TENEMENT"),
+        ("villa", "VILLA"),
+        ("row house",  ["VILLA", "BUNGALOW", "ROW_HOUSE"]),
+        ("rowhouse",   ["VILLA", "BUNGALOW", "ROW_HOUSE"]),
+        ("row-house",  ["VILLA", "BUNGALOW", "ROW_HOUSE"]),
+        ("bungalow",   ["VILLA", "BUNGALOW", "ROW_HOUSE"]),
+        ("banglow",    ["VILLA", "BUNGALOW", "ROW_HOUSE"]),
+        ("bunglow",    ["VILLA", "BUNGALOW", "ROW_HOUSE"]),
+    ]:
         if pt_keyword in lower_query:
             property_type = pt_value
             break
@@ -1423,7 +1440,36 @@ def _post_process_cypher(cypher: str, params: dict, user_query: str = "") -> str
     - Fix toLower/toFloat/toInteger applied to list params
     - Expand room name params to synonym groups  (generalized)
     - Expand amenity tag params to synonym groups (generalized)
+    - SAFETY NET: upgrade single BUNGALOW/ROW_HOUSE property_type to list
     """
+    # ── 0. BUNGALOW / ROW_HOUSE property_type safety net ──────────────────────
+    # The LLM sometimes ignores the LIST rule and emits property_type="BUNGALOW"
+    # or property_type="ROW_HOUSE" as a single string.  Both values exist in the
+    # DB, but users searching for bungalows expect VILLA + BUNGALOW + ROW_HOUSE.
+    # Intercept here and rewrite to the list form so 0-result bugs are impossible.
+    _BUNGALOW_TYPES = ["VILLA", "BUNGALOW", "ROW_HOUSE"]
+    _bad_pt_val = params.get("property_type")
+    if isinstance(_bad_pt_val, str) and _bad_pt_val.upper() in ("BUNGALOW", "ROW_HOUSE"):
+        logger.info(
+            f"[Post-process] Upgrading single property_type='{_bad_pt_val}' "
+            f"-> list {_BUNGALOW_TYPES} to avoid 0 results."
+        )
+        del params["property_type"]
+        params["property_types"] = _BUNGALOW_TYPES
+        # Rewrite: toLower(u.property_type) = toLower($property_type)
+        #       -> toLower(u.property_type) IN [x IN $property_types | toLower(x)]
+        cypher = re.sub(
+            r'toLower\((\w+\.property_type)\)\s*=\s*toLower\(\$property_type\)',
+            r'toLower(\1) IN [x IN $property_types | toLower(x)]',
+            cypher,
+        )
+        # Rewrite: u.property_type = $property_type  (without toLower)
+        cypher = re.sub(
+            r'(\w+\.property_type)\s*=\s*\$property_type\b',
+            r'\1 IN $property_types',
+            cypher,
+        )
+
     # ── 1. Numeric type safety ──────────────────────────────────────────────
 
     for sqft_field in ('area_sqft', 'carpet_sqft', 'super_builtup_sqft'):
