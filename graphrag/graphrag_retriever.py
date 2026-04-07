@@ -300,57 +300,40 @@ class GraphRetriever:
     @staticmethod
     def _intent_has_graph_filters(intent: QueryIntent) -> bool:
         """
-        Returns True if the intent has at least one filter that can be
-        expressed as a structural graph query (location, BHK, amenity, etc.).
-
-        Used to gate the intent-driven fallback: if the LLM Cypher returned
-        0 results but the intent has NO graph-expressible filters, we skip
-        the fallback so vector search can handle the semantic query instead
-        of flooding the context with all projects.
-
-        Filters that DON'T count (can't be expressed as simple graph filters):
-          - semantic_keywords only  (e.g. "spacious", "senior-friendly")
-          - property_type alone  (too broad — would return all villas/apartments)
-          - has_balcony / has_parking alone  (already covered by graph flags)
+        Returns True if the intent has at least one structural graph query filter.
+        Used to gate the intent-driven fallback.
         """
-        if intent.city:
-            return True
-        if intent.neighbourhood:
-            return True
-        if intent.zone:
-            return True
-        if intent.bhk is not None:
-            return True
-        if intent.amenities:
-            return True
-        if intent.landmark_types:
-            return True
-        if intent.specific_landmarks:
-            return True
-        if intent.developer:
-            return True
-        if intent.project_names:
-            return True
-        if intent.min_sqft is not None or intent.max_sqft is not None:
-            return True
-        if intent.min_units_per_floor is not None or intent.max_units_per_floor is not None:
-            return True
-        if intent.entrance_facing:
-            return True
-        # Room dimensions are a strict structural filter
-        if getattr(intent, "room_dimensions", None):
-            return True
-        # property_type alone counts as a graph filter ONLY for specific types
-        # (VILLA, TENEMENT, PENTHOUSE, ROW_HOUSE, BUNGALOW) — these are narrow enough
-        # to be useful as a sole filter.  APARTMENT alone is too broad.
-        if intent.property_type:
+        # 1. Narrow / strict filters always count as valid graph filters
+        if intent.neighbourhood: return True
+        if getattr(intent, "bhk", None) is not None: return True
+        if intent.amenities: return True
+        if getattr(intent, "landmark_types", None): return True
+        if getattr(intent, "specific_landmarks", None): return True
+        if getattr(intent, "developer", None): return True
+        if getattr(intent, "project_names", None): return True
+        if getattr(intent, "min_sqft", None) is not None or getattr(intent, "max_sqft", None) is not None: return True
+        if getattr(intent, "min_units_per_floor", None) is not None or getattr(intent, "max_units_per_floor", None) is not None: return True
+        if getattr(intent, "entrance_facing", None): return True
+        if getattr(intent, "room_dimensions", None): return True
+        
+        # Property type counts if it's narrow (not a generic apartment)
+        if getattr(intent, "property_type", None):
             pt = intent.property_type
-            non_apartment_types = {"VILLA", "TENEMENT", "PENTHOUSE", "ROW_HOUSE", "BUNGALOW"}
-            if isinstance(pt, list):
-                if any(p.upper() in non_apartment_types for p in pt):
-                    return True
-            elif isinstance(pt, str) and pt.upper() in non_apartment_types:
-                return True
+            non_apartment = {"VILLA", "TENEMENT", "PENTHOUSE", "ROW_HOUSE", "BUNGALOW"}
+            if isinstance(pt, list) and any(p.upper() in non_apartment for p in pt): return True
+            elif isinstance(pt, str) and pt.upper() in non_apartment: return True
+
+        # 2. Broad filters (City, Zone)
+        has_broad_geo = bool(getattr(intent, "city", None) or getattr(intent, "zone", None))
+        has_semantic = bool(getattr(intent, "semantic_keywords", []))
+
+        # If the user asks "projects in Ahmedabad", we fall back to dumping the city (has_broad_geo = True).
+        # But if they ask "quiet projects for seniors in Ahmedabad" (has_semantic = True), 
+        # dumping the entire city will drown out the 5 accurate Vector DB results. 
+        # So for semantic queries, City/Zone alone do NOT justify a graph fallback.
+        if has_broad_geo and not has_semantic:
+            return True
+
         return False
 
     def _execute_cypher(self, cq: CypherQuery) -> tuple[list[ProjectResult], list[dict]]:

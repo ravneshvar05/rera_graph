@@ -577,10 +577,10 @@ Common filters:
   NOTE: r.attached_bathroom and r.has_balcony_access values: 1 = confirmed yes, 0 or null = no/unknown.
   For "has attached bathroom" always use = 1. For "no attached bathroom" use (r.attached_bathroom = 0 OR r.attached_bathroom IS NULL).
 
-  Floor-level / accessibility filter (for "ground floor bedroom", "senior-friendly", "aging parents"):
-    Room.floor_level stores the floor number (0 = ground floor, 1 = first floor, etc.).
-    "ground floor bedroom" = a bedroom room at floor_level = 0:
-      EXISTS {{ MATCH (p)-[:HAS_UNIT]->(u2)-[:HAS_ROOM]->(r2) WHERE r2.name IN ['Bedroom','Master Bedroom'] AND toInteger(r2.floor_level) = 0 }}
+  Floor-level / accessibility filter (for "ground floor bedroom"):
+    Room.floor_level stores the floor name as a string (e.g. "Ground", "First", "Second").
+    "ground floor bedroom" = a bedroom room at floor_level = 'Ground':
+      EXISTS {{ MATCH (p)-[:HAS_UNIT]->(u2)-[:HAS_ROOM]->(r2) WHERE r2.name IN ['Bedroom','Master Bedroom'] AND toLower(r2.floor_level) = 'ground' }}
     Combine with property_type if user specifies (e.g. "ground floor bedroom villa"):
       ANY(u IN units WHERE toLower(u.property_type) = 'villa')
       AND EXISTS {{ MATCH (p)-[:HAS_UNIT]->(u2)-[:HAS_ROOM]->(r2) WHERE r2.name IN ['Bedroom','Master Bedroom'] AND toInteger(r2.floor_level) = 0 }}

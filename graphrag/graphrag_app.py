@@ -508,20 +508,27 @@ def _render_clarification_ui(pending: dict):
         bhk_cols = st.columns(6)
         for i, b in enumerate([1, 2, 3, 4, 5]):
             with bhk_cols[i]:
-                if st.button(f"{b} BHK", key=f"gate_bhk_{b}", use_container_width=True, type="primary"):
-                    combined = _build_combined_query(pending["original_query"], None, b)
-                    st.session_state.messages.append({"role": "user", "content": combined})
-                    st.session_state["gate_resolved_query"] = combined
-                    del st.session_state["pending_clarification"]
-                    st.session_state.pop("clarification_bhk", None)
+                is_sel = selected_bhk == b
+                label = f"✓ {b} BHK" if is_sel else f"{b} BHK"
+                if st.button(label, key=f"gate_bhk_only_{b}", use_container_width=True, type="primary" if is_sel else "secondary"):
+                    st.session_state["clarification_bhk"] = None if is_sel else b
                     st.rerun()
         with bhk_cols[5]:
-            if st.button("Any", key="gate_bhk_any", use_container_width=True, type="secondary"):
-                del st.session_state["pending_clarification"]
-                st.session_state.pop("clarification_bhk", None)
-                st.session_state["gate_resolved_query"] = pending["original_query"]
+            is_sel = selected_bhk == "Any"
+            label = "✓ Any" if is_sel else "Any"
+            if st.button(label, key="gate_bhk_only_any", use_container_width=True, type="primary" if is_sel else "secondary"):
+                st.session_state["clarification_bhk"] = None if is_sel else "Any"
                 st.rerun()
 
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("Search 🔍", key="search_bhk_only", type="primary", use_container_width=True):
+            bhk_val = None if selected_bhk == "Any" else selected_bhk
+            combined = _build_combined_query(pending["original_query"], None, bhk_val)
+            st.session_state.messages.append({"role": "user", "content": combined})
+            st.session_state["gate_resolved_query"] = combined
+            del st.session_state["pending_clarification"]
+            st.session_state.pop("clarification_bhk", None)
+            st.rerun()
         return
 
     # ── City mode (city is missing — show city chips + optional BHK) ───────────
@@ -533,43 +540,54 @@ def _render_clarification_ui(pending: dict):
         unsafe_allow_html=True,
     )
 
-    # City chips (clicking = submit)
+    selected_city = st.session_state.get("clarification_city")
+
+    # City chips (toggle)
     st.markdown('<p class="gate-section-label">📍 Select your city:</p>', unsafe_allow_html=True)
     city_cols = st.columns(len(AVAILABLE_CITIES) + 1)
     for i, city in enumerate(AVAILABLE_CITIES):
         with city_cols[i]:
-            if st.button(city, key=f"gate_city_{city}", use_container_width=True, type="primary"):
-                combined = _build_combined_query(pending["original_query"], city, selected_bhk)
-                st.session_state.messages.append({"role": "user", "content": combined})
-                st.session_state["gate_resolved_query"] = combined
-                del st.session_state["pending_clarification"]
-                st.session_state.pop("clarification_bhk", None)
+            is_sel = selected_city == city
+            label = f"✓ {city}" if is_sel else city
+            if st.button(label, key=f"gate_city_{city}", use_container_width=True, type="primary" if is_sel else "secondary"):
+                st.session_state["clarification_city"] = None if is_sel else city
                 st.rerun()
     with city_cols[-1]:
-        if st.button("🌍 All Cities", key="gate_city_all", use_container_width=True):
-            combined = _build_combined_query(pending["original_query"], None, selected_bhk)
-            del st.session_state["pending_clarification"]
-            st.session_state.pop("clarification_bhk", None)
-            st.session_state["gate_resolved_query"] = combined
+        is_sel = selected_city == "All Cities"
+        label = "✓ All Cities" if is_sel else "🌍 All Cities"
+        if st.button(label, key="gate_city_all", use_container_width=True, type="primary" if is_sel else "secondary"):
+            st.session_state["clarification_city"] = None if is_sel else "All Cities"
             st.rerun()
 
-    # BHK optional chips (toggle, not submit)
-    st.markdown('<p class="gate-opt-label">🛏️ BHK type <span style="color:#718096;font-size:0.8rem;">(optional — select before choosing city)</span></p>', unsafe_allow_html=True)
+    # BHK optional chips (toggle)
+    st.markdown('<p class="gate-opt-label">🛏️ BHK type <span style="color:#718096;font-size:0.8rem;">(optional)</span></p>', unsafe_allow_html=True)
     bhk_cols = st.columns(6)
     for i, b in enumerate([1, 2, 3, 4, 5]):
         with bhk_cols[i]:
             is_sel = selected_bhk == b
             label = f"✓ {b} BHK" if is_sel else f"{b} BHK"
-            if st.button(label, key=f"gate_bhk_{b}", use_container_width=True,
-                         type="primary" if is_sel else "secondary"):
+            if st.button(label, key=f"gate_bhk_{b}", use_container_width=True, type="primary" if is_sel else "secondary"):
                 st.session_state["clarification_bhk"] = None if is_sel else b
                 st.rerun()
     with bhk_cols[5]:
-        if st.button("Any", key="gate_bhk_any_city", use_container_width=True, type="secondary"):
-            st.session_state.pop("clarification_bhk", None)
+        is_sel = selected_bhk == "Any"
+        label = "✓ Any" if is_sel else "Any"
+        if st.button(label, key="gate_bhk_any_city", use_container_width=True, type="primary" if is_sel else "secondary"):
+            st.session_state["clarification_bhk"] = None if is_sel else "Any"
             st.rerun()
 
-    # (Skip button removed to enforce compulsory city selection)
+    st.markdown("<br>", unsafe_allow_html=True)
+    if st.button("Search 🔍", key="search_city_mode", type="primary", disabled=(not selected_city), use_container_width=True):
+        city_val = None if selected_city == "All Cities" else selected_city
+        bhk_val = None if selected_bhk == "Any" else selected_bhk
+        combined = _build_combined_query(pending["original_query"], city_val, bhk_val)
+        st.session_state.messages.append({"role": "user", "content": combined})
+        st.session_state["gate_resolved_query"] = combined
+        del st.session_state["pending_clarification"]
+        st.session_state.pop("clarification_bhk", None)
+        st.session_state.pop("clarification_city", None)
+        st.rerun()
+
 
 
 # ── Session state ──────────────────────────────────────────────────────────────
@@ -705,6 +723,7 @@ user_input = st.chat_input("Describe the property you're looking for…")
 if user_input and st.session_state.get("pending_clarification"):
     del st.session_state["pending_clarification"]
     st.session_state.pop("clarification_bhk", None)
+    st.session_state.pop("clarification_city", None)
 
 # Determine active query (resolved > preset > typed; skip typed if still pending clarification)
 if resolved:
