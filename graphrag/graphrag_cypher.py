@@ -532,6 +532,35 @@ Common filters:
     (u.balcony_sqft IS NOT NULL AND toFloat(u.balcony_sqft) > 0)
     OR ANY(r IN u.rooms WHERE r.name IN ['Balcony', 'Terrace'])
 
+  Wash area check (IMPORTANT — same dual-check pattern as balcony):
+  The Unit node stores a pre-computed u.wash_sqft value, but many projects leave it null
+  and only store it as a Room node named 'Wash Area'. ALWAYS check BOTH.
+  ─ Existence only ("units with wash area", no size mentioned):
+      ANY(r IN u.rooms WHERE r.name IN ['Wash Area'])
+  ─ Size filter ("wash area > N sqft", "wash area around N sqft", "wash area at least N sqft"):
+      Check BOTH unit-level field AND room-level area_sqft:
+      (
+        (u.wash_sqft IS NOT NULL AND toFloat(u.wash_sqft) <comparison>)
+        OR ANY(r IN u.rooms WHERE r.name IN ['Wash Area']
+               AND r.area_sqft IS NOT NULL AND toFloat(r.area_sqft) <comparison>)
+      )
+  Area comparison operators (same rules as unit area):
+    "around N sqft" / "approximately N sqft"  → >= toFloat($wash_min) AND <= toFloat($wash_max)  [wash_min=N*0.85, wash_max=N*1.15]
+    "at least / minimum / >= N sqft"          → >= toFloat($min_wash_sqft)
+    "less than / under N sqft"               → <= toFloat($max_wash_sqft)
+    Plain "N sqft" (no qualifier)            → treat as "around" (±15%% window)
+  Full example — "2 BHK with wash area more than 30 sqft":
+    ANY(u IN units WHERE
+      u.bhk = 2
+      AND (
+        (u.wash_sqft IS NOT NULL AND toFloat(u.wash_sqft) > toFloat($min_wash_sqft))
+        OR ANY(r IN u.rooms WHERE r.name IN ['Wash Area']
+               AND r.area_sqft IS NOT NULL AND toFloat(r.area_sqft) > toFloat($min_wash_sqft))
+      )
+    )
+    params: {{ min_wash_sqft: 30, limit: 50 }}
+  NEVER check u.wash_sqft alone — always pair it with the room-level OR clause.
+
   CORRELATED MULTI-ROOM / ROOM+FEATURE filter (ALL conditions on the SAME unit):
   When user wants a unit with MULTIPLE features (e.g. wash area + balcony), use ONE ANY(u IN units WHERE ...) clause:
     Example — "2 BHK with wash area AND balcony":
@@ -648,7 +677,14 @@ Common filters:
   Total buildings: p.total_buildings IS NOT NULL AND toInteger(p.total_buildings) >= toInteger($min_buildings)
 
   Floor layout filters (use when user asks about lifts/elevators in building, staircase, refuge area, units per floor):
-  IMPORTANT: "lift" queries should PREFER Amenity match (already in amenity tags). Use FloorLayout ONLY when user specifically asks about the building's floor plan having lifts/no-lifts.
+  IMPORTANT — LIFT / ELEVATOR queries: ALWAYS combine BOTH the Amenity tag check AND the FloorLayout
+  boolean with OR. Some projects record lifts only as an amenity tag; others confirm it only via
+  FloorLayout.has_lifts. Using just one source will miss valid results:
+    (
+      EXISTS {{ MATCH (p)-[:HAS_AMENITY]->(am2) WHERE ANY(t IN ['Lifts'] WHERE t IN am2.canonical_tags) }}
+      OR EXISTS {{ MATCH (p)-[:HAS_FLOOR_LAYOUT]->(f:FloorLayout) WHERE f.has_lifts = 1 }}
+    )
+  DO NOT pick only one path — always write the OR-combined form for lift/elevator queries.
   Has lifts in building:     EXISTS {{ MATCH (p)-[:HAS_FLOOR_LAYOUT]->(f:FloorLayout) WHERE f.has_lifts = 1 }}
   Has staircase in building: EXISTS {{ MATCH (p)-[:HAS_FLOOR_LAYOUT]->(f:FloorLayout) WHERE f.has_staircases = 1 }}
   Has refuge area:           EXISTS {{ MATCH (p)-[:HAS_FLOOR_LAYOUT]->(f:FloorLayout) WHERE f.has_refuge_area = 1 }}
