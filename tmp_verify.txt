@@ -1,7 +1,0 @@
-literal = json.dumps(canonical_names)
-            d1_f, d2_f = float(d1), float(d2)
-
-            if dim_qualifier == "around":
-                # ▒15% on each dimension independently ù NOT area multiplication
-                d1_lo = round(d1_f * (1 - _DIM_TOLERANCE), 4)
-                d1_hi = round(

@@ -674,9 +674,12 @@ def build_unit_embedding_text(
 # ══════════════════════════════════════════════════════════════════════════════
 
 # Project + City + Neighbourhood
+# NOTE: Neighbourhood is merged on (name, city) as a composite key to prevent
+# same-name neighbourhoods in different cities from sharing a single node
+# (e.g. "Race Course" in both Rajkot and Ahmedabad must be separate nodes).
 _CYPHER_PROJECT = """
 MERGE (city:City {name: $city})
-MERGE (hood:Neighbourhood {name: $neighbourhood})
+MERGE (hood:Neighbourhood {name: $neighbourhood, city: $city})
 MERGE (hood)-[:IN_CITY]->(city)
 
 MERGE (p:Project {project_id: $project_id})

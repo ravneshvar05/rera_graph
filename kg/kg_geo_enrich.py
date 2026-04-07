@@ -73,15 +73,15 @@ CITY_ZONES: dict[str, dict[str, list[str]]] = {
             "Hanspur", "Hanspura",
             # Exact DB neighbourhood names
             "Vatva", "New Vatva",
-            "Danteshwar",
+            # NOTE: "Danteshwar" belongs to Vadodara — do NOT add here.
+            # NOTE: "Vardhman Nagar" belongs to Rajkot — do NOT add here.
             "Vishala Circle",
-            "Vardhman Nagar",
         ],
         "Central Ahmedabad": [
             "Maninagar", "Paldi", "Navrangpura", "Ellisbridge", "Ghatlodia",
             # Exact DB neighbourhood names
             "NARANPURA", "Naranpura",
-            "Race Course",
+            # NOTE: "Race Course" belongs to Rajkot — do NOT add here.
         ],
     },
     "Surat": {
@@ -149,11 +149,13 @@ NEIGHBOURHOOD_ALIASES: dict[str, str] = {
 #  CYPHER HELPERS
 # ══════════════════════════════════════════════════════════════════════════════
 
+# Use (name, city) as composite key consistent with kg_ingest.py to prevent
+# same-name neighbourhoods in different cities from sharing a single node.
 _CYPHER_ZONE_LINK = """
 MERGE (city:City {name: $city_name})
 MERGE (zone:Zone {name: $zone_name})
 MERGE (zone)-[:IN_CITY]->(city)
-MERGE (hood:Neighbourhood {name: $hood_name})
+MERGE (hood:Neighbourhood {name: $hood_name, city: $city_name})
 MERGE (hood)-[:IN_CITY]->(city)
 MERGE (hood)-[:PART_OF]->(zone)
 """

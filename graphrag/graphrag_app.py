@@ -298,6 +298,42 @@ st.markdown("""
     }
     .stat-box .stat-num { font-size: 1.7rem; font-weight: 600; color: #90cdf4; }
     .stat-box .stat-lbl { font-size: 0.8rem; color: #a0aec0; }
+
+    /* ── GATE CLARIFICATION CARD ── */
+    .gate-card {
+        background: linear-gradient(135deg, rgba(99,179,237,0.07), rgba(159,122,234,0.04));
+        border: 1px solid rgba(99, 179, 237, 0.25);
+        border-left: 4px solid #63b3ed;
+        border-radius: 14px;
+        padding: 18px 22px;
+        margin-bottom: 16px;
+    }
+    .gate-label {
+        font-size: 0.72rem;
+        color: #90cdf4;
+        text-transform: uppercase;
+        letter-spacing: 1.2px;
+        font-weight: 700;
+        margin-bottom: 8px;
+    }
+    .gate-question {
+        font-size: 1.05rem;
+        color: #e2e8f0;
+        margin: 0;
+        line-height: 1.55;
+    }
+    .gate-section-label {
+        color: #90cdf4;
+        font-weight: 600;
+        margin: 14px 0 8px 0;
+        font-size: 0.88rem;
+    }
+    .gate-opt-label {
+        color: #a0aec0;
+        font-weight: 500;
+        margin: 14px 0 8px 0;
+        font-size: 0.85rem;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -334,6 +370,207 @@ with st.sidebar:
     st.markdown("---")
     show_debug = st.toggle("Show Debug Info", value=False)
     show_context = st.toggle("Show Retrieved Context", value=False)
+    enable_gate = st.toggle("🔍 Smart Clarification", value=True,
+                            help="When ON: asks for city/BHK if your query is too broad, saving time and tokens.")
+
+# ── Gate: available cities + helpers ─────────────────────────────────────────
+AVAILABLE_CITIES = ["Ahmedabad", "Surat", "Vadodara", "Rajkot"]
+
+_GATE_SYSTEM_PROMPT = """You are a query gate for a real estate search system in Gujarat, India.
+The database has residential projects in: Ahmedabad, Surat, Vadodara, Rajkot.
+
+Decide if the user query has enough specificity/location context to search directly.
+You must return ONE of three states.
+
+── STATE 1: ready=true ──
+Return this if the query contains ANY of:
+- A city name (Ahmedabad, Surat, Vadodara, Rajkot, or any Gujarat town/village)
+- A specific locality, area, or neighbourhood (Bopal, Nikol, Satellite, Vinzol, Naroda, Sarkhej, Thaltej, Vastrapur, Chandkheda, Paldi, Gota, Naranpura, etc.)
+- A road, highway, or street name (SG Highway, Sarkhej-Gandhinagar Highway, Ring Road, SP Ring Road, 132 feet road, Sindhu Bhavan Road, Bodakdev, etc.)
+- A directional zone (west Ahmedabad, east side, south zone, north Gujarat, etc.)
+- Any landmark, institution, or place name (near airport, Karnavati Club, near school, near hospital, near mall, SGVP, IIM, GIFT City, etc.)
+- A specific project name or developer/builder name
+- At least THREE independent non-location property filters (e.g. BHK + property type + amenity)
+AND the BHK type IS mentioned explicitly in the query.
+Output: {"ready": true}
+
+── STATE 2: asked_for="bhk_optional" ──
+Return this when:
+- The query HAS location/project context (city, area, road, zone, landmark, project, etc.) OR has 3+ non-location filters
+- BUT the BHK count is NOT mentioned (no "1 BHK", "2 BHK", "3 BHK", "2bhk", "two bedroom", etc.)
+Output: {"ready": false, "asked_for": "bhk_optional", "question": "<short friendly question asking if they want to filter by BHK — mention it is optional>"}
+
+── STATE 3: asked_for="city" ──
+Return this ONLY when ALL of these are true simultaneously:
+- The query has ZERO location context of any kind (no city, area, road, zone, landmark, project, developer, no "near X", no "in X")
+- AND has fewer than 3 independent non-location property filters (e.g., just BHK and one amenity is not enough)
+If the user mentions ANYTHING that sounds like a place or area — even vaguely — do NOT return this state.
+Output: {"ready": false, "asked_for": "city", "question": "<friendly question asking which city from: Ahmedabad, Surat, Vadodara, Rajkot>"}
+
+Examples:
+- "find me 2bhk project with garden" → STATE 3 city  (zero location, only 2 filters: BHK + amenity)
+- "apartments in Ahmedabad" → STATE 2 bhk_optional  (city present, BHK missing)
+- "show all projects" → STATE 3 city  (zero location, zero filters)
+- "3 BHK in Ahmedabad" → STATE 1 ready=true  (city + BHK both present)
+- "2 BHK near SG highway" → STATE 1 ready=true  (road + BHK both present)
+- "projects near Sarkhej" → STATE 2 bhk_optional  (area present, BHK missing)
+- "near the school" → STATE 2 bhk_optional  (landmark present, BHK missing)
+- "flat near SP ring road" → STATE 2 bhk_optional  (road present, BHK missing)
+- "2 BHK penthouse with pool under 80 lakhs" → STATE 1 ready=true  (BHK + type + amenity + price = 4 non-location filters, ready without city)
+
+Output ONLY valid JSON, nothing else — one of:
+{"ready": true}
+{"ready": false, "asked_for": "bhk_optional", "question": "..."}
+{"ready": false, "asked_for": "city", "question": "..."}
+"""
+
+
+def _gate_llm_check(raw_query: str, api_keys: dict) -> dict | None:
+    """Tiny LLM gate. Returns None to pass through, or {"asked_for": ..., "question": ...} to ask."""
+    from graphrag_config import build_groq_pool, settings
+    from groq import Groq
+    import json
+
+    groq_pool = build_groq_pool(api_keys)
+    for _ in range(max(len(groq_pool), 1)):
+        key = groq_pool.next()
+        if not key:
+            break
+        try:
+            client = Groq(api_key=key)
+            resp = client.chat.completions.create(
+                model=settings.GROQ_MODEL,
+                response_format={"type": "json_object"},
+                messages=[
+                    {"role": "system", "content": _GATE_SYSTEM_PROMPT},
+                    {"role": "user", "content": raw_query},
+                ],
+                temperature=0.0,
+                max_tokens=100,
+            )
+            data = json.loads(resp.choices[0].message.content.strip())
+            if data.get("ready", True):
+                return None
+            asked_for = data.get("asked_for", "city")
+            default_q = (
+                f"I have projects across {', '.join(AVAILABLE_CITIES)}! Which city are you looking in?"
+                if asked_for == "city"
+                else "Would you like to filter by BHK type? (completely optional — you can skip this)"
+            )
+            return {
+                "asked_for": asked_for,
+                "question": data.get("question", default_q),
+            }
+        except Exception as e:
+            logger.warning(f"[Gate] LLM call failed ({e}). Passing through.")
+    return None  # safe fallback: always pass through if gate fails
+
+
+def _build_combined_query(original: str, city: str | None, bhk: int | None) -> str:
+    """Build a natural combined query from original + user clarification selections."""
+    orig = original.strip().rstrip(".")
+    orig_lower = orig.lower()
+    add_bhk = ""
+    add_city = ""
+
+    if bhk:
+        if f"{bhk} bhk" not in orig_lower and f"{bhk}bhk" not in orig_lower.replace(" ", ""):
+            add_bhk = f"{bhk} BHK"
+
+    if city and city.lower() not in orig_lower:
+        add_city = f"in {city}"
+
+    if add_bhk and add_city:
+        return f"{orig}, {add_bhk} {add_city}"
+    elif add_bhk:
+        return f"{orig}, {add_bhk}"
+    elif add_city:
+        return f"{orig} {add_city}"
+    return orig
+
+
+def _render_clarification_ui(pending: dict):
+    """Render the clarification UI. Shows city+BHK chips (city missing) or BHK-only chips (bhk optional)."""
+    question = pending.get("question", "Which city are you looking in?")
+    asked_for = pending.get("asked_for", "city")
+    selected_bhk = st.session_state.get("clarification_bhk")
+
+    # ── BHK-only mode (city is already known, BHK is optional) ────────────────
+    if asked_for == "bhk_optional":
+        st.markdown(
+            f'<div class="gate-card">'
+            f'<div class="gate-label">🛏️ Optional filter</div>'
+            f'<p class="gate-question">{question}</p>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+        st.markdown('<p class="gate-section-label">Select BHK type:</p>', unsafe_allow_html=True)
+        bhk_cols = st.columns(6)
+        for i, b in enumerate([1, 2, 3, 4, 5]):
+            with bhk_cols[i]:
+                if st.button(f"{b} BHK", key=f"gate_bhk_{b}", use_container_width=True, type="primary"):
+                    combined = _build_combined_query(pending["original_query"], None, b)
+                    st.session_state.messages.append({"role": "user", "content": combined})
+                    st.session_state["gate_resolved_query"] = combined
+                    del st.session_state["pending_clarification"]
+                    st.session_state.pop("clarification_bhk", None)
+                    st.rerun()
+        with bhk_cols[5]:
+            if st.button("Any", key="gate_bhk_any", use_container_width=True, type="secondary"):
+                del st.session_state["pending_clarification"]
+                st.session_state.pop("clarification_bhk", None)
+                st.session_state["gate_resolved_query"] = pending["original_query"]
+                st.rerun()
+
+        return
+
+    # ── City mode (city is missing — show city chips + optional BHK) ───────────
+    st.markdown(
+        f'<div class="gate-card">'
+        f'<div class="gate-label">🔍 One quick question</div>'
+        f'<p class="gate-question">{question}</p>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
+
+    # City chips (clicking = submit)
+    st.markdown('<p class="gate-section-label">📍 Select your city:</p>', unsafe_allow_html=True)
+    city_cols = st.columns(len(AVAILABLE_CITIES) + 1)
+    for i, city in enumerate(AVAILABLE_CITIES):
+        with city_cols[i]:
+            if st.button(city, key=f"gate_city_{city}", use_container_width=True, type="primary"):
+                combined = _build_combined_query(pending["original_query"], city, selected_bhk)
+                st.session_state.messages.append({"role": "user", "content": combined})
+                st.session_state["gate_resolved_query"] = combined
+                del st.session_state["pending_clarification"]
+                st.session_state.pop("clarification_bhk", None)
+                st.rerun()
+    with city_cols[-1]:
+        if st.button("🌍 All Cities", key="gate_city_all", use_container_width=True):
+            combined = _build_combined_query(pending["original_query"], None, selected_bhk)
+            del st.session_state["pending_clarification"]
+            st.session_state.pop("clarification_bhk", None)
+            st.session_state["gate_resolved_query"] = combined
+            st.rerun()
+
+    # BHK optional chips (toggle, not submit)
+    st.markdown('<p class="gate-opt-label">🛏️ BHK type <span style="color:#718096;font-size:0.8rem;">(optional — select before choosing city)</span></p>', unsafe_allow_html=True)
+    bhk_cols = st.columns(6)
+    for i, b in enumerate([1, 2, 3, 4, 5]):
+        with bhk_cols[i]:
+            is_sel = selected_bhk == b
+            label = f"✓ {b} BHK" if is_sel else f"{b} BHK"
+            if st.button(label, key=f"gate_bhk_{b}", use_container_width=True,
+                         type="primary" if is_sel else "secondary"):
+                st.session_state["clarification_bhk"] = None if is_sel else b
+                st.rerun()
+    with bhk_cols[5]:
+        if st.button("Any", key="gate_bhk_any_city", use_container_width=True, type="secondary"):
+            st.session_state.pop("clarification_bhk", None)
+            st.rerun()
+
+    # (Skip button removed to enforce compulsory city selection)
+
 
 # ── Session state ──────────────────────────────────────────────────────────────
 SETTINGS_PATH = Path("user_settings.json")
@@ -452,61 +689,82 @@ for msg in st.session_state.messages:
             with st.expander("📄 Retrieved Context"):
                 st.text(msg["context"])
 
+# ── Pending Clarification UI (rendered after chat history if gate fired) ────────
+if "pending_clarification" in st.session_state:
+    with st.chat_message("assistant"):
+        _render_clarification_ui(st.session_state["pending_clarification"])
+
 # ── Input ──────────────────────────────────────────────────────────────────────
 # Handle preset query from sidebar buttons
 preset = st.session_state.pop("preset_query", None)
+# gate_resolved_query is set when user picks city/BHK from the clarification UI
+resolved = st.session_state.pop("gate_resolved_query", None)
 user_input = st.chat_input("Describe the property you're looking for…")
-query = preset or user_input
+
+# If user types something fresh while a clarification is pending, treat it as a new query
+if user_input and st.session_state.get("pending_clarification"):
+    del st.session_state["pending_clarification"]
+    st.session_state.pop("clarification_bhk", None)
+
+# Determine active query (resolved > preset > typed; skip typed if still pending clarification)
+if resolved:
+    query = resolved
+elif preset:
+    query = preset
+elif user_input and not st.session_state.get("pending_clarification"):
+    query = user_input
+else:
+    query = None
 
 if query:
-    # Display user message
-    st.session_state.messages.append({"role": "user", "content": query})
+    # Only append to messages if this is a fresh typed/preset query (resolved was already appended
+    # inside _render_clarification_ui when the city chip was clicked)
+    if not resolved:
+        st.session_state.messages.append({"role": "user", "content": query})
     with st.chat_message("user"):
         st.markdown(query)
 
     # ── Pipeline ──────────────────────────────────────────────────────────────
     with st.chat_message("assistant"):
+
+        # ── Gate check (only for fresh typed queries; skip for preset/resolved) ──
+        if enable_gate and not resolved and not preset:
+            with st.status("🔍 Checking query…", expanded=False) as gate_status:
+                gate_result = _gate_llm_check(query, st.session_state.user_settings)
+            if gate_result:
+                # Gate fired — remove the user message we just added (will be re-added
+                # as the combined query after user picks city)
+                if st.session_state.messages and st.session_state.messages[-1]["content"] == query:
+                    st.session_state.messages.pop()
+                st.session_state["pending_clarification"] = {
+                    "original_query": query,
+                    "question": gate_result["question"],
+                    "asked_for": gate_result.get("asked_for", "city"),
+                }
+                _render_clarification_ui(st.session_state["pending_clarification"])
+                st.stop()  # don't run the main pipeline
+
         with st.status("Searching properties…", expanded=True) as status:
             # Step 1: Generate Cypher + Intent in a SINGLE LLM call
             status.write("🧠 Understanding your query & generating graph query…")
             cypher_result = generate_cypher(query, api_keys=st.session_state.user_settings)
             intent = cypher_result.intent
 
-            # ── TEMPORARILY DISABLED: City slot-filling prompt ──────────────────
-            # Uncomment the block below to re-enable asking for a city when
-            # the query has no city / neighbourhood / zone / project name.
-            #
-            # needs_city = (
-            #     not intent.city
-            #     and not intent.neighbourhood
-            #     and not intent.zone
-            #     and not intent.project_names
-            # )
-            # if needs_city:
-            #     status.update(
-            #         label="Need more information", state="complete", expanded=False
-            #     )
-            #     answer = "I have many options available! To give you the best recommendations, please mention which **city** you are looking in (e.g., Ahmedabad or Surat)."
-            #     results = []
-            #     context_text = ""
-            # else:
-            # ──────────────────────────────────────────────────────────────────
-            if True:  # placeholder for the disabled needs_city block above
-                # Step 2: Retrieve (Graph + Vector run in PARALLEL internally)
-                status.write("🔍 Searching knowledge graph and vector index…")
-                retriever: DualRetriever = st.session_state.retriever
-                context_text, results, direct_answer_text = retriever.retrieve_and_assemble(
-                    intent, query, cypher_result=cypher_result
-                )
+            # Step 2: Retrieve (Graph + Vector run in PARALLEL internally)
+            status.write("🔍 Searching knowledge graph and vector index…")
+            retriever: DualRetriever = st.session_state.retriever
+            context_text, results, direct_answer_text = retriever.retrieve_and_assemble(
+                intent, query, cypher_result=cypher_result
+            )
 
-                # Step 3: Generate answer
-                status.write("✍️ Generating recommendations…")
-                answer = generate_answer(query, context_text, results, intent, direct_answer_text, api_keys=st.session_state.user_settings)
+            # Step 3: Generate answer
+            status.write("✍️ Generating recommendations…")
+            answer = generate_answer(query, context_text, results, intent, direct_answer_text, api_keys=st.session_state.user_settings)
 
-                final_count = len(answer.get("projects", [])) if isinstance(answer, dict) else len(results)
-                status.update(
-                    label=f"✅ Found {final_count} project(s)", state="complete", expanded=False
-                )
+            final_count = len(answer.get("projects", [])) if isinstance(answer, dict) else len(results)
+            status.update(
+                label=f"✅ Found {final_count} project(s)", state="complete", expanded=False
+            )
 
         # ── Display answer ─────────────────────────────────────────────────────
         if isinstance(answer, dict):

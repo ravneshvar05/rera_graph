@@ -1,9 +1,0 @@
---- fallback extractor ---
-x = lower_query[:match.end()]
-                    _dim_qualifier = None
-                    _AROUND = ('around', 'approximately', 'roughly', 'about', 'approx', 'close to', 'near about', '~')
-                    _GTE    = ('at least', 'atleast', 'minimum', 'bigger than', 'larger than', 'more than', 'at-least')
-                    _LTE    = ('less than', 'smaller than', 'under', 'no more than')
-                    if any(w in _prefix for w in _AROUND):
-                        _dim_qualifier = 'around'
-                    elif any(w in _prefix for
