@@ -532,33 +532,11 @@ Common filters:
     (u.balcony_sqft IS NOT NULL AND toFloat(u.balcony_sqft) > 0)
     OR ANY(r IN u.rooms WHERE r.name IN ['Balcony', 'Terrace'])
 
-  Wash area check (IMPORTANT — same dual-check pattern as balcony):
-  The Unit node stores a pre-computed u.wash_sqft value, but many projects leave it null
-  and only store it as a Room node named 'Wash Area'. ALWAYS check BOTH.
-  ─ Existence only ("units with wash area", no size mentioned):
-      ANY(r IN u.rooms WHERE r.name IN ['Wash Area'])
-  ─ Size filter ("wash area > N sqft", "wash area around N sqft", "wash area at least N sqft"):
-      Check BOTH unit-level field AND room-level area_sqft:
-      (
-        (u.wash_sqft IS NOT NULL AND toFloat(u.wash_sqft) <comparison>)
-        OR ANY(r IN u.rooms WHERE r.name IN ['Wash Area']
-               AND r.area_sqft IS NOT NULL AND toFloat(r.area_sqft) <comparison>)
-      )
-  Area comparison operators (same rules as unit area):
-    "around N sqft" / "approximately N sqft"  → >= toFloat($wash_min) AND <= toFloat($wash_max)  [wash_min=N*0.85, wash_max=N*1.15]
-    "at least / minimum / >= N sqft"          → >= toFloat($min_wash_sqft)
-    "less than / under N sqft"               → <= toFloat($max_wash_sqft)
-    Plain "N sqft" (no qualifier)            → treat as "around" (±15%% window)
-  Full example — "2 BHK with wash area more than 30 sqft":
-    ANY(u IN units WHERE
-      u.bhk = 2
-      AND (
-        (u.wash_sqft IS NOT NULL AND toFloat(u.wash_sqft) > toFloat($min_wash_sqft))
-        OR ANY(r IN u.rooms WHERE r.name IN ['Wash Area']
-               AND r.area_sqft IS NOT NULL AND toFloat(r.area_sqft) > toFloat($min_wash_sqft))
-      )
-    )
-    params: {{ min_wash_sqft: 30, limit: 50 }}
+  Wash area check (CRITICAL — same dual-check as balcony):
+  Existence: ANY(r IN u.rooms WHERE r.name IN ['Wash Area'])
+  Size filter — check BOTH sources (same area comparison operators as unit area):
+    (u.wash_sqft IS NOT NULL AND toFloat(u.wash_sqft) <comparison>)
+    OR ANY(r IN u.rooms WHERE r.name IN ['Wash Area'] AND r.area_sqft IS NOT NULL AND toFloat(r.area_sqft) <comparison>)
   NEVER check u.wash_sqft alone — always pair it with the room-level OR clause.
 
   CORRELATED MULTI-ROOM / ROOM+FEATURE filter (ALL conditions on the SAME unit):
@@ -749,60 +727,27 @@ When the user gives room DIMENSIONS (not sqft area), use length_ft / width_ft fo
     No qualifier word present → dim_qualifier=null  (exact match, DEFAULT)
   Step 4 — Generate the WHERE clause based on dim_qualifier:
 
-  4a. EXACT (dim_qualifier=null, default — NO qualifier word in query):
+  DIMENSION FILTER (EXISTS subquery — all dim_qualifiers share this structure):
     WHERE EXISTS {{
       MATCH (p)-[:HAS_UNIT]->(u2:Unit)-[:HAS_ROOM]->(r2:Room)
       WHERE r2.name IN $room_names
       AND r2.length_ft IS NOT NULL AND r2.width_ft IS NOT NULL
-      AND (
-        (toFloat(r2.length_ft) = toFloat($d1) AND toFloat(r2.width_ft) = toFloat($d2))
-        OR (toFloat(r2.length_ft) = toFloat($d2) AND toFloat(r2.width_ft) = toFloat($d1))
-      )
+      AND <COMPARISON>
     }}
-    Params: {{d1, d2, room_names}}
+  Choose <COMPARISON> by dim_qualifier (always orientation-agnostic — try both d1↔d2 orderings):
+    null (exact): (toFloat(r2.length_ft)=toFloat($d1) AND toFloat(r2.width_ft)=toFloat($d2)) OR (toFloat(r2.length_ft)=toFloat($d2) AND toFloat(r2.width_ft)=toFloat($d1))
+                  Params: {{d1, d2, room_names}}
+    around (±15%% per dim independently — NEVER multiply d1*d2):
+                  Compute d1_lo=d1*0.85,d1_hi=d1*1.15,d2_lo=d2*0.85,d2_hi=d2*1.15
+                  (toFloat(r2.length_ft)>=toFloat($d1_lo) AND toFloat(r2.length_ft)<=toFloat($d1_hi) AND toFloat(r2.width_ft)>=toFloat($d2_lo) AND toFloat(r2.width_ft)<=toFloat($d2_hi))
+                  OR (toFloat(r2.length_ft)>=toFloat($d2_lo) AND toFloat(r2.length_ft)<=toFloat($d2_hi) AND toFloat(r2.width_ft)>=toFloat($d1_lo) AND toFloat(r2.width_ft)<=toFloat($d1_hi))
+                  Params: {{d1_lo,d1_hi,d2_lo,d2_hi,room_names}} — NO raw d1/d2
+    gte:          (toFloat(r2.length_ft)>=toFloat($d1) AND toFloat(r2.width_ft)>=toFloat($d2)) OR (toFloat(r2.length_ft)>=toFloat($d2) AND toFloat(r2.width_ft)>=toFloat($d1))
+                  Params: {{d1, d2, room_names}}
+    lte:          (toFloat(r2.length_ft)<=toFloat($d1) AND toFloat(r2.width_ft)<=toFloat($d2)) OR (toFloat(r2.length_ft)<=toFloat($d2) AND toFloat(r2.width_ft)<=toFloat($d1))
+                  Params: {{d1, d2, room_names}}
 
-  4b. AROUND (dim_qualifier="around" — ±15%% on each dim independently, NOT area):
-    Compute: d1_lo=d1*0.85, d1_hi=d1*1.15, d2_lo=d2*0.85, d2_hi=d2*1.15
-    WHERE EXISTS {{
-      MATCH (p)-[:HAS_UNIT]->(u2:Unit)-[:HAS_ROOM]->(r2:Room)
-      WHERE r2.name IN $room_names
-      AND r2.length_ft IS NOT NULL AND r2.width_ft IS NOT NULL
-      AND (
-        (toFloat(r2.length_ft) >= toFloat($d1_lo) AND toFloat(r2.length_ft) <= toFloat($d1_hi)
-         AND toFloat(r2.width_ft) >= toFloat($d2_lo) AND toFloat(r2.width_ft) <= toFloat($d2_hi))
-        OR
-        (toFloat(r2.length_ft) >= toFloat($d2_lo) AND toFloat(r2.length_ft) <= toFloat($d2_hi)
-         AND toFloat(r2.width_ft) >= toFloat($d1_lo) AND toFloat(r2.width_ft) <= toFloat($d1_hi))
-      )
-    }}
-    Params: {{d1_lo, d1_hi, d2_lo, d2_hi, room_names}} (NO d1/d2 raw params for around)
-    CRITICAL: ±15%% applies to each dimension INDEPENDENTLY. NEVER multiply d1*d2 to get area.
-
-  4c. GTE (dim_qualifier="gte" — both dims >= given values, orientation-agnostic):
-    WHERE EXISTS {{
-      MATCH (p)-[:HAS_UNIT]->(u2:Unit)-[:HAS_ROOM]->(r2:Room)
-      WHERE r2.name IN $room_names
-      AND r2.length_ft IS NOT NULL AND r2.width_ft IS NOT NULL
-      AND (
-        (toFloat(r2.length_ft) >= toFloat($d1) AND toFloat(r2.width_ft) >= toFloat($d2))
-        OR (toFloat(r2.length_ft) >= toFloat($d2) AND toFloat(r2.width_ft) >= toFloat($d1))
-      )
-    }}
-    Params: {{d1, d2, room_names}}
-
-  4d. LTE (dim_qualifier="lte" — both dims <= given values, orientation-agnostic):
-    WHERE EXISTS {{
-      MATCH (p)-[:HAS_UNIT]->(u2:Unit)-[:HAS_ROOM]->(r2:Room)
-      WHERE r2.name IN $room_names
-      AND r2.length_ft IS NOT NULL AND r2.width_ft IS NOT NULL
-      AND (
-        (toFloat(r2.length_ft) <= toFloat($d1) AND toFloat(r2.width_ft) <= toFloat($d2))
-        OR (toFloat(r2.length_ft) <= toFloat($d2) AND toFloat(r2.width_ft) <= toFloat($d1))
-      )
-    }}
-    Params: {{d1, d2, room_names}}
-
-  Step 5 — query_type=AGGREGATE. Include answer_data with matching_rooms.
+  query_type=AGGREGATE. Include answer_data with matching_rooms.
 
   Dimension formats to detect (all handled identically):
     "10x12", "10 x 12", "10 by 12", "10*12", "10\'x12\'", "10 ft by 12 ft"
@@ -869,62 +814,26 @@ parameters and comparison operator as in the WHERE EXISTS clause.
 CRITICAL: matching_rooms must be a FLAT list of room objects (not unit-wrapped).
 Each item must contain: unit_type, bhk, room_name, area_sqft, length, width.
 
-Use this EXACT structure for "around" (+/- 15% range) queries:
-
-MATCH (p:Project)-[:LOCATED_IN]->(n:Neighbourhood)-[:IN_CITY]->(c:City)
+Use BASE MATCH + WHERE EXISTS to filter, then include answer_data in RETURN:
 WHERE EXISTS {{
   MATCH (p)-[:HAS_UNIT]->(u2:Unit)-[:HAS_ROOM]->(r2:Room)
   WHERE r2.name = $room_name AND r2.area_sqft IS NOT NULL
-  AND toFloat(r2.area_sqft) >= toFloat($area_min) AND toFloat(r2.area_sqft) <= toFloat($area_max)
+  AND <area comparison per room comparison rules above>
 }}
-OPTIONAL MATCH (p)-[:BUILT_BY]->(dev:Developer)
-CALL {{
-  WITH p
-  OPTIONAL MATCH (p)-[:HAS_UNIT]->(u:Unit)
-  WITH u WHERE u IS NOT NULL
-  RETURN collect(u {{ .*, rooms: [(u)-[:HAS_ROOM]->(r:Room) | properties(r)] }}) AS units
-}}
-CALL {{
-  WITH p
-  OPTIONAL MATCH (p)-[:HAS_AMENITY]->(am:Amenity)
-  WITH am WHERE am IS NOT NULL
-  RETURN collect(am.name) AS amenities
-}}
-CALL {{
-  WITH p
-  OPTIONAL MATCH (p)-[:NEAR]->(lm:Landmark)
-  WITH lm WHERE lm IS NOT NULL
-  RETURN collect(lm.name) AS landmarks
-}}
-WITH p, n, c, dev, units, amenities, landmarks
-RETURN p, n.name AS neighbourhood, c.name AS city, dev.name AS developer,
-       units, amenities, landmarks,
-       {{ project_name: p.project_name, city: c.name, neighbourhood: n.name,
-          matching_rooms: [u_item IN units WHERE u_item IS NOT NULL |
-            [r_item IN u_item.rooms WHERE r_item.name = $room_name
-             AND r_item.area_sqft IS NOT NULL
-             AND toFloat(r_item.area_sqft) >= toFloat($area_min) AND toFloat(r_item.area_sqft) <= toFloat($area_max) |
-               {{ unit_type: u_item.unit_type, bhk: u_item.bhk,
-                  room_name: r_item.name, area_sqft: r_item.area_sqft,
-                  length: r_item.length, width: r_item.width }}]][0]
-       }} AS answer_data
-LIMIT $limit
+[If BHK: also add AND u2.bhk = $bhk in WHERE EXISTS]
 
-For "larger than / greater than / >=" (non-around) queries, use this RETURN comprehension:
-       {{ project_name: p.project_name, city: c.name, neighbourhood: n.name,
-          matching_rooms: [u_item IN units WHERE u_item IS NOT NULL |
-            [r_item IN u_item.rooms WHERE r_item.name = $room_name
-             AND r_item.area_sqft IS NOT NULL
-             AND toFloat(r_item.area_sqft) > toFloat($min_area) |
-               {{ unit_type: u_item.unit_type, bhk: u_item.bhk,
-                  room_name: r_item.name, area_sqft: r_item.area_sqft,
-                  length: r_item.length, width: r_item.width }}]][0]
-       }} AS answer_data
-
-If the query also specifies BHK (e.g. "2 BHK with Kitchen around 70 sqft"), add BHK filter:
-  WHERE r2.name = $room_name AND u2.bhk = $bhk AND r2.area_sqft IS NOT NULL AND ...
-  AND in the RETURN comprehension: WHERE u_item IS NOT NULL AND u_item.bhk = $bhk
-Note: [list][0] flattens nested list — if no match it returns null (safely skipped by the reader).
+RETURN answer_data structure (append after the standard RETURN columns):
+  {{ project_name: p.project_name, city: c.name, neighbourhood: n.name,
+     matching_rooms: [u_item IN units WHERE u_item IS NOT NULL |
+       [r_item IN u_item.rooms WHERE r_item.name = $room_name
+        AND r_item.area_sqft IS NOT NULL
+        AND <same comparison operator/params as WHERE EXISTS> |
+          {{ unit_type: u_item.unit_type, bhk: u_item.bhk,
+             room_name: r_item.name, area_sqft: r_item.area_sqft,
+             length: r_item.length, width: r_item.width }}]][0]
+  }} AS answer_data
+[If BHK: also add u_item.bhk = $bhk in RETURN comprehension]
+Note: [list][0] flattens nested list. ALWAYS include standard RETURN columns PLUS answer_data. LIMIT $limit.
 
 Key rules:
 - ALWAYS include RETURN p, n.name, c.name, dev.name, units, amenities, landmarks PLUS answer_data
@@ -977,82 +886,28 @@ answer_data includes list of matching room details for each unit.
     (e.g. BHK + room type + balcony), ALL conditions MUST be in ONE ANY(u IN units WHERE ...) clause.
     NEVER split into separate top-level AND clauses.
     For room checks within the same unit, use ANY(r IN u.rooms WHERE r.name IN [...]) — NOT correlated EXISTS.
-    Balcony check must be: (u.balcony_sqft IS NOT NULL AND toFloat(u.balcony_sqft) > 0) OR ANY(r IN u.rooms WHERE r.name IN ['Balcony','Terrace'])
+    Balcony check: (u.balcony_sqft IS NOT NULL AND toFloat(u.balcony_sqft) > 0) OR ANY(r IN u.rooms WHERE r.name IN ['Balcony','Terrace'])
     Wrong:  ANY(u IN units WHERE u.bhk=2) AND EXISTS{{...wash area...}} AND ANY(u IN units WHERE u.balcony_sqft>0)
     Correct: ANY(u IN units WHERE u.bhk=2 AND ANY(r IN u.rooms WHERE r.name IN ['Wash Area']) AND ((u.balcony_sqft IS NOT NULL AND toFloat(u.balcony_sqft)>0) OR ANY(r IN u.rooms WHERE r.name IN ['Balcony','Terrace'])))
- 19. GROUND FLOOR QUERIES: Phrases like "ground floor bedroom", "bedroom on ground floor".
-     Only if the user EXPLICITLY asks for a ground floor, filter for a bedroom at floor_level='ground':
-       EXISTS {{ MATCH (p)-[:HAS_UNIT]->(u2)-[:HAS_ROOM]->(r2) WHERE r2.name IN ['Bedroom','Master Bedroom'] AND toLower(r2.floor_level) = 'ground' }}
-     Combined with property_type if user specified one (villa, tenement, etc.).
-     IMPORTANT: For vague terms ("suitable for aging parents", "elderly", "senior-friendly"), DO NOT invent a floor_level check. Instead, set intent.semantic_keywords=["aging parents", "senior-friendly"] for vector fallback.
-20. ROOM DIMENSION QUERIES ("bedroom 10 x 12", "toilet 4 by 7", "kitchen 8x10", "room size 10 by 10",
-    "length 10 width 20", "10'x12' bedroom", "washroom 4 ft by 6 ft",
-    "bedroom 10x10, toilet 3x6, balcony 7x4"):
-    a) Identify the ROOM TYPE(S) from room names (use ROOM NAMES table for canonical names).
-    b) Extract the dimension numbers as d1 and d2 (in feet). DO NOT multiply. DO NOT compute area.
-    c) Use Room.length_ft and Room.width_ft with EXACT orientation-agnostic match (see DIMENSION section).
-       Single room:  params {{d1, d2, room_names}}  with EXISTS subquery on length_ft/width_ft.
-       Multi-room:   params {{d1_0, d2_0, room_names_0, d1_1, d2_1, room_names_1, ...}}
-                     with ANY(u IN units WHERE ...) embedded rooms pattern (same-unit guarantee).
-    d) NEVER use area_sqft, area_min, area_max for dimension queries.
-    e) NEVER filter r.length or r.width (raw strings, not numbers).
-    f) NEVER put dimension values into u.carpet_sqft / u.super_builtup_sqft.
-    g) Single room dimension  → query_type=AGGREGATE, answer_columns=["answer_data"].
-       Multi-room dimensions  → query_type=SPECIFIC, answer_columns=[].
-    h) *** COMBINED: unit area + room dimension (MOST COMMON REAL-WORLD CASE) ***
-       If user mentions BOTH a unit area (carpet sqft, super built-up) AND a room dimension:
-       Examples: "1372 carpet sqft with bedroom 10.6 by 12.4"
-                 "2 BHK around 900 sqft, bedroom 10x12"
-                 "flat 1200 sqft with kitchen 8 by 10 and gym"
-       MANDATORY rules:
-         i)  query_type = "SPECIFIC"  (NEVER AGGREGATE for these)
-         ii) answer_columns = []
-         iii) Use Template 2 (BASE MATCH + WHERE after WITH) with:
-              - Unit area filter using BOTH fields with OR (see rule 17 above).
-              - PLUS room dimension: AND EXISTS {{ MATCH (p)-[:HAS_UNIT]->(u2:Unit)-[:HAS_ROOM]->(r2:Room)
-                                       WHERE r2.name IN $room_names
-                                       AND r2.length_ft IS NOT NULL AND r2.width_ft IS NOT NULL
-                                       AND ((toFloat(r2.length_ft) = toFloat($d1) AND toFloat(r2.width_ft) = toFloat($d2))
-                                         OR (toFloat(r2.length_ft) = toFloat($d2) AND toFloat(r2.width_ft) = toFloat($d1))) }}
-              - Any other filters (BHK, amenity, location, landmark) are added as AND clauses too.
-         iv) DO NOT use answer_data, matching_rooms, or any AGGREGATE RETURN structure.
-         v)  The full WHERE block example:
-             WHERE ANY(u IN units WHERE
-               (u.carpet_sqft IS NOT NULL AND toFloat(u.carpet_sqft) >= toFloat($area_min) AND toFloat(u.carpet_sqft) <= toFloat($area_max))
-               OR (u.super_builtup_sqft IS NOT NULL AND toFloat(u.super_builtup_sqft) >= toFloat($area_min) AND toFloat(u.super_builtup_sqft) <= toFloat($area_max)))
-             AND EXISTS {{ MATCH (p)-[:HAS_UNIT]->(u2:Unit)-[:HAS_ROOM]->(r2:Room)
-               WHERE r2.name IN $room_names
-               AND r2.length_ft IS NOT NULL AND r2.width_ft IS NOT NULL
-               AND ((toFloat(r2.length_ft) = toFloat($d1) AND toFloat(r2.width_ft) = toFloat($d2))
-                 OR (toFloat(r2.length_ft) = toFloat($d2) AND toFloat(r2.width_ft) = toFloat($d1))) }}
-         INTENT fields for this case:
-           intent.min_sqft = <target value>  (if "around" → also set intent.around_area=true)
-           intent.area_qualifier = "carpet" | "super_builtup" | null  (display only)
-           intent.room_dimensions = [{{"room": "Bedroom", "d1": 10.6, "d2": 12.4, "dim_qualifier": null}}]
-           # "around bedroom 10 by 12": dim_qualifier="around" → ±15%% on each dim
-           # "bedroom at least 10 by 12": dim_qualifier="gte"
-           # "bedroom less than 10 by 12": dim_qualifier="lte"
+19. GROUND FLOOR QUERIES: Only if user EXPLICITLY says "ground floor", filter floor_level='ground':
+    EXISTS {{ MATCH (p)-[:HAS_UNIT]->(u2)-[:HAS_ROOM]->(r2) WHERE r2.name IN ['Bedroom','Master Bedroom'] AND toLower(r2.floor_level) = 'ground' }}
+    Combined with property_type if user specified one. For vague terms ("aging parents","senior-friendly") → semantic_keywords only.
+20. ROOM DIMENSION QUERIES ("bedroom 10x12", "toilet 4 by 7", "length 10 width 20", multi-room "bedroom 10x10, toilet 3x6"):
+    a) Canonical room type + d1,d2 in feet. DO NOT multiply. DO NOT use area_sqft.
+    b) Apply DIMENSION FILTER from Template 4a — choose <COMPARISON> by dim_qualifier.
+    c) Single room → query_type=AGGREGATE, answer_columns=["answer_data"].
+       Multi-room  → ANY(u IN units WHERE ...) embedded rooms pattern, query_type=SPECIFIC, answer_columns=[].
+    d) Combined unit area + room dimension → query_type=SPECIFIC, answer_columns=[]. Unit area: both carpet+super OR. Room dim: AND EXISTS subquery. NO answer_data.
+    e) NEVER filter r.length or r.width (raw strings). NEVER put dim values into u.carpet_sqft/u.super_builtup_sqft.
 
 === INTENT EXTRACTION ===
 - "all projects"/"show all" → query_type="GLOBAL". Filtered → "SPECIFIC".
 - "2 bedroom"/"2BHK" → bhk=2. "west Ahmedabad" → zone="West Ahmedabad". "Bopal" → neighbourhood="Bopal".
 - "school nearby" → landmark_types=["EDUCATION"]. "near hospital" → ["HEALTHCARE"].
 - Fuzzy words → semantic_keywords: "spacious", "luxury", "affordable", "family-friendly".
-- PROPERTY TYPE (hard structural filter, NEVER put in semantic_keywords):
-    "apartment" / "flat" / "flats" → property_type="APARTMENT"  (single string)
-    "villa" / "villas" → property_type="VILLA"  (single string)
-    "penthouse" / "pent house" / "sky villa" → property_type="PENTHOUSE"  (single string)
-    "tenement" → property_type="TENEMENT"  (single string)
-    "bungalow" / "bungalows" / "banglow" → property_type=["VILLA","BUNGALOW","ROW_HOUSE"]  (LIST — DB may store as any of these)
-    "row house" / "rowhouse" / "row-house" → property_type=["VILLA","BUNGALOW","ROW_HOUSE"]  (LIST)
-    "house" / "houses" / "homes" / "home" / "property" / "properties" / "residence" / "unit" → GENERIC — set property_type=null. These are informal synonyms for ANY residential property. Do NOT map to VILLA or any other type.
-  When property_type is a single string:
-    ANY(u IN units WHERE toLower(u.property_type) = toLower($property_type))
-  When property_type is a list (bungalow, row house):
-    ANY(u IN units WHERE toLower(u.property_type) IN [x IN $property_types | toLower(x)])
-    params: property_types = ["VILLA", "BUNGALOW", "ROW_HOUSE"]
+- Property type: use PROPERTY TYPE SYNONYM MAP from Template 2. NEVER put property type in semantic_keywords.
 - If a field is not mentioned, use null or empty list.
-- Gujarat localities: Vinzol, Bopal, Nikol, Naroda, Vatva, Gamdi, Gamdi Gaam, Satellite, Chandkheda, Thaltej, Vastrapur, Hanspura, Paldi, Sarkhej, Isanpur, Ghodasar, Kotarpur, Chiloda.
+- Gujarat localities (examples): Bopal, Nikol, Naroda, Satellite, Chandkheda, Thaltej, Sarkhej, Vastrapur.
 - Sub-locality/road names → neighbourhood. System searches both n.name and p.address.
 """
 

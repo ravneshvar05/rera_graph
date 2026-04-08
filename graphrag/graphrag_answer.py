@@ -52,6 +52,9 @@ Relevance rules:
 - When uncertain on a GENERAL query, prefer relevant=true.
 - When uncertain on a SPECIFIC query, prefer relevant=false.
 - Never drop a project solely on subjective/lifestyle mismatches (e.g. "luxury feel").
+- HARD FILTER — developer/builder name: if the user query specifically names a developer or
+  builder (e.g. "projects by X", "built by X", "X developer"), mark relevant=false for any
+  project whose developer field does NOT contain that name, regardless of other matches.
 - Return ONLY raw JSON, no markdown, no explanation.
 
 Output format (strict):
@@ -112,6 +115,7 @@ def _build_judge_summary(p: ProjectResult) -> dict:
 
     return {
         "project_name": p.project_name,
+        "developer": p.developer or None,          # for developer-name hard filter
         "location": f"{p.neighbourhood}, {p.city}",
         "bhk": bhk_set,
         "unit_types": unit_types,
