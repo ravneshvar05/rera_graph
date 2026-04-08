@@ -370,7 +370,7 @@ with st.sidebar:
     st.markdown("---")
     show_debug = st.toggle("Show Debug Info", value=False)
     show_context = st.toggle("Show Retrieved Context", value=False)
-    enable_gate = st.toggle("🔍 Smart Clarification", value=True,
+    enable_gate = st.toggle("🔍 Smart Clarification", value=False,
                             help="When ON: asks for city/BHK if your query is too broad, saving time and tokens.")
 
 # ── Gate: available cities + helpers ─────────────────────────────────────────
